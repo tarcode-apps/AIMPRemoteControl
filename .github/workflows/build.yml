@@ -14,7 +14,7 @@ jobs:
       matrix:
         arch: [x64, x86]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -22,7 +22,7 @@ jobs:
         shell: pwsh
         run: .\build-windows.ps1 -Arch ${{ matrix.arch }} -Config Release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: AIMPRemoteControlPlugin-windows-${{ matrix.arch }}
           path: dist/windows-${{ matrix.arch }}/
@@ -32,7 +32,7 @@ jobs:
     name: linux-x64
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -45,7 +45,7 @@ jobs:
       - name: Build
         run: bash build-linux.sh --release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: AIMPRemoteControlPlugin-linux-x64
           path: dist/linux-x64/
@@ -64,7 +64,7 @@ jobs:
     needs: [windows, linux]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # for LICENSE.txt and docs/catalog/
+      - uses: actions/checkout@v6 # for LICENSE.txt and docs/catalog/
 
       - name: Read the plugin version
         run: |
@@ -73,7 +73,7 @@ jobs:
           echo "PLUGIN_VERSION=$version" >> "$GITHUB_ENV"
           echo "plugin version: $version"
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           path: artifacts
 
@@ -94,7 +94,7 @@ jobs:
           find pack -type f | sort
           (cd pack && zip -r ../aimp_remote_control.aimppack aimp_remote_control)
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: aimp_remote_control.aimppack
           path: aimp_remote_control.aimppack
@@ -109,8 +109,10 @@ jobs:
           mkdir catalog
           cp aimp_remote_control.aimppack catalog/aimp_remote_control.zip
           sed "s/{VERSION}/$PLUGIN_VERSION/" docs/catalog/aimp_remote_control.txt > catalog/aimp_remote_control.txt
-          shopt -s nullglob
-          shots=(docs/catalog/aimp_remote_control_*.{png,jpg})
+          shots=()
+          for f in docs/catalog/aimp_remote_control_{sm,full}.{png,jpg}; do
+            if [ -f "$f" ]; then shots+=("$f"); fi
+          done
           if [ ${#shots[@]} -gt 0 ]; then
             cp "${shots[@]}" catalog/
           else
@@ -121,7 +123,7 @@ jobs:
           fi
           cat catalog/aimp_remote_control.txt
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: aimp_remote_control-catalog
           path: catalog/
@@ -134,11 +136,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: aimp_remote_control.aimppack
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: aimp_remote_control.aimppack
           generate_release_notes: true

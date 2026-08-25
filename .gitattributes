@@ -63,3 +63,7 @@
 #*.RTF   diff=astextplain
 
 *.sh text eol=lf
+
+# The catalog files ship to Windows users and to the catalog moderators; CI
+# packages them on Linux, so pin CRLF whatever the checkout platform.
+docs/catalog/*.txt text eol=crlf

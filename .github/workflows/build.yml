@@ -58,13 +58,20 @@ jobs:
   #   aimp_remote_control/aimp_remote_control.dll      Windows x86
   #   aimp_remote_control/x64/aimp_remote_control.dll  Windows x64
   #   aimp_remote_control/x64/aimp_remote_control.so   Linux x64
-  #   aimp_remote_control/README.md, LICENSE.txt, THIRD-PARTY-NOTICES.txt
+  #   aimp_remote_control/readme.txt, LICENSE.txt, THIRD-PARTY-NOTICES.txt
   package:
     name: aimppack
     needs: [windows, linux]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # for README.md and LICENSE.txt
+      - uses: actions/checkout@v4 # for LICENSE.txt and docs/catalog/
+
+      - name: Read the plugin version
+        run: |
+          set -eu
+          version=$(sed -n "s/^#define PLUGIN_VERSION_\(MAJOR\|MINOR\|PATCH\)[[:space:]]\+//p" src/pluginInfo.h | paste -sd.)
+          echo "PLUGIN_VERSION=$version" >> "$GITHUB_ENV"
+          echo "plugin version: $version"
 
       - uses: actions/download-artifact@v4
         with:
@@ -80,7 +87,9 @@ jobs:
           cp artifacts/AIMPRemoteControlPlugin-windows-x86/aimp_remote_control.dll "$pkg/"
           cp artifacts/AIMPRemoteControlPlugin-windows-x64/aimp_remote_control.dll "$pkg/x64/"
           cp artifacts/AIMPRemoteControlPlugin-linux-x64/aimp_remote_control.so "$pkg/x64/"
-          cp README.md LICENSE.txt "$pkg/"
+          cp LICENSE.txt "$pkg/"
+          # readme.txt is also the txt the catalog rules want inside the folder.
+          sed "s/{VERSION}/$PLUGIN_VERSION/" docs/catalog/readme.txt > "$pkg/readme.txt"
           cp artifacts/AIMPRemoteControlPlugin-windows-x86/THIRD-PARTY-NOTICES.txt "$pkg/"
           find pack -type f | sort
           (cd pack && zip -r ../aimp_remote_control.aimppack aimp_remote_control)
@@ -89,6 +98,33 @@ jobs:
         with:
           name: aimp_remote_control.aimppack
           path: aimp_remote_control.aimppack
+          if-no-files-found: error
+
+      # What the AIMP addons catalog asks for, see docs/catalog/README.md:
+      # the same folder under the name the rules want, the description file with
+      # the version filled in, and the screenshot when the repo carries one.
+      - name: Build the catalog bundle
+        run: |
+          set -eu
+          mkdir catalog
+          cp aimp_remote_control.aimppack catalog/aimp_remote_control.zip
+          sed "s/{VERSION}/$PLUGIN_VERSION/" docs/catalog/aimp_remote_control.txt > catalog/aimp_remote_control.txt
+          shopt -s nullglob
+          shots=(docs/catalog/aimp_remote_control_*.{png,jpg})
+          if [ ${#shots[@]} -gt 0 ]; then
+            cp "${shots[@]}" catalog/
+          else
+            echo "::warning::no docs/catalog/aimp_remote_control_sm.png - the bundle ships without screenshots"
+          fi
+          if ! grep -q "^Topic: http" catalog/aimp_remote_control.txt; then
+            echo "::warning::Topic: has no forum link - fill it in before sending the bundle to the catalog"
+          fi
+          cat catalog/aimp_remote_control.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aimp_remote_control-catalog
+          path: catalog/
           if-no-files-found: error
 
   release:

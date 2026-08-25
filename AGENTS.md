@@ -55,6 +55,11 @@ Notes:
   copying; on Windows the profile `%APPDATA%\AIMP\Plugins` works too) and
   enable the plugin in AIMP options. Debug configs for VS Code (`.vscode/`)
   and Visual Studio (`launch.vs.json`) exist for both Windows and WSL.
+- `docs/catalog/` holds the files the AIMP addons catalog wants; the `package`
+  job builds them into the `aimp_remote_control-catalog` artifact and fills in
+  `{VERSION}` from `src/pluginInfo.h`. They are CRLF on purpose
+  (`.gitattributes`) and `readme.txt` carries a UTF-8 BOM — it is read in
+  Windows text editors. See `docs/catalog/README.md`.
 
 ## Verifying changes
 

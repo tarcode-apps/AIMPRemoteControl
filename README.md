@@ -39,14 +39,13 @@ targets the app's last released version (2.0.31).
    installation. The package contains the builds for all platforms; AIMP picks
    the right one.
 
-   Manual alternative: the `.aimppack` is a plain zip — unpack the
-   `aimp_remote_control` folder into `Plugins` of either the AIMP installation
-   folder (`C:\Program Files\AIMP\Plugins`) or the profile
-   (`%APPDATA%\AIMP\Plugins`).
-3. Restart AIMP and enable the plugin in *Options → Plugins*.
+   Manual alternative: the `.aimppack` is a plain zip — close the player,
+   unpack the `aimp_remote_control` folder into `Plugins` of either the AIMP
+   installation folder (`C:\Program Files\AIMP\Plugins`) or the profile
+   (`%APPDATA%\AIMP\Plugins`), and start the player again.
+3. Enable the plugin in *Options → Plugins*.
 
-Tested with AIMP 6.0 on Windows and Linux; AIMP 5.x should work but has not
-been verified.
+Tested with AIMP 5 and AIMP 6.0 on Windows and Linux.
 
 ## Setup
 
@@ -96,6 +95,7 @@ before rebuilding. The same scripts run in
 | `src/optionsFrame.*`, `Langs/` | options page and its localization |
 | `src/sleepTimer.*` | timer behind the `Scheduler` command |
 | `docs/remote-control-protocol.md` | protocol reference |
+| `docs/catalog/` | files for the entry in the AIMP addons catalog |
 
 ## License
 

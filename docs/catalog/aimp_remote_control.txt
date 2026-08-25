@@ -1,0 +1,25 @@
+Назначение: Удаленное управление
+Версия: AIMP5, AIMP6
+Name: AIMP Remote Control
+Version: {VERSION}
+Author: Artem Tarasov
+AuthorContact: artem@tarasovlabs.com
+Topic: https://aimp.ru/forum/index.php?topic=78138.0
+
+Description:
+Альтернативный сервер удалённого управления AIMP по локальной сети — для приложения «AIMP Remote Control» под Android. Windows и Linux.
+- Плейлисты и очередь воспроизведения, управление воспроизведением, 18-полосный эквалайзер.
+- Обложки, тексты песен, рейтинги, поиск.
+- Обзор файлов на компьютере, добавление файлов и потоков, загрузка и скачивание треков, таймер сна.
+- Авторизация, права клиента и список сетевых интерфейсов настраиваются в плеере.
+Приложение: https://aimpremote.blogspot.com — APK в теме на 4PDA: https://4pda.to/forum/index.php?showtopic=499539
+Исходный код на GitHub: https://github.com/tarcode-apps/AIMPRemoteControl
+
+Description (English):
+An alternative remote control server for AIMP over the local network — for the "AIMP Remote Control" Android app. Windows and Linux.
+- Playlists and playback queue, playback control, 18-band equalizer.
+- Covers, lyrics, ratings, search.
+- Browsing the computer's files, adding files and streams, uploading and downloading tracks, sleep timer.
+- Authentication, client permissions and the list of network interfaces are configured in the player.
+The app: https://aimpremote.blogspot.com — the APK is in the 4PDA thread: https://4pda.to/forum/index.php?showtopic=499539
+Source code on GitHub: https://github.com/tarcode-apps/AIMPRemoteControl

@@ -1,15 +1,6 @@
 Текст для темы на форуме AIMP (раздел Addons -> Plugins), BBCode.
 Оформлен по шаблону из правил раздела: https://www.aimp.ru/forum/index.php?topic=32363.0
 
-Перед публикацией заменить:
-  {VERSION}    - версию плагина (см. src/pluginInfo.h)
-  {SCREENSHOT} - прямую ссылку на скриншот (imgbb / hostingkartinok / imgur)
-  {RELEASE}    - ссылку на релиз на GitHub
-
-Тег в названии: [AIMP5] - он определён в правилах и покрывает большинство
-пользователей (текущий релиз для ПК - 5.40). Если к моменту публикации AIMP 6
-уже вышел, уместнее [AIMP6].
-
 --- НАЗВАНИЕ ТЕМЫ ------------------------------------------------------------
 
 AIMP Remote Control - удалённое управление плеером по сети [AIMP5]
@@ -77,4 +68,4 @@ AIMP Remote Control - удалённое управление плеером п�
 
 [b]Скачать[/b]
 
-Во вложении, а также в [url={RELEASE}]релизах на GitHub[/url].
+Во вложении, а также в [url=https://github.com/tarcode-apps/AIMPRemoteControl/releases/tag/v1.3.0]релизах на GitHub[/url].

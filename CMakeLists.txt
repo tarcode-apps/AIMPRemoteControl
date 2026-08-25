@@ -157,12 +157,10 @@ if (WIN32)
   target_compile_definitions(AIMPRemoteControlPlugin PRIVATE UNICODE _UNICODE NOMINMAX)
 endif()
 
-# AIMP SDK assigns string literals to non-const PChar (wchar_t*).
-# Relax strict string checking so the SDK headers compile under C++20.
 # /EHsc is explicit: CMake 4.x no longer adds it to the MSVC defaults, and
 # httplib/json-rpc-cxx/nlohmann all need working stack unwinding.
 if (MSVC)
-  target_compile_options(AIMPRemoteControlPlugin PRIVATE /Zc:strictStrings- /EHsc)
+  target_compile_options(AIMPRemoteControlPlugin PRIVATE /EHsc)
 endif()
 
 set_property(TARGET AIMPRemoteControlPlugin PROPERTY CXX_STANDARD 20)

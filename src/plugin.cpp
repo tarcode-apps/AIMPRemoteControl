@@ -45,11 +45,11 @@ PChar WINAPI AIMPPlugin::InfoGet(INT32 Index)
 	switch (Index)
 	{
 	case AIMP_PLUGIN_INFO_NAME:
-		return TEXT(PLUGIN_NAME);
+		return const_cast<PChar>(TEXT(PLUGIN_NAME));
 	case AIMP_PLUGIN_INFO_AUTHOR:
-		return TEXT(PLUGIN_AUTHOR);
+		return const_cast<PChar>(TEXT(PLUGIN_AUTHOR));
 	case AIMP_PLUGIN_INFO_SHORT_DESCRIPTION:
-		return TEXT(PLUGIN_DESCRIPTION);
+		return const_cast<PChar>(TEXT(PLUGIN_DESCRIPTION));
 	default:
 		return nullptr;
 	}

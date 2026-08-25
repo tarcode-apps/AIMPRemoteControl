@@ -1,0 +1,108 @@
+name: build
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  windows:
+    name: windows-${{ matrix.arch }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, x86]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build
+        shell: pwsh
+        run: .\build-windows.ps1 -Arch ${{ matrix.arch }} -Config Release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AIMPRemoteControlPlugin-windows-${{ matrix.arch }}
+          path: dist/windows-${{ matrix.arch }}/
+          if-no-files-found: error
+
+  linux:
+    name: linux-x64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # cmake and g++ come with the runner image; ninja does not.
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build
+
+      - name: Build
+        run: bash build-linux.sh --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AIMPRemoteControlPlugin-linux-x64
+          path: dist/linux-x64/
+          if-no-files-found: error
+
+  # .aimppack = zip with the plugin folder laid out as AIMP expects
+  # (SDK: "Plugin folder structure"):
+  #   aimp_remote_control/Langs/*.lng
+  #   aimp_remote_control/wwwroot/**                   static site for browsers
+  #   aimp_remote_control/aimp_remote_control.dll      Windows x86
+  #   aimp_remote_control/x64/aimp_remote_control.dll  Windows x64
+  #   aimp_remote_control/x64/aimp_remote_control.so   Linux x64
+  #   aimp_remote_control/README.md, LICENSE.txt, THIRD-PARTY-NOTICES.txt
+  package:
+    name: aimppack
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4 # for README.md and LICENSE.txt
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Lay out the plugin folder
+        run: |
+          set -eu
+          pkg=pack/aimp_remote_control
+          mkdir -p "$pkg/x64"
+          cp -r artifacts/AIMPRemoteControlPlugin-windows-x86/Langs "$pkg/Langs"
+          cp -r artifacts/AIMPRemoteControlPlugin-windows-x86/wwwroot "$pkg/wwwroot"
+          cp artifacts/AIMPRemoteControlPlugin-windows-x86/aimp_remote_control.dll "$pkg/"
+          cp artifacts/AIMPRemoteControlPlugin-windows-x64/aimp_remote_control.dll "$pkg/x64/"
+          cp artifacts/AIMPRemoteControlPlugin-linux-x64/aimp_remote_control.so "$pkg/x64/"
+          cp README.md LICENSE.txt "$pkg/"
+          cp artifacts/AIMPRemoteControlPlugin-windows-x86/THIRD-PARTY-NOTICES.txt "$pkg/"
+          find pack -type f | sort
+          (cd pack && zip -r ../aimp_remote_control.aimppack aimp_remote_control)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aimp_remote_control.aimppack
+          path: aimp_remote_control.aimppack
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: aimp_remote_control.aimppack
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: aimp_remote_control.aimppack
+          generate_release_notes: true

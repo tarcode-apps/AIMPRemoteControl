@@ -1,0 +1,9 @@
+; The one symbol AIMP looks up in the plugin DLL.
+;
+; Listing it here rather than marking it __declspec(dllexport) keeps the export
+; table down to this single entry and, on x86, exports it undecorated: the
+; linker matches this plain name against the __stdcall symbol
+; _AIMPPluginGetHeader@4, while dllexport would have published the decorated
+; name that AIMP cannot resolve.
+EXPORTS
+    AIMPPluginGetHeader

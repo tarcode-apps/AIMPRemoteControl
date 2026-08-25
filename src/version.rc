@@ -1,0 +1,36 @@
+#include <winres.h>
+#include "pluginInfo.h"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION    PLUGIN_VERSION_MAJOR, PLUGIN_VERSION_MINOR, PLUGIN_VERSION_PATCH, PLUGIN_VERSION_BUILD
+ PRODUCTVERSION PLUGIN_VERSION_MAJOR, PLUGIN_VERSION_MINOR, PLUGIN_VERSION_PATCH, PLUGIN_VERSION_BUILD
+ FILEFLAGSMASK  VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+ FILEFLAGS      VS_FF_DEBUG
+#else
+ FILEFLAGS      0x0L
+#endif
+ FILEOS         VOS_NT_WINDOWS32
+ FILETYPE       VFT_DLL
+ FILESUBTYPE    VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0" // English (US), Unicode
+        BEGIN
+            VALUE "CompanyName",      PLUGIN_AUTHOR
+            VALUE "FileDescription",  PLUGIN_NAME " plugin"
+            VALUE "FileVersion",      PLUGIN_VERSION_STRING
+            VALUE "InternalName",     PLUGIN_INTERNAL_NAME
+            VALUE "LegalCopyright",   PLUGIN_COPYRIGHT
+            VALUE "OriginalFilename", PLUGIN_FILE_NAME
+            VALUE "ProductName",      PLUGIN_NAME
+            VALUE "ProductVersion",   PLUGIN_VERSION_STRING
+            VALUE "Comments",         PLUGIN_DESCRIPTION
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

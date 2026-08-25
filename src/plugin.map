@@ -1,0 +1,13 @@
+/* Linker version script: the ELF counterpart of plugin.def.
+ *
+ * -fvisibility=hidden alone is not enough. Guard variables and static locals
+ * inside asio's inline functions get STB_GNU_UNIQUE binding and stay in .dynsym
+ * regardless, which left ~300 symbols exposed to the host process. Localising
+ * everything but the entry point here is a link-time decision that no header
+ * attribute can override. */
+{
+  global:
+    AIMPPluginGetHeader;
+  local:
+    *;
+};

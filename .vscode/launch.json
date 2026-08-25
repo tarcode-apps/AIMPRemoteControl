@@ -1,0 +1,42 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            // The plugin DLL cannot run on its own: start AIMP and debug the
+            // plugin inside it. Expects the plugin to be installed in AIMP's
+            // Plugins folder (e.g. a junction from %APPDATA%\AIMP\Plugins\
+            // aimp_remote_control to dist\windows-x64); the .pdb next to the
+            // DLL makes breakpoints bind.
+            "name": "AIMP (Windows)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "C:\\Program Files\\AIMP\\AIMP.exe",
+            "cwd": "C:\\Program Files\\AIMP",
+            "preLaunchTask": "Build Windows x64 (Debug)"
+        },
+        {
+            // Debugs the Linux AIMP under gdb inside WSL (needs gdb installed
+            // there: sudo apt-get install -y gdb). The preLaunchTask builds
+            // the .so and installs it into /opt/aimp/Plugins.
+            "name": "AIMP (WSL)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/usr/bin/aimp",
+            "cwd": "/opt/aimp",
+            "MIMode": "gdb",
+            "pipeTransport": {
+                "pipeProgram": "wsl.exe",
+                "pipeArgs": ["-e"],
+                "debuggerPath": "/usr/bin/gdb",
+                "pipeCwd": ""
+            },
+            // gdb reports sources as /mnt/<drive>/... — map them back to the
+            // Windows checkout so breakpoints bind wherever the repo lives.
+            "sourceFileMap": {
+                "/mnt/c": "c:\\",
+                "/mnt/d": "d:\\"
+            },
+            "preLaunchTask": "Install into WSL AIMP"
+        }
+    ]
+}

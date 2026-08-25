@@ -1,0 +1,21 @@
+{
+  "version": "0.2.1",
+  "defaults": {},
+  "configurations": [
+    {
+      "type": "dll",
+      "exe": "c:\\Program Files\\AIMP\\AIMP.exe",
+      "project": "CMakeLists.txt",
+      "projectTarget": "aimp_remote_control.dll",
+      "name": "AIMP (Windows)"
+    },
+    {
+      "type": "cppgdb",
+      "name": "AIMP (WSL)",
+      "project": "CMakeLists.txt",
+      "projectTarget": "aimp_remote_control.so",
+      "program": "/usr/bin/aimp",
+      "cwd": "/opt/aimp"
+    }
+  ]
+}

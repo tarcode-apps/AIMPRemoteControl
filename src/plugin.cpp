@@ -5,6 +5,7 @@
 
 #include "aimpHelper.h"
 #include "apiMessages.h"
+#include "apiPlayer.h"
 #include "mainThreadRunner.h"
 
 #include "remoteControlCommands/addFilesCommand.h"
@@ -40,6 +41,18 @@
 #include "remoteControlCommands/uploadTrackCommand.h"
 #include "remoteControlCommands/versionCommand.h"
 
+namespace
+{
+	bool HasService(IAIMPCore *core, REFIID iid)
+	{
+		IUnknown *service = nullptr;
+		if (Failed(core->QueryInterface(iid, reinterpret_cast<void **>(&service))) || !service)
+			return false;
+		service->Release();
+		return true;
+	}
+}
+
 PChar WINAPI AIMPPlugin::InfoGet(INT32 Index)
 {
 	switch (Index)
@@ -62,6 +75,11 @@ DWORD WINAPI AIMPPlugin::InfoGetCategories()
 
 HRESULT WINAPI AIMPPlugin::Initialize(IAIMPCore *Core)
 {
+	if (!HasService(Core, IID_IAIMPServicePlayer) ||
+		!HasService(Core, IID_IAIMPServicePlaylistManager) ||
+		!HasService(Core, IID_IAIMPServiceMessageDispatcher))
+		return E_FAIL;
+
 	FCore = Core;
 	FSettings.Set(Settings::Load(Core));
 	FNetworkWatcher.SetExcludedInterfaces(FSettings.Get().Network.ExcludedInterfaces);

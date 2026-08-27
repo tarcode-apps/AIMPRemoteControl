@@ -35,14 +35,9 @@ targets the app's last released version (2.0.31).
 
 1. Download `aimp_remote_control.aimppack` from [Releases](../../releases) (or
    the artifact of a build in [Actions](../../actions)).
-2. Open it with AIMP (double-click or drop it onto the player) and confirm the
-   installation. The package contains the builds for all platforms; AIMP picks
-   the right one.
-
-   Manual alternative: the `.aimppack` is a plain zip — close the player,
-   unpack the `aimp_remote_control` folder into `Plugins` of either the AIMP
-   installation folder (`C:\Program Files\AIMP\Plugins`) or the profile
-   (`%APPDATA%\AIMP\Plugins`), and start the player again.
+2. Open it with AIMP: double-click it or drop it onto the player. If
+   double-clicking does nothing, open *Options → Plugins* and click *install*.
+   The package contains the builds for all platforms; AIMP picks the right one.
 3. Enable the plugin in *Options → Plugins*.
 
 Tested with AIMP 5 and AIMP 6.0 on Windows and Linux.
@@ -82,6 +77,29 @@ Artifacts land in `dist/<platform>/` together with `Langs`, `wwwroot` and
 `THIRD-PARTY-NOTICES.txt`. AIMP keeps the DLL loaded, so close the player
 before rebuilding. The same scripts run in
 [GitHub Actions](.github/workflows/build.yml).
+
+## Debugging
+
+The binary cannot run on its own: you debug it inside AIMP. Point the player's
+`Plugins` folder at the build output once, and every rebuild is picked up
+without copying anything:
+
+```powershell
+New-Item -ItemType Junction -Path "$env:APPDATA\AIMP\Plugins\aimp_remote_control" -Target "$PWD\dist\windows-x64"
+```
+
+Then start AIMP under the debugger. Both IDEs carry the same two
+configurations, *AIMP (Windows)* and *AIMP (WSL)* — VS Code in
+[.vscode/launch.json](.vscode/launch.json), Visual Studio in
+[launch.vs.json](launch.vs.json). The VS Code ones build Debug first; the WSL
+one also stops a running player and copies the `.so` into `/opt/aimp/Plugins`,
+since a loaded `.so` cannot be replaced. Debugging in WSL needs `gdb` in the
+distro (`sudo apt-get install -y gdb`).
+
+Breakpoints bind only against the symbols of the binary AIMP actually loaded:
+on Windows the `.pdb` has to sit next to the DLL — the build script copies it
+into `dist/` whenever it exists — and on Linux `strip` runs for Release only,
+so build with `--debug`.
 
 ## Project layout
 

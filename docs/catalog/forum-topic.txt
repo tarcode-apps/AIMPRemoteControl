@@ -58,9 +58,9 @@ AIMP Remote Control - удалённое управление плеером п�
 
 [b]Установка[/b]
 
-Откройте [b]aimp_remote_control.aimppack[/b] плеером (двойной клик или перетащите на окно AIMP) и подтвердите установку. Затем включите плагин в Настройки -> Плагины.
+Откройте [b]aimp_remote_control.aimppack[/b] плеером: двойной клик или перетащите файл на окно AIMP. Если по двойному клику файл не открывается, откройте [i]Настройки -> Плагины[/i] и нажмите [i]установить[/i].
 
-Вручную: [b].aimppack[/b] - это обычный zip: закройте плеер, распакуйте папку [i]aimp_remote_control[/i] в папку [i]Plugins[/i] плеера ([i]C:\Program Files\AIMP\Plugins[/i] или [i]%APPDATA%\AIMP\Plugins[/i], на Linux [i]/opt/aimp/Plugins[/i]) и запустите его снова.
+После установки включите плагин там же, в [i]Настройки -> Плагины[/i].
 
 [b]Изменения[/b]
 
@@ -68,4 +68,4 @@ AIMP Remote Control - удалённое управление плеером п�
 
 [b]Скачать[/b]
 
-Во вложении, а также в [url=https://github.com/tarcode-apps/AIMPRemoteControl/releases/tag/v1.3.0]релизах на GitHub[/url].
+Во вложении, а также в [url=https://github.com/tarcode-apps/AIMPRemoteControl/releases/latest]релизах на GitHub[/url].

@@ -35,16 +35,11 @@ Not affiliated with the AIMP or the app authors.
 
 УСТАНОВКА
 
-  Откройте aimp_remote_control.aimppack плеером (двойной клик или
-  перетащите файл на окно AIMP) и подтвердите установку.
+  Откройте aimp_remote_control.aimppack плеером: двойной клик или
+  перетащите файл на окно AIMP. Если по двойному клику файл не
+  открывается, откройте Настройки -> Плагины и нажмите "установить".
 
-  Вручную: .aimppack - это обычный zip. Закройте AIMP, распакуйте папку
-  aimp_remote_control в папку Plugins плеера и запустите его снова:
-       Windows: C:\Program Files\AIMP\Plugins
-                или %APPDATA%\AIMP\Plugins (профиль пользователя)
-       Linux:   /opt/aimp/Plugins
-
-  После установки включите плагин в Настройки -> Плагины.
+  После установки включите плагин там же, в Настройки -> Плагины.
 
 НАСТРОЙКА
 
@@ -94,17 +89,11 @@ DESCRIPTION
 
 INSTALLATION
 
-  Open aimp_remote_control.aimppack with AIMP (double-click it or drop it
-  onto the player window) and confirm the installation.
+  Open aimp_remote_control.aimppack with AIMP: double-click it or drop it
+  onto the player window. If double-clicking does nothing, open
+  Options -> Plugins and click "install".
 
-  Manually: the .aimppack is a plain zip. Close AIMP, unpack the
-  aimp_remote_control folder into the player's Plugins folder and start it
-  again:
-       Windows: C:\Program Files\AIMP\Plugins
-                or %APPDATA%\AIMP\Plugins (user profile)
-       Linux:   /opt/aimp/Plugins
-
-  Then enable the plugin in Options -> Plugins.
+  Then enable the plugin there, in Options -> Plugins.
 
 SETUP
 

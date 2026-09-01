@@ -385,6 +385,13 @@ present). Error `21` for an unknown track.
 Toggles: playing → paused, paused → playing, stopped → starts the focused
 track. Returns the state **before** the toggle.
 
+#### `Stop`
+
+`{} → {"playback_state": string}`
+
+Stops playback (the app sends it on a long press of play/pause). Returns the
+state **before** the stop.
+
 #### `PlayNext`, `PlayPrevious`
 
 `{} → {"playlist_id": int, "track_id": int}`

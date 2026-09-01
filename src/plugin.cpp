@@ -37,6 +37,7 @@
 #include "remoteControlCommands/setTrackRatingCommand.h"
 #include "remoteControlCommands/showMessageCommand.h"
 #include "remoteControlCommands/statusCommand.h"
+#include "remoteControlCommands/stopCommand.h"
 #include "remoteControlCommands/subscribeOnAIMPStateUpdateEventCommand.h"
 #include "remoteControlCommands/uploadTrackCommand.h"
 #include "remoteControlCommands/versionCommand.h"
@@ -111,6 +112,7 @@ HRESULT WINAPI AIMPPlugin::Initialize(IAIMPCore *Core)
 	commands.push_back(std::make_unique<GetCoverCommand>(Core, FIdManager));
 	commands.push_back(std::make_unique<GetPlayerControlPanelStateCommand>(Core, FIdManager));
 	commands.push_back(std::make_unique<PauseCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<StopCommand>(Core, FIdManager));
 	commands.push_back(std::make_unique<PlayCommand>(Core, FIdManager));
 	commands.push_back(std::make_unique<PlayNextCommand>(Core, FIdManager, FStateEvents));
 	commands.push_back(std::make_unique<PlayPreviousCommand>(Core, FIdManager, FStateEvents));

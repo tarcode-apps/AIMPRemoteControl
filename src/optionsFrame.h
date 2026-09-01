@@ -64,9 +64,9 @@ private:
 	IAIMPUICheckBox *FPhysicalDeletionCheck = nullptr;
 	IAIMPUICheckBox *FUploadTracksCheck = nullptr;
 	IAIMPUIEdit *FUploadFolderEdit = nullptr;
-	std::vector<IAIMPUIControl *> FUploadFolderChildren;
-	IAIMPUICheckBox *FSchedulerCheck = nullptr;
 	IAIMPUICheckBox *FBrowseFilesCheck = nullptr;
+	std::vector<IAIMPUIControl *> FUploadChildren;
+	IAIMPUICheckBox *FSchedulerCheck = nullptr;
 
 	Settings FSettings;
 	bool FLoading = false;

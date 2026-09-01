@@ -30,7 +30,7 @@ namespace
 	constexpr int LinkGap = 12;		  // horizontal space between the links in the about row
 	constexpr int AddressGap = 6;	  // horizontal space between an interface checkbox and its address link
 	constexpr int CheckRowHeight = 17;  // natural height of an autosized checkbox row
-	constexpr int GroupBottomPad = 6; // space under the last row of the connection group
+	constexpr int GroupBottomPad = 6; // space under the last row of a group
 
 	constexpr const char *FormName = "AIMPRemoteControlOptionsForm";
 
@@ -348,15 +348,22 @@ void OptionsFrame::BuildFeaturesGroup(IAIMPServiceUI *svc)
 
 	FSchedulerCheck = CreateCheckBox(FCore, svc, FForm, group, FEvents, "cbScheduler");
 	FPhysicalDeletionCheck = CreateCheckBox(FCore, svc, FForm, group, FEvents, "cbPhysicalDeletion");
-	FBrowseFilesCheck = CreateCheckBox(FCore, svc, FForm, group, FEvents, "cbBrowseFiles");
 	FUploadTracksCheck = CreateCheckBox(FCore, svc, FForm, group, FEvents, "cbUploadTracks");
 
-	FUploadFolderEdit = CreateLabeledEdit(FCore, svc, FForm, group, FEvents, "UploadFolder", FUploadFolderChildren);
+	FUploadFolderEdit = CreateLabeledEdit(FCore, svc, FForm, group, FEvents, "UploadFolder", FUploadChildren);
 	if (FUploadFolderEdit)
 	{
 		IAIMPUIEditButton *button = nullptr;
 		if (Succeeded(FUploadFolderEdit->AddButton(FBrowseEvents, &button)) && button)
 			button->Release();
+	}
+
+	FBrowseFilesCheck = CreateCheckBox(FCore, svc, FForm, group, FEvents, "cbBrowseFiles");
+	if (FBrowseFilesCheck)
+	{
+		Align(FBrowseFilesCheck, ualTop, RowHeight, {RowIndent + LabelWidth + LabelGap, RowGap, 0, GroupBottomPad}); // left edge of the upload folder edit
+		FBrowseFilesCheck->AddRef();
+		FUploadChildren.push_back(FBrowseFilesCheck);
 	}
 
 	group->Release();
@@ -365,7 +372,7 @@ void OptionsFrame::BuildFeaturesGroup(IAIMPServiceUI *svc)
 void OptionsFrame::UpdateEnabledStates()
 {
 	SetEnabled(FAuthChildren, IsChecked(FAuthGroup, AIMPUI_GROUPBOX_PROPID_CHECKED));
-	SetEnabled(FUploadFolderChildren, IsChecked(FUploadTracksCheck, AIMPUI_CHECKBOX_PROPID_STATE));
+	SetEnabled(FUploadChildren, IsChecked(FUploadTracksCheck, AIMPUI_CHECKBOX_PROPID_STATE));
 }
 
 void OptionsFrame::LoadFromSettings()
@@ -494,7 +501,7 @@ void OptionsFrame::OnBrowseUploadFolder()
 void WINAPI OptionsFrame::DestroyFrame()
 {
 	ReleaseAll(FAuthChildren);
-	ReleaseAll(FUploadFolderChildren);
+	ReleaseAll(FUploadChildren);
 	for (InterfaceCheck &c : FInterfaceChecks)
 		c.Check->Release();
 	FInterfaceChecks.clear();

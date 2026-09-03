@@ -54,6 +54,29 @@ jobs:
           path: dist/linux-x64/
           if-no-files-found: error
 
+  web-client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: web-client/package-lock.json
+
+      - name: Build
+        working-directory: web-client
+        run: |
+          npm ci
+          npm run build
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: AIMPRemoteControlPlugin-web-client
+          path: web-client/out/
+          if-no-files-found: error
+
   # .aimppack = zip with the plugin folder laid out as AIMP expects
   # (SDK: "Plugin folder structure"):
   #   aimp_remote_control/Langs/*.lng
@@ -64,7 +87,7 @@ jobs:
   #   aimp_remote_control/readme.txt, LICENSE.txt, THIRD-PARTY-NOTICES.txt
   package:
     name: aimppack
-    needs: [windows, linux]
+    needs: [windows, linux, web-client]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6 # for LICENSE.txt and docs/catalog/
@@ -86,7 +109,7 @@ jobs:
           pkg=pack/aimp_remote_control
           mkdir -p "$pkg/x64"
           cp -r artifacts/AIMPRemoteControlPlugin-windows-x86/Langs "$pkg/Langs"
-          cp -r artifacts/AIMPRemoteControlPlugin-windows-x86/wwwroot "$pkg/wwwroot"
+          cp -r artifacts/AIMPRemoteControlPlugin-web-client "$pkg/wwwroot"
           cp artifacts/AIMPRemoteControlPlugin-windows-x86/aimp_remote_control.dll "$pkg/"
           cp artifacts/AIMPRemoteControlPlugin-windows-x64/aimp_remote_control.dll "$pkg/x64/"
           cp artifacts/AIMPRemoteControlPlugin-linux-x64/aimp_remote_control.so "$pkg/x64/"
@@ -94,6 +117,21 @@ jobs:
           # readme.txt is also the txt the catalog rules want inside the folder.
           sed "s/{VERSION}/$PLUGIN_VERSION/" docs/catalog/readme.txt > "$pkg/readme.txt"
           cp artifacts/AIMPRemoteControlPlugin-windows-x86/THIRD-PARTY-NOTICES.txt "$pkg/"
+          # The plugin's notices cover third_party/ only; the web client bundles
+          # npm packages of its own, whose licenses the build emits into the export.
+          web_notices="$pkg/wwwroot/_next/static/third-party-licenses.txt"
+          if [ ! -f "$web_notices" ]; then
+            echo "::error::web client licenses are missing from the artifact" >&2
+            exit 1
+          fi
+          {
+            echo
+            echo "--------------------------------------------------------------------------"
+            echo "web client (npm)"
+            echo "--------------------------------------------------------------------------"
+            echo
+            cat "$web_notices"
+          } >> "$pkg/THIRD-PARTY-NOTICES.txt"
           find pack -type f | sort
           (cd pack && zip -r ../aimp_remote_control.aimppack aimp_remote_control)
 

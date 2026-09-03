@@ -229,13 +229,16 @@ foreach ($architecture in $Arch)
     }
     Assert-EntryPointExported -Dll $dll
 
-    if (Test-Path $distDir) { Remove-Item -Recurse -Force $distDir }
+    # Clear what a previous build left, but step over junctions and symlinks: a
+    # developer's wwwroot link into web-client/out lives here and has to survive.
     New-Item -ItemType Directory -Force -Path $distDir | Out-Null
+    Get-ChildItem $distDir -Force |
+        Where-Object { -not $_.Attributes.HasFlag([IO.FileAttributes]::ReparsePoint) } |
+        Remove-Item -Recurse -Force
     Copy-Item $dll $distDir
     $pdb = Join-Path $buildDir 'aimp_remote_control.pdb'
     if (Test-Path $pdb) { Copy-Item $pdb $distDir }
     Copy-Item (Join-Path $RepoRoot 'Langs') (Join-Path $distDir 'Langs') -Recurse
-    Copy-Item (Join-Path $RepoRoot 'wwwroot') (Join-Path $distDir 'wwwroot') -Recurse
     Copy-Item (Join-Path $buildDir 'THIRD-PARTY-NOTICES.txt') $distDir
 
     $built += (Join-Path $distDir 'aimp_remote_control.dll')

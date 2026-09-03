@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <map>
 #include <mutex>
 #include <string>
 
@@ -22,6 +23,8 @@ public:
 
 private:
 	static constexpr std::chrono::minutes NonceLifetime{15};
+	static constexpr std::chrono::seconds FailedAttemptInterval{1};
+	static constexpr std::chrono::minutes FailedAttemptRetention{5};
 
 	std::string NonceSecret() const;
 	std::string MakeNonce() const;
@@ -29,6 +32,12 @@ private:
 	int CheckNonce(const std::string &nonce) const;
 	void Challenge(httplib::Response &res, bool stale) const;
 
+	bool IsRateLimited(const std::string &address) const;
+	void RecordFailure(const std::string &address) const;
+
 	mutable std::mutex FMutex;
 	Settings::AuthSettings FSettings;
+
+	mutable std::mutex FAttemptsMutex;
+	mutable std::map<std::string, std::chrono::steady_clock::time_point> FLastFailure;
 };

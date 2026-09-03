@@ -82,11 +82,12 @@ cmake --build --preset "$PRESET"
 [ -f "$BUILD_DIR/$ARTIFACT" ] || { echo "error: build finished but $BUILD_DIR/$ARTIFACT is missing" >&2; exit 1; }
 
 step "Packaging"
-rm -rf "$DIST_DIR"
+# Clear what a previous build left, but step over symlinks: a developer's
+# wwwroot link into web-client/out lives here and has to survive.
 mkdir -p "$DIST_DIR"
+find "$DIST_DIR" -mindepth 1 -maxdepth 1 ! -type l -exec rm -rf {} +
 cp "$BUILD_DIR/$ARTIFACT" "$DIST_DIR/"
 cp -r "$REPO_ROOT/Langs" "$DIST_DIR/Langs"
-cp -r "$REPO_ROOT/wwwroot" "$DIST_DIR/wwwroot"
 cp "$BUILD_DIR/THIRD-PARTY-NOTICES.txt" "$DIST_DIR/"
 
 if [ "$CONFIG" = Release ] && command -v strip >/dev/null 2>&1; then

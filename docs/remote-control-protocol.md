@@ -95,8 +95,10 @@ are protected by the same Digest authentication. They are listed in
 ## 3. Authentication
 
 Authentication is optional and enabled in the plugin settings. When enabled,
-every request (RPC, GET and POST alike) must carry HTTP Digest credentials
-([RFC 7616](https://www.rfc-editor.org/rfc/rfc7616)):
+every request of this protocol (RPC, GET and POST alike) must carry HTTP Digest
+credentials ([RFC 7616](https://www.rfc-editor.org/rfc/rfc7616)). Static files
+under `wwwroot/` are outside the protocol and are served without credentials;
+the app never requests them.
 
 | Parameter | Value |
 |---|---|
@@ -117,6 +119,13 @@ Implementation notes that matter for compatibility:
   stays valid across player restarts. The app caches the nonce for days and
   does **not** retry every request after a `401`; a nonce that changed on
   restart would break it.
+- Failed credentials are rate-limited to **one verification per second per
+  client address**. A credential-bearing request that arrives inside that window
+  gets the ordinary `401` challenge without being checked, so it is
+  indistinguishable from a wrong password. Correct credentials are never
+  throttled and a request without an `Authorization` header is not an attempt,
+  so a well-behaved client never notices. This is an addition to the original
+  plugin, which had no limit.
 - The `uri` in the `Authorization` header may be an absolute URL
   (`http://host:3333/downloadTrack/…`) — Android's DownloadManager signs it that
   way. The server compares only the path part.

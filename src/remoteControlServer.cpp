@@ -4,9 +4,11 @@
 #include <cstdlib>
 #include <filesystem>
 #include <mutex>
+#include <optional>
 #include <regex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <thread>
 
 #include <httplib.h>
@@ -33,6 +35,7 @@ struct AIMPRemoteControlServer::Impl : IRpcRegistrar
 	std::vector<std::unique_ptr<IRemoteControlCommand>> Commands;
 	std::vector<std::function<void(httplib::Server &)>> Routes;
 	std::vector<std::regex> UploadPaths;
+	std::vector<std::regex> AuthenticatedPaths;
 	jsonrpc::JsonRpcServer Rpc;
 	DigestAuthenticator Auth;
 	NetworkWatcher &Network;
@@ -51,26 +54,18 @@ struct AIMPRemoteControlServer::Impl : IRpcRegistrar
 	{
 		Routes.push_back([this](httplib::Server &http)
 						 {
-			http.new_task_queue = []
-			{ return new httplib::ThreadPool(32); };
 			http.set_payload_max_length(static_cast<std::size_t>(2) * 1024 * 1024 * 1024);
-
-			std::error_code ec;
-			if (std::filesystem::is_directory(WwwRoot, ec))
-				http.set_mount_point("/", WwwRoot.string(), {{"Cache-Control", "no-cache"}});
 
 			http.set_pre_routing_handler([this](const httplib::Request &req, httplib::Response &res)
 										 {
-											 if (IsStaticFileRequest(req))
-												 return httplib::Server::HandlerResponse::Unhandled;
+											 if (RequiresAuthentication(req) && !Auth.Authorize(req, res))
+												 return httplib::Server::HandlerResponse::Handled;
 											 if (!IsUploadRequest(req) && PayloadTooLarge(req))
 											 {
 												 res.status = 413;
 												 return httplib::Server::HandlerResponse::Handled;
 											 }
-											 return Auth.Authorize(req, res)
-														? httplib::Server::HandlerResponse::Unhandled
-														: httplib::Server::HandlerResponse::Handled; });
+											 return httplib::Server::HandlerResponse::Unhandled; });
 
 			http.Post("/RPC_JSON", [this](const httplib::Request &req, httplib::Response &res)
 					  {
@@ -82,6 +77,8 @@ struct AIMPRemoteControlServer::Impl : IRpcRegistrar
 
 		for (auto &cmd : Commands)
 			cmd->Register(*this);
+
+		AddStaticFileFallback();
 
 		Network.Subscribe([this](const std::vector<NetworkAddress> &allowed)
 						  { return Reconcile(allowed); });
@@ -106,6 +103,7 @@ struct AIMPRemoteControlServer::Impl : IRpcRegistrar
 
 	void AddGet(const std::string &pathPattern, HttpGetHandler handler) override
 	{
+		AuthenticatedPaths.emplace_back(pathPattern);
 		Routes.push_back([pathPattern, handler = std::move(handler)](httplib::Server &http)
 						 { http.Get(pathPattern, [handler](const httplib::Request &req, httplib::Response &res)
 									{
@@ -157,23 +155,67 @@ struct AIMPRemoteControlServer::Impl : IRpcRegistrar
 		return false;
 	}
 
-	bool IsStaticFileRequest(const httplib::Request &req) const
+	void AddStaticFileFallback()
+	{
+		Routes.push_back([this](httplib::Server &http)
+						 { http.Get(".*", [this](const httplib::Request &req, httplib::Response &res)
+									{ ServeStaticFile(req, res); }); });
+	}
+
+	bool RequiresAuthentication(const httplib::Request &req) const
 	{
 		if (req.method != "GET" && req.method != "HEAD")
-			return false;
-		std::string relative = req.path == "/" ? "/index.html" : req.path;
-		relative.erase(0, 1);
+			return true;
+		return std::any_of(AuthenticatedPaths.begin(), AuthenticatedPaths.end(), [&](const std::regex &pattern)
+						   { return std::regex_match(req.path, pattern); });
+	}
+
+	static bool IsInside(const std::filesystem::path &root, const std::filesystem::path &path)
+	{
+		return std::mismatch(root.begin(), root.end(), path.begin(), path.end()).first == root.end();
+	}
+
+	std::optional<std::filesystem::path> ResolveStaticFile(const std::string &path) const
+	{
+		if (path.empty() || path.front() != '/')
+			return std::nullopt;
 
 		std::error_code ec;
 		const std::filesystem::path root = std::filesystem::weakly_canonical(WwwRoot, ec);
 		if (ec || root.empty())
-			return false;
+			return std::nullopt;
+
+		const std::u8string relative(path.begin() + 1, path.end());
 		const std::filesystem::path target =
-			std::filesystem::weakly_canonical(root / std::filesystem::path(std::u8string(relative.begin(), relative.end())), ec);
-		if (ec || !std::filesystem::is_regular_file(target, ec))
-			return false;
-		const std::wstring rootStr = (root / L"").wstring();
-		return target.wstring().compare(0, rootStr.size(), rootStr) == 0;
+			std::filesystem::weakly_canonical(root / std::filesystem::path(relative), ec);
+		if (ec || !IsInside(root, target))
+			return std::nullopt;
+
+		if (std::filesystem::is_regular_file(target, ec))
+			return target;
+
+		const std::filesystem::path directoryIndex = target / "index.html";
+		if (std::filesystem::is_regular_file(directoryIndex, ec))
+			return directoryIndex;
+
+		return std::nullopt;
+	}
+
+	void ServeStaticFile(const httplib::Request &req, httplib::Response &res) const
+	{
+		res.set_header("Cache-Control", "no-cache");
+
+		if (const auto file = ResolveStaticFile(req.path))
+		{
+			res.set_file_content(file->string());
+			return;
+		}
+
+		res.status = 404;
+		const std::filesystem::path notFound = WwwRoot / "404.html";
+		std::error_code ec;
+		if (std::filesystem::is_regular_file(notFound, ec))
+			res.set_file_content(notFound.string());
 	}
 
 	static void NormalizeParams(nlohmann::json &request)

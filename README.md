@@ -52,9 +52,11 @@ Open *Options → Plugins → Remote Control*:
 - **Client permissions** — what the app is allowed to do beyond playback.
   Everything here is off by default, including browsing the computer's files
   from the app.
-- **Require authentication** — username and password the app must use.
-  Recommended on any network you do not fully trust: without it, anyone on
-  the network can control the player.
+- **Require authentication** — username and password the app must use. It
+  guards the API, not the pages: `wwwroot/` is served to anyone, while every
+  command, cover and track transfer needs the credentials. Recommended on any
+  network you do not fully trust: without it, anyone on the network can control
+  the player.
 
 Ports: TCP `3333` (JSON‑RPC over HTTP), UDP `3332` (discovery). Make sure the
 firewall lets AIMP accept connections on them.
@@ -73,10 +75,38 @@ CMake ≥ 3.28 and Ninja.
 ./build-linux.sh                   # Release
 ```
 
-Artifacts land in `dist/<platform>/` together with `Langs`, `wwwroot` and
+Artifacts land in `dist/<platform>/` together with `Langs` and
 `THIRD-PARTY-NOTICES.txt`. AIMP keeps the DLL loaded, so close the player
 before rebuilding. The same scripts run in
 [GitHub Actions](.github/workflows/build.yml).
+
+### The web client
+
+The client in [web-client/](web-client/) is a Next.js app (App Router, static
+export) built separately from the plugin;
+[GitHub Actions](.github/workflows/build.yml) ships `web-client/out/` as the
+plugin's `wwwroot/`.
+
+```bash
+cd web-client
+npm install
+npm run build     # web-client/out/
+npm run dev       # localhost:3334, with /api rewritten to the player on 3333
+```
+
+The plugin looks for `wwwroot/` next to its binary, so link one at
+`web-client/out` instead of copying after every client build:
+
+```powershell
+New-Item -ItemType Junction -Path "$env:APPDATA\AIMP\Plugins\aimp_remote_control\wwwroot" -Target "$PWD\web-client\out"
+```
+
+```bash
+ln -s "$PWD/web-client/out" /opt/aimp/Plugins/aimp_remote_control/wwwroot
+```
+
+The link survives plugin rebuilds: the build scripts clear `dist/<platform>/`
+without touching junctions and symlinks.
 
 ## Debugging
 
@@ -112,6 +142,7 @@ so build with `--debug`.
 | `src/helpers/` | AIMP SDK helpers, network interface enumeration and watcher, JSON helpers |
 | `src/optionsFrame.*`, `Langs/` | options page and its localization |
 | `src/sleepTimer.*` | timer behind the `Scheduler` command |
+| `web-client/` | the web client (Next.js, static export); builds into `web-client/out/` |
 | `docs/remote-control-protocol.md` | protocol reference |
 | `docs/catalog/` | files for the entry in the AIMP addons catalog |
 

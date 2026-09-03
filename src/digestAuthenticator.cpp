@@ -84,6 +84,23 @@ int DigestAuthenticator::CheckNonce(const std::string &nonce) const
 	return (NowSeconds() - issued) <= std::chrono::duration_cast<std::chrono::seconds>(NonceLifetime).count() ? 1 : 2;
 }
 
+bool DigestAuthenticator::IsRateLimited(const std::string &address) const
+{
+	std::lock_guard lock(FAttemptsMutex);
+	const auto it = FLastFailure.find(address);
+	return it != FLastFailure.end() &&
+		   std::chrono::steady_clock::now() - it->second < FailedAttemptInterval;
+}
+
+void DigestAuthenticator::RecordFailure(const std::string &address) const
+{
+	const auto now = std::chrono::steady_clock::now();
+	std::lock_guard lock(FAttemptsMutex);
+	std::erase_if(FLastFailure, [&](const auto &entry)
+				  { return now - entry.second > FailedAttemptRetention; });
+	FLastFailure[address] = now;
+}
+
 void DigestAuthenticator::Challenge(httplib::Response &res, bool stale) const
 {
 	std::string header = std::string("Digest realm=\"") + Settings::AuthSettings::Realm +
@@ -111,6 +128,19 @@ bool DigestAuthenticator::Authorize(const httplib::Request &req, httplib::Respon
 		return false;
 	}
 
+	if (IsRateLimited(req.remote_addr))
+	{
+		Challenge(res, false);
+		return false;
+	}
+
+	auto reject = [&]
+	{
+		RecordFailure(req.remote_addr);
+		Challenge(res, false);
+		return false;
+	};
+
 	const auto p = ParseDigestHeader(req.get_header_value("Authorization"));
 	auto field = [&](const char *k) -> std::string
 	{
@@ -119,26 +149,17 @@ bool DigestAuthenticator::Authorize(const httplib::Request &req, httplib::Respon
 	};
 
 	if (field("username") != settings.Username || field("realm") != Settings::AuthSettings::Realm)
-	{
-		Challenge(res, false);
-		return false;
-	}
+		return reject();
 
 	// Android's DownloadManager signs the absolute URL ("http://host:port/path")
 	const std::string signedUri = RequestPathOf(field("uri"));
 	if (signedUri != req.path && signedUri != req.target)
-	{
-		Challenge(res, false);
-		return false;
-	}
+		return reject();
 
 	const std::string nonce = field("nonce");
 	const int nonceState = CheckNonce(nonce);
 	if (nonceState == 0)
-	{
-		Challenge(res, false);
-		return false;
-	}
+		return reject();
 
 	// RFC 7616 §3.4.1 with qop=auth:
 	//   response = MD5( HA1 : nonce : nc : cnonce : qop : HA2 ),  HA2 = MD5(method:uri)
@@ -151,16 +172,10 @@ bool DigestAuthenticator::Authorize(const httplib::Request &req, httplib::Respon
 	else if (qop == "auth")
 		expected = Md5Hex(settings.Ha1 + ":" + nonce + ":" + field("nc") + ":" + field("cnonce") + ":auth:" + ha2);
 	else
-	{
-		Challenge(res, false);
-		return false;
-	}
+		return reject();
 
 	if (!EqualConstantTime(expected, field("response")))
-	{
-		Challenge(res, false);
-		return false;
-	}
+		return reject();
 
 	if (nonceState == 2)
 	{

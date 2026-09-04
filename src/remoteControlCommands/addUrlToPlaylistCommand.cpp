@@ -29,8 +29,8 @@ void AddUrlToPlaylistCommand::Register(IRpcRegistrar &rpc)
 
 		const HRESULT result = RunOnMainThread(core, [&] { return AddFilesToPlaylist(core, idManager, playlistId, {url}); });
 		if (result == E_INVALIDARG)
-			throw RpcError(ErrorPlaylistNotFound, "Adding URL failed. Reason: playlist not found.");
+			throw LocalizedRpcError(ErrorPlaylistNotFound, "addUrlPlaylistNotFound");
 		if (Failed(result))
-			throw RpcError(ErrorAddFailed, "Adding URL failed.");
+			throw LocalizedRpcError(ErrorAddFailed, "addUrlFailed");
 		return nullptr; });
 }

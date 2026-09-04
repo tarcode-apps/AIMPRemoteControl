@@ -40,8 +40,8 @@ void RemoveTrackFromPlayQueueCommand::Register(IRpcRegistrar &rpc)
 			return hr;
 		});
 		if (result == E_INVALIDARG)
-			throw RpcError(ErrorTrackNotFound, "Removing track from queue failed. Reason: track not found.");
+			throw LocalizedRpcError(ErrorTrackNotFound, "dequeueTrackNotFound");
 		if (Failed(result))
-			throw RpcError(ErrorDequeueFailed, "Removing track from queue failed.");
+			throw LocalizedRpcError(ErrorDequeueFailed, "dequeueFailed");
 		return nullptr; });
 }

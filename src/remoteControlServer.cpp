@@ -7,6 +7,7 @@
 #include <optional>
 #include <regex>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -39,6 +40,7 @@ struct AIMPRemoteControlServer::Impl : IRpcRegistrar
 	jsonrpc::JsonRpcServer Rpc;
 	DigestAuthenticator Auth;
 	NetworkWatcher &Network;
+	MessageLocalizer LocalizeMessage;
 
 	std::mutex ListenersMutex;
 	std::vector<Listener> Listeners;
@@ -49,8 +51,8 @@ struct AIMPRemoteControlServer::Impl : IRpcRegistrar
 
 	const std::filesystem::path WwwRoot = ModuleDirectory() / "wwwroot";
 
-	Impl(std::vector<std::unique_ptr<IRemoteControlCommand>> commands, NetworkWatcher &network)
-		: Commands(std::move(commands)), Network(network)
+	Impl(std::vector<std::unique_ptr<IRemoteControlCommand>> commands, NetworkWatcher &network, MessageLocalizer localize)
+		: Commands(std::move(commands)), Network(network), LocalizeMessage(std::move(localize))
 	{
 		Routes.push_back([this](httplib::Server &http)
 						 {
@@ -87,11 +89,15 @@ struct AIMPRemoteControlServer::Impl : IRpcRegistrar
 	void Add(const std::string &name, RpcMethod method) override
 	{
 		std::function<nlohmann::json(nlohmann::json)> handler =
-			[method = std::move(method)](nlohmann::json params)
+			[this, method = std::move(method)](nlohmann::json params)
 		{
 			try
 			{
 				return method(params);
+			}
+			catch (const LocalizedRpcError &e)
+			{
+				throw jsonrpc::exception(e.Code(), LocalizeMessage(std::string("AIMPRemoteControlErrors\\") + e.Key()));
 			}
 			catch (const RpcError &e)
 			{
@@ -137,6 +143,104 @@ struct AIMPRemoteControlServer::Impl : IRpcRegistrar
 				for (const auto &[name, part] : req.form.files)
 					files.push_back({name, part.filename, part.content_type, part.content});
 				res.status = handler(matches, files); }); });
+	}
+
+	using HttpRoute = httplib::Server &(httplib::Server::*)(const std::string &, httplib::Server::Handler);
+
+	static HttpRoute RouteFor(HttpMethod method)
+	{
+		switch (method)
+		{
+		case HttpMethod::Get:
+			return &httplib::Server::Get;
+		case HttpMethod::Post:
+			return static_cast<HttpRoute>(&httplib::Server::Post);
+		case HttpMethod::Put:
+			return static_cast<HttpRoute>(&httplib::Server::Put);
+		case HttpMethod::Patch:
+			return static_cast<HttpRoute>(&httplib::Server::Patch);
+		case HttpMethod::Delete:
+			return static_cast<HttpRoute>(&httplib::Server::Delete);
+		}
+		throw std::invalid_argument("unsupported API method");
+	}
+
+	void AddApi(HttpMethod method, const std::string &pathPattern, ApiHandler handler) override
+	{
+		const HttpRoute route = RouteFor(method);
+		AuthenticatedPaths.emplace_back(pathPattern);
+		Routes.push_back([this, route, pathPattern, handler = std::move(handler)](httplib::Server &http)
+						 { (http.*route)(pathPattern, [this, handler](const httplib::Request &req, httplib::Response &res)
+										   {
+				ApiRequest request;
+				for (std::size_t i = 1; i < req.matches.size(); ++i)
+					request.PathMatches.push_back(req.matches[i].str());
+				request.Query.insert(req.params.begin(), req.params.end());
+				try
+				{
+					if (!req.body.empty())
+					{
+						request.Body = nlohmann::json::parse(req.body, nullptr, false);
+						if (request.Body.is_discarded())
+							throw ApiError(400, "invalidJson");
+					}
+					res.set_content(handler(request).dump(), "application/json");
+				}
+				catch (const ApiError &e)
+				{
+					res.status = e.Status();
+					res.set_content(nlohmann::json{{"error", {{"code", e.Code()}, {"message", LocalizeMessage(std::string("AIMPRemoteControlErrors\\") + e.Code())}}}}.dump(), "application/json");
+				} }); });
+	}
+
+	class EventStream : public IEventStream
+	{
+	public:
+		explicit EventStream(httplib::DataSink &sink) : FSink(sink) {}
+
+		bool Send(const std::string &event, const std::string &data) override
+		{
+			std::string message = "event: " + event + "\n";
+			std::size_t start = 0;
+			while (true)
+			{
+				const std::size_t end = data.find('\n', start);
+				message += "data: " + data.substr(start, end == std::string::npos ? std::string::npos : end - start) + "\n";
+				if (end == std::string::npos)
+					break;
+				start = end + 1;
+			}
+			return Write(message + "\n");
+		}
+
+		bool Ping() override { return Write(": ping\n\n"); }
+
+		bool Write(const std::string &text)
+		{
+			return FSink.is_writable() && FSink.write(text.data(), text.size());
+		}
+
+	private:
+		httplib::DataSink &FSink;
+	};
+
+	void AddEventStream(const std::string &pathPattern, EventStreamHandler handler) override
+	{
+		AuthenticatedPaths.emplace_back(pathPattern);
+		Routes.push_back([pathPattern, handler = std::move(handler)](httplib::Server &http)
+						 { http.Get(pathPattern, [handler](const httplib::Request &, httplib::Response &res)
+									{
+				// no-transform keeps compressing proxies from buffering the stream; the Next dev
+				// server gzips proxied responses and would hold events back until its buffer fills.
+				res.set_header("Cache-Control", "no-cache, no-transform");
+				res.set_header("X-Accel-Buffering", "no");
+				res.set_chunked_content_provider("text/event-stream", [handler](std::size_t, httplib::DataSink &sink)
+												 {
+					EventStream stream(sink);
+					if (stream.Write("retry: 3000\n\n"))
+						handler(stream);
+					sink.done();
+					return true; }); }); });
 	}
 
 	bool IsUploadRequest(const httplib::Request &req) const
@@ -302,8 +406,8 @@ struct AIMPRemoteControlServer::Impl : IRpcRegistrar
 	}
 };
 
-AIMPRemoteControlServer::AIMPRemoteControlServer(std::vector<std::unique_ptr<IRemoteControlCommand>> commands, NetworkWatcher &network)
-	: FImpl(std::make_unique<Impl>(std::move(commands), network)) {}
+AIMPRemoteControlServer::AIMPRemoteControlServer(std::vector<std::unique_ptr<IRemoteControlCommand>> commands, NetworkWatcher &network, MessageLocalizer localize)
+	: FImpl(std::make_unique<Impl>(std::move(commands), network, std::move(localize))) {}
 
 AIMPRemoteControlServer::~AIMPRemoteControlServer() { Stop(); }
 

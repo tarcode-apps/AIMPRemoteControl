@@ -32,7 +32,7 @@ void SchedulerCommand::Register(IRpcRegistrar &rpc)
 	rpc.Add("Scheduler", [&timer = FTimer, &settings = FSettings](const nlohmann::json &params) -> nlohmann::json
 			{
 		if (!settings.Get().Features.Scheduler)
-			throw RpcError(ErrorSchedulerUnavailable, "Scheduler service unavailable");
+			throw LocalizedRpcError(ErrorSchedulerUnavailable, "schedulerUnavailable");
 
 		if (params.contains("cancel") && IsTrue(params["cancel"]))
 			timer.Cancel();

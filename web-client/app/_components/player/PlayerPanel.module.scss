@@ -1,0 +1,88 @@
+@use "../../_styles/mixins" as mixins;
+
+.panel {
+    --sheet-progress: 0;
+    --sheet-transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+
+    @include mixins.player-sheet {
+        position: fixed;
+        inset: 0;
+        z-index: 8;
+        transform: translateY(calc(100% - var(--mini-player-height) - var(--toolbar-height)));
+        transition: transform var(--sheet-transition);
+        touch-action: none;
+        box-shadow: 0 0 12px var(--color-shadow);
+
+        @include mixins.drawer-docked {
+            left: var(--drawer-width);
+        }
+
+        &.hidden {
+            display: none;
+        }
+
+        &.expanded {
+            --sheet-progress: 1;
+
+            transform: none;
+        }
+
+        &.dragging {
+            transform: translateY(var(--sheet-offset));
+            transition: none;
+        }
+    }
+
+    @include mixins.player-docked {
+        flex: none;
+        width: var(--player-width);
+        border-left: 1px solid var(--color-divider);
+    }
+}
+
+.mini {
+    flex: none;
+    height: var(--mini-player-height);
+    background: var(--color-surface);
+    opacity: calc(1 - var(--sheet-progress));
+    transition: opacity var(--sheet-transition);
+
+    .panel.expanded & {
+        pointer-events: none;
+    }
+
+    .panel.dragging & {
+        transition: none;
+    }
+
+    @include mixins.player-docked {
+        display: none;
+    }
+}
+
+.full {
+    flex: 1;
+    min-height: 0;
+    background: var(--color-bg);
+
+    @include mixins.player-sheet {
+        position: absolute;
+        inset: 0;
+        opacity: var(--sheet-progress);
+        transition:
+            opacity var(--sheet-transition),
+            visibility 0s linear var(--sheet-transition);
+
+        .panel:not(.expanded, .dragging) & {
+            visibility: hidden;
+        }
+
+        .panel.dragging & {
+            transition: none;
+        }
+    }
+}

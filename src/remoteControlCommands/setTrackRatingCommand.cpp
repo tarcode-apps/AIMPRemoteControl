@@ -39,6 +39,6 @@ void SetTrackRatingCommand::Register(IRpcRegistrar &rpc)
 			return actual;
 		});
 		if (!result)
-			throw RpcError(ErrorTrackNotFound, "Setting rating failed. Reason: track not found.");
+			throw LocalizedRpcError(ErrorTrackNotFound, "setRatingTrackNotFound");
 		return {{"rating", *result}}; });
 }

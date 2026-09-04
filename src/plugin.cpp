@@ -41,6 +41,8 @@
 #include "remoteControlCommands/subscribeOnAIMPStateUpdateEventCommand.h"
 #include "remoteControlCommands/uploadTrackCommand.h"
 #include "remoteControlCommands/versionCommand.h"
+#include "webCommands/eventsCommand.h"
+#include "webCommands/playlistsCommand.h"
 
 namespace
 {
@@ -137,7 +139,14 @@ HRESULT WINAPI AIMPPlugin::Initialize(IAIMPCore *Core)
 	commands.push_back(std::make_unique<UploadTrackCommand>(Core, FIdManager, FSettings));
 	commands.push_back(std::make_unique<StatusCommand>(Core));
 	commands.push_back(std::make_unique<SubscribeOnAIMPStateUpdateEventCommand>(Core, FIdManager, FStateEvents, FSleepTimer));
-	FRemoteControlServer = std::make_unique<AIMPRemoteControlServer>(std::move(commands), FNetworkWatcher);
+	commands.push_back(std::make_unique<web::PlaylistsCommand>(Core));
+	commands.push_back(std::make_unique<web::EventsCommand>(FStateEvents));
+	FRemoteControlServer = std::make_unique<AIMPRemoteControlServer>(std::move(commands), FNetworkWatcher,
+		[core = FCore](const std::string &keyPath)
+		{
+			return RunOnMainThread(core, [&]
+								   { return Localize(core, keyPath, keyPath); });
+		});
 	FRemoteControlServer->OnBindFailure([core = FCore](const std::string &address, unsigned short port)
 		{
 			PostToMainThread(core, [core, endpoint = address + ":" + std::to_string(port)]

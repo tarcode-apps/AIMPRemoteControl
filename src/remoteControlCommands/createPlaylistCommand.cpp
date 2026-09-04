@@ -40,6 +40,6 @@ void CreatePlaylistCommand::Register(IRpcRegistrar &rpc)
 			return result;
 		});
 		if (aimpId.empty())
-			throw RpcError(ErrorPlaylistCreationFailed, "Playlist creation failed.");
+			throw LocalizedRpcError(ErrorPlaylistCreationFailed, "playlistCreationFailed");
 		return {{"playlist_id", idManager.PlaylistGetOrGeneratePluginId(aimpId)}}; });
 }

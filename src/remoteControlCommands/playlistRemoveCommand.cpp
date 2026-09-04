@@ -34,8 +34,8 @@ void PlaylistRemoveCommand::Register(IRpcRegistrar &rpc)
 			return hr;
 		});
 		if (result == E_INVALIDARG)
-			throw RpcError(ErrorPlaylistNotFound, "Removing playlist failed. Reason: playlist not found.");
+			throw LocalizedRpcError(ErrorPlaylistNotFound, "removePlaylistNotFound");
 		if (Failed(result))
-			throw RpcError(ErrorPlaylistRemoveFailed, "Removing playlist failed.");
+			throw LocalizedRpcError(ErrorPlaylistRemoveFailed, "removePlaylistFailed");
 		return {{"success", true}}; });
 }

@@ -36,6 +36,6 @@ void SetTrackEnabledCommand::Register(IRpcRegistrar &rpc)
 			return true;
 		});
 		if (!found)
-			throw RpcError(ErrorTrackNotFound, "Setting track state failed. Reason: track not found.");
+			throw LocalizedRpcError(ErrorTrackNotFound, "setTrackEnabledTrackNotFound");
 		return {{"success", true}}; });
 }

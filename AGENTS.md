@@ -99,6 +99,13 @@ discovery responder (`serviceDiscoveryServer.*`), the options page
 `src/remoteControlCommands/`. `src/helpers/` holds AIMP SDK wrappers, JSON
 helpers and the network-interface watcher.
 
+Two protocols share one player: `src/player/` holds protocol-neutral
+operations on AIMP (C++ types, AIMP identifiers, main-thread only), and the
+command folders are thin adapters over it — `src/remoteControlCommands/` for
+the frozen `/RPC_JSON` (CRC ids, percentages, numeric error codes) and
+`src/webCommands/` for `/api/v1` ([docs/web-api.md](docs/web-api.md)).
+Legacy representation belongs in the legacy adapter, never in `src/player/`.
+
 Things that bite:
 
 - **Thread affinity.** HTTP requests run on httplib worker threads, but AIMP
@@ -139,6 +146,9 @@ Things that bite:
 - **Localization.** `Langs/*.lng` are UTF-16LE with BOM and CRLF line endings
   — preserve both, git treats them as binary. Keys used in code must exist in
   every language file; format placeholders (`{0}`) must survive translation.
+  Error messages of both protocols share `[AIMPRemoteControlErrors]`, keyed
+  by the `LocalizedRpcError` key or the `ApiError` code (camelCase, as on the
+  wire); the English text lives only in `english.lng`.
   The options page reloads localized captions via `ApplyLocalization`.
 
 ## Code conventions

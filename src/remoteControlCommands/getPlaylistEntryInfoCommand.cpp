@@ -54,6 +54,6 @@ void GetPlaylistEntryInfoCommand::Register(IRpcRegistrar &rpc)
 		});
 
 		if (result.is_null())
-			throw RpcError(ErrorTrackNotFound, "Getting info about track failed. Reason: track not found.");
+			throw LocalizedRpcError(ErrorTrackNotFound, "trackInfoTrackNotFound");
 		return result; });
 }

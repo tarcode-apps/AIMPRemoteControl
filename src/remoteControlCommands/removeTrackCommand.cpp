@@ -33,7 +33,7 @@ void RemoveTrackCommand::Register(IRpcRegistrar &rpc)
 		const std::int32_t trackId = params["track_id"].get<std::int32_t>();
 		const bool physically = params.value("physically", false);
 		if (physically && !settings.Get().Features.PhysicalDeletion)
-			throw RpcError(ErrorRemoveFailed, "Removing track failed. Reason: physical deletion is disabled in the plugin settings.");
+			throw LocalizedRpcError(ErrorRemoveFailed, "removeTrackDisabled");
 
 		const HRESULT result = RunOnMainThread(core, [&]() -> HRESULT
 		{
@@ -55,8 +55,8 @@ void RemoveTrackCommand::Register(IRpcRegistrar &rpc)
 			return hr;
 		});
 		if (result == E_INVALIDARG)
-			throw RpcError(ErrorTrackNotFound, "Removing track failed. Reason: track not found.");
+			throw LocalizedRpcError(ErrorTrackNotFound, "removeTrackNotFound");
 		if (Failed(result))
-			throw RpcError(ErrorRemoveFailed, "Removing track failed.");
+			throw LocalizedRpcError(ErrorRemoveFailed, "removeTrackFailed");
 		return {{"success", true}}; });
 }

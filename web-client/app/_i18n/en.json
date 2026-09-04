@@ -1,0 +1,46 @@
+{
+  "actions": {
+    "retry": "Retry"
+  },
+  "errors": {
+    "network": "The player is unreachable",
+    "http": "The player answered {{status}}"
+  },
+  "app": {
+    "name": "AIMP Remote Control"
+  },
+  "nav": {
+    "main": "Main navigation",
+    "playlists": "Playlists",
+    "menu": "Menu",
+    "back": "Back"
+  },
+  "screens": {
+    "player": "Player",
+    "timer": "Timer",
+    "effects": "Effects",
+    "favorites": "Favorites",
+    "queue": "Queue"
+  },
+  "player": {
+    "noTrack": "Nothing is playing",
+    "expand": "Show player",
+    "collapse": "Hide player",
+    "previous": "Previous track",
+    "play": "Play",
+    "next": "Next track",
+    "shuffle": "Shuffle",
+    "repeat": "Repeat"
+  },
+  "playlists": {
+    "tracks_one": "{{count}} track",
+    "tracks_other": "{{count}} tracks"
+  },
+  "playlist": {
+    "add": "Add",
+    "select": "Select tracks",
+    "sort": "Sort",
+    "search": "Search",
+    "more": "More"
+  }
+}

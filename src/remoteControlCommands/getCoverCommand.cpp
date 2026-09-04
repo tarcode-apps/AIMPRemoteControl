@@ -136,7 +136,7 @@ void GetCoverCommand::Register(IRpcRegistrar &rpc)
 
 		const std::optional<HttpContent> cover = LoadCover(core, idManager, trackId);
 		if (!cover)
-			throw RpcError(ErrorCoverNotFound, "Getting cover failed. Reason: album cover is not found.");
+			throw LocalizedRpcError(ErrorCoverNotFound, "coverNotFound");
 
 		const std::uint32_t crc = Crc32Update(0, cover->Body.data(), cover->Body.size());
 		return {{"album_cover_uri", "album_covers_cache/cover_0_" + std::to_string(trackId) + "_0x0_" + std::to_string(crc % 100000) + "." + ExtensionFor(*cover)}}; });

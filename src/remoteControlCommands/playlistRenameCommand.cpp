@@ -48,8 +48,8 @@ void PlaylistRenameCommand::Register(IRpcRegistrar &rpc)
 			return hr;
 		});
 		if (result == E_INVALIDARG)
-			throw RpcError(ErrorPlaylistNotFound, "Renaming playlist failed. Reason: playlist not found.");
+			throw LocalizedRpcError(ErrorPlaylistNotFound, "renamePlaylistNotFound");
 		if (Failed(result))
-			throw RpcError(ErrorRenameFailed, "Renaming playlist failed.");
+			throw LocalizedRpcError(ErrorRenameFailed, "renamePlaylistFailed");
 		return {{"success", true}}; });
 }

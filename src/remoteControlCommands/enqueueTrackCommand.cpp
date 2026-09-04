@@ -41,8 +41,8 @@ void EnqueueTrackCommand::Register(IRpcRegistrar &rpc)
 			return hr;
 		});
 		if (result == E_INVALIDARG)
-			throw RpcError(ErrorTrackNotFound, "Enqueue track failed. Reason: track not found.");
+			throw LocalizedRpcError(ErrorTrackNotFound, "enqueueTrackNotFound");
 		if (Failed(result))
-			throw RpcError(ErrorEnqueueFailed, "Enqueue track failed.");
+			throw LocalizedRpcError(ErrorEnqueueFailed, "enqueueFailed");
 		return nullptr; });
 }

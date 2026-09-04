@@ -1,5 +1,7 @@
 #include "stateUpdateEvents.h"
 
+#include <algorithm>
+
 #include "apiCore.h"
 #include "apiMessages.h"
 #include "apiPlaylists.h"
@@ -196,6 +198,37 @@ bool StateUpdateEvents::Wait(Kind kind, std::chrono::milliseconds timeout)
 	return FChanged.wait_for(lock, timeout, [&]
 							 { return FStopped || FVersions[kind] != seen; }) &&
 		   !FStopped;
+}
+
+StateUpdateEvents::Versions StateUpdateEvents::Current()
+{
+	std::lock_guard lock(FMutex);
+	Versions versions;
+	std::copy(std::begin(FVersions), std::end(FVersions), versions.begin());
+	return versions;
+}
+
+std::bitset<StateUpdateEvents::KindCount> StateUpdateEvents::WaitAny(Versions &seen, std::chrono::milliseconds timeout)
+{
+	std::bitset<KindCount> changed;
+	std::unique_lock lock(FMutex);
+	const bool moved = FChanged.wait_for(lock, timeout, [&]
+										 {
+											 if (FStopped)
+												 return true;
+											 for (int kind = 0; kind < KindCount; ++kind)
+												 if (FVersions[kind] != seen[kind])
+													 return true;
+											 return false; });
+	if (!moved || FStopped)
+		return changed;
+	for (int kind = 0; kind < KindCount; ++kind)
+		if (FVersions[kind] != seen[kind])
+		{
+			seen[kind] = FVersions[kind];
+			changed.set(kind);
+		}
+	return changed;
 }
 
 void StateUpdateEvents::Notify(Kind kind)

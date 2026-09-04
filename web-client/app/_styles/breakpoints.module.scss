@@ -1,0 +1,7 @@
+@use "sass:math";
+@use "breakpoints";
+
+:export {
+    drawerDockedFrom: math.div(breakpoints.$drawer-docked-from, 1px);
+    playerDockedFrom: math.div(breakpoints.$player-docked-from, 1px);
+}

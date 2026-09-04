@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+#include <bitset>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -28,6 +30,10 @@ public:
 	void Stop();
 
 	bool Wait(Kind kind, std::chrono::milliseconds timeout);
+
+	using Versions = std::array<std::uint64_t, KindCount>;
+	Versions Current();
+	std::bitset<KindCount> WaitAny(Versions &seen, std::chrono::milliseconds timeout);
 
 	void Notify(Kind kind);
 	bool IsStopped();

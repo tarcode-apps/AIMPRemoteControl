@@ -151,6 +151,8 @@ Implementation notes that matter for compatibility:
 ## 5. Errors
 
 JSON-RPC errors look like `{"code": 21, "message": "Getting info about track failed. Reason: track not found."}`.
+`message` comes in the language of the player's interface (`Langs/*.lng`, section
+`[AIMPRemoteControlErrors]`); only `-32602` and `-32000` stay in English.
 
 | Code | Meaning |
 |---|---|

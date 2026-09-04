@@ -10,12 +10,14 @@
 class IRemoteControlCommand;
 class NetworkWatcher;
 
+using MessageLocalizer = std::function<std::string(const std::string &keyPath)>;
+
 class AIMPRemoteControlServer
 {
 public:
 	static constexpr unsigned short DefaultPort = 3333;
 
-	AIMPRemoteControlServer(std::vector<std::unique_ptr<IRemoteControlCommand>> commands, NetworkWatcher &network);
+	AIMPRemoteControlServer(std::vector<std::unique_ptr<IRemoteControlCommand>> commands, NetworkWatcher &network, MessageLocalizer localize);
 	~AIMPRemoteControlServer();
 
 	AIMPRemoteControlServer(const AIMPRemoteControlServer &) = delete;

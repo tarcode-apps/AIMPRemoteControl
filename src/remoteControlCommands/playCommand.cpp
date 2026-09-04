@@ -49,6 +49,6 @@ void PlayCommand::Register(IRpcRegistrar &rpc)
 			return before;
 		});
 		if (result.is_null())
-			throw RpcError(ErrorTrackNotFound, "Track not found.");
+			throw LocalizedRpcError(ErrorTrackNotFound, "playTrackNotFound");
 		return result; });
 }

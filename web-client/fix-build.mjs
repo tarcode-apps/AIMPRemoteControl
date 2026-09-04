@@ -2,47 +2,52 @@
 
 // Workaround for https://github.com/vercel/next.js/issues/73427
 // Remove after PR merged https://github.com/vercel/next.js/pull/73912/files
+//
+// With `output: 'export'` the client requests segment RSC payloads by a flat
+// name, e.g. `/queue/__next.!<base64>.queue.__PAGE__.txt`, but the export
+// writes them as a nested tree: `out/queue/__next.!<base64>/queue/__PAGE__.txt`.
+// Flatten every `__next.*` directory into its parent, joining path segments
+// with dots, so the files exist under the names the client asks for.
 
-import { existsSync, globSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
-import { basename, dirname, join, parse } from 'node:path';
+import { readdirSync, renameSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+
+const OUT_DIR = 'out';
+const SEGMENT_DIR_PREFIX = '__next.';
 
 // Recursively move all files from directory to target directory with flattened names
-function flattenDirectory(sourceDir, targetDir, prefix = '') {
-    const entries = readdirSync(sourceDir, { withFileTypes: true });
-
-    for (const entry of entries) {
+function flattenDirectory(sourceDir, targetDir, prefix) {
+    for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
         const sourcePath = join(sourceDir, entry.name);
-        const newName = prefix ? `${prefix}.${entry.name}` : entry.name;
+        const newName = `${prefix}.${entry.name}`;
 
         if (entry.isFile()) {
             const targetPath = join(targetDir, newName);
             console.log(`Moving: ${sourcePath} -> ${targetPath}`);
             renameSync(sourcePath, targetPath);
         } else if (entry.isDirectory()) {
-            // Recursively flatten subdirectories
             flattenDirectory(sourcePath, targetDir, newName);
         }
     }
 }
 
-const txtFiles = globSync(['out/**/__next.!*.txt', 'out/**/__next._not-found.txt']);
-for (const txtFile of txtFiles) {
-    const fileDir = dirname(txtFile);
-    const fileName = basename(txtFile);
-    const fileNameWithoutExt = parse(fileName).name;
-    const correspondingDir = join(fileDir, fileNameWithoutExt);
+// Walk the export and flatten every `__next.*` directory found
+function fixDirectory(dir) {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
 
-    // Check if there's a directory with the same name
-    if (existsSync(correspondingDir) && statSync(correspondingDir).isDirectory()) {
-        console.log(`Found directory: ${correspondingDir}`);
-
-        // Flatten the directory structure
-        flattenDirectory(correspondingDir, fileDir, fileNameWithoutExt);
-
-        // Remove the now-empty directory
-        console.log(`Removing directory: ${correspondingDir}`);
-        rmSync(correspondingDir, { recursive: true, force: true });
+        const path = join(dir, entry.name);
+        if (entry.name.startsWith(SEGMENT_DIR_PREFIX)) {
+            console.log(`Found directory: ${path}`);
+            flattenDirectory(path, dir, entry.name);
+            console.log(`Removing directory: ${path}`);
+            rmSync(path, { recursive: true, force: true });
+        } else {
+            fixDirectory(path);
+        }
     }
 }
+
+fixDirectory(OUT_DIR);
 
 console.log('Build fix completed!');

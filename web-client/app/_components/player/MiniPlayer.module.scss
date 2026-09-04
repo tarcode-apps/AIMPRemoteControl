@@ -1,0 +1,47 @@
+@use "../../_styles/mixins" as mixins;
+
+.miniPlayer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: var(--mini-player-bar-height);
+    padding: 0 calc(4px + var(--safe-right)) 0 calc(8px + var(--safe-left));
+}
+
+.cover {
+    --icon-size: 28px;
+
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 4px;
+    background: var(--color-surface-raised);
+    color: var(--color-text-secondary);
+}
+
+.track {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    align-self: stretch;
+    justify-content: center;
+    text-align: left;
+}
+
+.title {
+    @include mixins.ellipsis;
+
+    max-width: 100%;
+    font-size: var(--font-size-subtitle);
+    color: var(--color-text-secondary);
+}
+
+.controls {
+    flex: none;
+    display: flex;
+}

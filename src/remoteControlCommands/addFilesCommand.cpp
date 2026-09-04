@@ -30,8 +30,8 @@ void AddFilesCommand::Register(IRpcRegistrar &rpc)
 
 		const HRESULT result = RunOnMainThread(core, [&] { return AddFilesToPlaylist(core, idManager, playlistId, files); });
 		if (result == E_INVALIDARG)
-			throw RpcError(ErrorPlaylistNotFound, "Adding files failed. Reason: playlist not found.");
+			throw LocalizedRpcError(ErrorPlaylistNotFound, "addFilesPlaylistNotFound");
 		if (Failed(result))
-			throw RpcError(ErrorAddFailed, "Adding files failed.");
+			throw LocalizedRpcError(ErrorAddFailed, "addFilesFailed");
 		return {{"success", true}}; });
 }

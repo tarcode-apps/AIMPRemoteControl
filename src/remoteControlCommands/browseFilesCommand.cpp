@@ -85,7 +85,7 @@ namespace
 		std::vector<std::string> files, folders;
 		std::filesystem::directory_iterator it(FromUtf8(pathUtf8), std::filesystem::directory_options::skip_permission_denied, ec);
 		if (ec)
-			throw RpcError(ErrorPathInaccessible, "Path inaccessible");
+			throw LocalizedRpcError(ErrorPathInaccessible, "pathInaccessible");
 		for (const auto &entry : it)
 		{
 			if (entry.is_directory(ec))
@@ -104,7 +104,7 @@ void BrowseFilesCommand::Register(IRpcRegistrar &rpc)
 	rpc.Add("BrowseFiles", [core = FCore, &settings = FSettings](const nlohmann::json &params) -> nlohmann::json
 			{
 		if (!settings.Get().Features.BrowseFiles)
-			throw RpcError(ErrorPathInaccessible, "Path inaccessible. Reason: file browsing is disabled in the plugin settings.");
+			throw LocalizedRpcError(ErrorPathInaccessible, "browseFilesDisabled");
 		const std::string path = params.value("path", std::string());
 		if (path.empty())
 			return Roots();

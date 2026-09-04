@@ -1,0 +1,48 @@
+{
+  "actions": {
+    "retry": "Повторить"
+  },
+  "errors": {
+    "network": "Плеер недоступен",
+    "http": "Плеер ответил {{status}}"
+  },
+  "app": {
+    "name": "AIMP Remote Control"
+  },
+  "nav": {
+    "main": "Основная навигация",
+    "playlists": "Плейлисты",
+    "menu": "Меню",
+    "back": "Назад"
+  },
+  "screens": {
+    "player": "Плеер",
+    "timer": "Таймер",
+    "effects": "Эффекты",
+    "favorites": "Избранное",
+    "queue": "Очередь"
+  },
+  "player": {
+    "noTrack": "Ничего не играет",
+    "expand": "Открыть плеер",
+    "collapse": "Свернуть плеер",
+    "previous": "Предыдущий трек",
+    "play": "Воспроизвести",
+    "next": "Следующий трек",
+    "shuffle": "Перемешать",
+    "repeat": "Повтор"
+  },
+  "playlists": {
+    "tracks_one": "{{count}} трек",
+    "tracks_few": "{{count}} трека",
+    "tracks_many": "{{count}} треков",
+    "tracks_other": "{{count}} трека"
+  },
+  "playlist": {
+    "add": "Добавить",
+    "select": "Выбрать треки",
+    "sort": "Сортировка",
+    "search": "Поиск",
+    "more": "Ещё"
+  }
+}

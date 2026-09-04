@@ -1,0 +1,100 @@
+@use "../../_styles/mixins" as mixins;
+
+.screen {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.appBar {
+    flex: none;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    min-height: calc(var(--app-bar-height) + var(--safe-top));
+    padding: var(--safe-top) calc(4px + var(--safe-right)) 0 calc(4px + var(--safe-left));
+    background: var(--color-bg);
+
+    &.withTabs {
+        @include mixins.drawer-modal {
+            --app-bar-height: 48px;
+            grid-template-columns: auto 1fr auto;
+        }
+    }
+}
+
+.appBar .nav {
+    grid-column: 1;
+    justify-self: start;
+
+    @include mixins.drawer-docked {
+        display: none;
+    }
+}
+
+.tabs {
+    grid-column: 2;
+    min-width: 0;
+    align-self: stretch;
+
+    @include mixins.drawer-docked {
+        display: none;
+    }
+}
+
+.heading {
+    grid-column: 2;
+    min-width: 0;
+    text-align: center;
+    padding: 6px 8px;
+
+    .withTabs & {
+        @include mixins.drawer-modal {
+            display: none;
+        }
+    }
+}
+
+.title {
+    @include mixins.ellipsis;
+
+    font-size: var(--font-size-title);
+    font-weight: var(--font-weight-bold);
+    line-height: var(--line-height-title);
+}
+
+.subtitle {
+    @include mixins.ellipsis;
+
+    font-size: var(--font-size-subtitle);
+    color: var(--color-text-secondary);
+}
+
+.actions {
+    grid-column: 3;
+    justify-self: end;
+    display: flex;
+    align-items: center;
+}
+
+.body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+
+    .screen:not(.secondary) & {
+        @include mixins.player-sheet {
+            padding-bottom: var(--mini-player-height);
+        }
+    }
+}
+
+.toolbar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    height: var(--toolbar-height);
+    padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
+    background: var(--color-surface);
+}

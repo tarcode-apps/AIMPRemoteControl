@@ -102,6 +102,6 @@ void LyricsCommand::Register(IRpcRegistrar &rpc)
 		}
 
 		if (text.empty())
-			throw RpcError(ErrorLyricsNotAvailable, "Lyrics not available");
+			throw LocalizedRpcError(ErrorLyricsNotAvailable, "lyricsNotAvailable");
 		return {{"text", text}}; });
 }

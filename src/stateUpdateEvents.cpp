@@ -5,7 +5,11 @@
 #include "apiCore.h"
 #include "apiMessages.h"
 #include "apiPlaylists.h"
+#include "aimpHelper.h"
 #include "IUnknownImpl.h"
+#include "joinPumpingMessages.h"
+#include "mainThreadRunner.h"
+#include "player/playlists.h"
 
 class StateUpdateEvents::MessageHook : public IUnknownImpl<IAIMPMessageHook>
 {
@@ -43,6 +47,11 @@ public:
 		case AIMP_MSG_EVENT_PLAYBACK_QUEUE:
 			FOwner.Notify(Queue);
 			break;
+		// View and formatting settings of playlists live in the options and have no
+		// playlist-level notification, so any options change counts for every playlist.
+		case AIMP_MSG_EVENT_OPTIONS:
+			FOwner.AllPlaylistsChanged();
+			break;
 		default:
 			break;
 		}
@@ -52,10 +61,18 @@ private:
 	StateUpdateEvents &FOwner;
 };
 
+// One listener per playlist: AIMP's Changed() carries no playlist, so the listener
+// itself is what tells the playlists apart. The playlist reference is dropped in
+// Removed(), the listener object itself only at Stop(), because AIMP may still be
+// walking its listener list while Removed() runs.
 class StateUpdateEvents::PlaylistListener : public IUnknownImpl<IAIMPPlaylistListener>
 {
 public:
-	explicit PlaylistListener(StateUpdateEvents &owner) : FOwner(owner) {}
+	PlaylistListener(StateUpdateEvents &owner, IAIMPPlaylist *playlist)
+		: FOwner(owner), FPlaylist(playlist), FId(GetPlaylistAIMPId(playlist))
+	{
+		FPlaylist->AddRef();
+	}
 
 	BOOL isOurRIID(REFIID riid) override { return EqualGUID(riid, IID_IAIMPPlaylistListener); }
 
@@ -63,33 +80,53 @@ public:
 	void WINAPI Changed(DWORD flags) override
 	{
 		if (flags & (AIMP_PLAYLIST_NOTIFY_NAME | AIMP_PLAYLIST_NOTIFY_CONTENT | AIMP_PLAYLIST_NOTIFY_FILEINFO |
-					 AIMP_PLAYLIST_NOTIFY_READONLY | AIMP_PLAYLIST_NOTIFY_PLAYINGSWITCHS))
-			FOwner.Notify(Playlists);
+					 AIMP_PLAYLIST_NOTIFY_READONLY | AIMP_PLAYLIST_NOTIFY_PLAYINGSWITCHS | AIMP_PLAYLIST_NOTIFY_STATISTICS |
+					 AIMP_PLAYLIST_NOTIFY_GROUPNAME))
+			FOwner.PlaylistChanged(FId);
 	}
-	void WINAPI Removed() override { FOwner.Notify(Playlists); }
+	void WINAPI Removed() override
+	{
+		ReleasePlaylist();
+		FOwner.PlaylistRemoved(FId);
+	}
+
+	void Attach() { FPlaylist->ListenerAdd(this); }
+
+	void Detach()
+	{
+		if (FPlaylist)
+			FPlaylist->ListenerRemove(this);
+		ReleasePlaylist();
+	}
+
+	const std::string &Id() const { return FId; }
 
 private:
+	void ReleasePlaylist()
+	{
+		if (FPlaylist)
+			FPlaylist->Release();
+		FPlaylist = nullptr;
+	}
+
 	StateUpdateEvents &FOwner;
+	IAIMPPlaylist *FPlaylist;
+	std::string FId;
 };
 
 class StateUpdateEvents::PlaylistManagerListener : public IUnknownImpl<IAIMPExtensionPlaylistManagerListener>
 {
 public:
-	PlaylistManagerListener(StateUpdateEvents &owner, PlaylistListener *listener) : FOwner(owner), FListener(listener) {}
+	explicit PlaylistManagerListener(StateUpdateEvents &owner) : FOwner(owner) {}
 
 	BOOL isOurRIID(REFIID riid) override { return EqualGUID(riid, IID_IAIMPExtensionPlaylistManagerListener); }
 
 	void WINAPI PlaylistActivated(IAIMPPlaylist *) override {}
-	void WINAPI PlaylistAdded(IAIMPPlaylist *playlist) override
-	{
-		playlist->ListenerAdd(FListener);
-		FOwner.Notify(Playlists);
-	}
+	void WINAPI PlaylistAdded(IAIMPPlaylist *playlist) override { FOwner.WatchPlaylist(playlist); }
 	void WINAPI PlaylistRemoved(IAIMPPlaylist *) override { FOwner.Notify(Playlists); }
 
 private:
 	StateUpdateEvents &FOwner;
-	PlaylistListener *FListener;
 };
 
 StateUpdateEvents::StateUpdateEvents() = default;
@@ -113,9 +150,7 @@ void StateUpdateEvents::Start(IAIMPCore *core)
 		dispatcher->Release();
 	}
 
-	FPlaylistListener = new PlaylistListener(*this);
-	FPlaylistListener->AddRef();
-	FPlaylistManagerListener = new PlaylistManagerListener(*this, FPlaylistListener);
+	FPlaylistManagerListener = new PlaylistManagerListener(*this);
 	FPlaylistManagerListener->AddRef();
 	core->RegisterExtension(IID_IAIMPServicePlaylistManager, FPlaylistManagerListener);
 
@@ -128,12 +163,15 @@ void StateUpdateEvents::Start(IAIMPCore *core)
 			IAIMPPlaylist *playlist = nullptr;
 			if (Succeeded(mgr->GetLoadedPlaylist(i, &playlist)) && playlist)
 			{
-				playlist->ListenerAdd(FPlaylistListener);
+				WatchPlaylist(playlist);
 				playlist->Release();
 			}
 		}
 		mgr->Release();
 	}
+
+	FSettingsPoller = std::thread([this]
+								  { PollPlaylistSettings(); });
 }
 
 void StateUpdateEvents::Stop()
@@ -143,6 +181,7 @@ void StateUpdateEvents::Stop()
 		FStopped = true;
 	}
 	FChanged.notify_all();
+	JoinPumpingMessages(FSettingsPoller);
 
 	if (!FCore)
 		return;
@@ -159,36 +198,77 @@ void StateUpdateEvents::Stop()
 		FMessageHook = nullptr;
 	}
 
-	if (FPlaylistListener)
-	{
-		IAIMPServicePlaylistManager *mgr = nullptr;
-		if (Succeeded(FCore->QueryInterface(IID_IAIMPServicePlaylistManager, reinterpret_cast<void **>(&mgr))) && mgr)
-		{
-			const INT32 count = mgr->GetLoadedPlaylistCount();
-			for (INT32 i = 0; i < count; ++i)
-			{
-				IAIMPPlaylist *playlist = nullptr;
-				if (Succeeded(mgr->GetLoadedPlaylist(i, &playlist)) && playlist)
-				{
-					playlist->ListenerRemove(FPlaylistListener);
-					playlist->Release();
-				}
-			}
-			mgr->Release();
-		}
-	}
 	if (FPlaylistManagerListener)
 	{
 		FCore->UnregisterExtension(FPlaylistManagerListener);
 		FPlaylistManagerListener->Release();
 		FPlaylistManagerListener = nullptr;
 	}
-	if (FPlaylistListener)
+	for (PlaylistListener *listener : FPlaylistListeners)
 	{
-		FPlaylistListener->Release();
-		FPlaylistListener = nullptr;
+		listener->Detach();
+		listener->Release();
+	}
+	FPlaylistListeners.clear();
+	{
+		std::lock_guard lock(FMutex);
+		FPlaylistRevisions.clear();
 	}
 	FCore = nullptr;
+}
+
+void StateUpdateEvents::WatchPlaylist(IAIMPPlaylist *playlist)
+{
+	PlaylistListener *listener = new PlaylistListener(*this, playlist);
+	listener->AddRef();
+	listener->Attach();
+	FPlaylistListeners.push_back(listener);
+	{
+		std::lock_guard lock(FMutex);
+		FPlaylistRevisions[listener->Id()] = 1;
+	}
+	Notify(Playlists);
+}
+
+void StateUpdateEvents::PlaylistChanged(const std::string &playlistId)
+{
+	{
+		std::lock_guard lock(FMutex);
+		++FPlaylistRevisions[playlistId];
+	}
+	Notify(Playlists);
+}
+
+void StateUpdateEvents::PlaylistRemoved(const std::string &playlistId)
+{
+	{
+		std::lock_guard lock(FMutex);
+		FPlaylistRevisions.erase(playlistId);
+	}
+	Notify(Playlists);
+}
+
+void StateUpdateEvents::AllPlaylistsChanged()
+{
+	{
+		std::lock_guard lock(FMutex);
+		for (auto &[id, revision] : FPlaylistRevisions)
+			++revision;
+	}
+	Notify(Playlists);
+}
+
+StateUpdateEvents::PlaylistRevisions StateUpdateEvents::CurrentPlaylistRevisions()
+{
+	std::lock_guard lock(FMutex);
+	return FPlaylistRevisions;
+}
+
+std::uint64_t StateUpdateEvents::PlaylistRevision(const std::string &playlistId)
+{
+	std::lock_guard lock(FMutex);
+	const auto it = FPlaylistRevisions.find(playlistId);
+	return it == FPlaylistRevisions.end() ? 0 : it->second;
 }
 
 bool StateUpdateEvents::Wait(Kind kind, std::chrono::milliseconds timeout)
@@ -244,4 +324,47 @@ bool StateUpdateEvents::IsStopped()
 {
 	std::lock_guard lock(FMutex);
 	return FStopped;
+}
+
+// The player sends nothing when a playlist's view, formatting or grouping settings
+// change, so they are compared on a timer instead.
+void StateUpdateEvents::PollPlaylistSettings()
+{
+	constexpr std::chrono::seconds Interval{2};
+	std::map<std::string, std::string> known;
+	while (true)
+	{
+		{
+			std::unique_lock lock(FMutex);
+			if (FChanged.wait_for(lock, Interval, [&]
+								  { return FStopped; }))
+				return;
+		}
+		const std::map<std::string, std::string> current = RunOnMainThread(FCore, [&]
+																			  {
+			std::map<std::string, std::string> snapshots;
+			IAIMPServicePlaylistManager *mgr = nullptr;
+			if (Succeeded(FCore->QueryInterface(IID_IAIMPServicePlaylistManager, reinterpret_cast<void **>(&mgr))) && mgr)
+			{
+				const INT32 count = mgr->GetLoadedPlaylistCount();
+				for (INT32 i = 0; i < count; ++i)
+				{
+					IAIMPPlaylist *playlist = nullptr;
+					if (Succeeded(mgr->GetLoadedPlaylist(i, &playlist)) && playlist)
+					{
+						snapshots[GetPlaylistAIMPId(playlist)] = player::SettingsSnapshot(playlist);
+						playlist->Release();
+					}
+				}
+				mgr->Release();
+			}
+			return snapshots; });
+		for (const auto &[id, snapshot] : current)
+		{
+			const auto seen = known.find(id);
+			if (seen != known.end() && seen->second != snapshot)
+				PlaylistChanged(id);
+		}
+		known = current;
+	}
 }

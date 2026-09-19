@@ -7,6 +7,7 @@ import clsx from 'clsx';
 import { useRef, type CSSProperties } from 'react';
 import { PlaylistPage } from './PlaylistPage';
 import styles from './PlaylistPager.module.scss';
+import { usePlaylistSearch } from './PlaylistSearch';
 import { usePlaylistSelection } from './PlaylistSelection';
 
 const flingVelocity = 0.5;
@@ -15,6 +16,7 @@ const edgeResistance = 0.3;
 export function PlaylistPager() {
     const paged = useMediaQuery(media.drawerModal);
     const { playlists, selected, select } = usePlaylistSelection();
+    const search = usePlaylistSearch();
     const trackRef = useRef<HTMLDivElement>(null);
     const width = useRef(0);
     const index = playlists && selected ? playlists.indexOf(selected) : -1;
@@ -22,7 +24,8 @@ export function PlaylistPager() {
 
     const drag = usePointerDrag({
         axis: 'x',
-        enabled: paged && index >= 0,
+        // A swipe would end the search or the selection.
+        enabled: paged && index >= 0 && search.query === null && !search.selecting,
         onStart: () => {
             const track = trackRef.current;
             if (!track) return false;

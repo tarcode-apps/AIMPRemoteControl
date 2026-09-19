@@ -1,6 +1,7 @@
 'use client';
 
 import { errorMessage } from '@/app/_api/errors';
+import { usePlaylists } from '@/app/_api/playlists';
 import clsx from 'clsx';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -10,7 +11,6 @@ import { Icon } from '../icons';
 import { usePlayerPanel } from '../player';
 import { usePlaylistSelection } from '../playlists';
 import { Skeleton } from '../skeleton';
-import { usePlaylists } from '@/app/_api/playlists';
 import { useDrawer } from './Drawer';
 import styles from './Sidebar.module.scss';
 
@@ -22,9 +22,9 @@ type NavItem = {
 
 const toolItems: NavItem[] = [
     { href: '/timer/', label: 'screens.timer', icon: 'schedule' },
-    { href: '/effects/', label: 'screens.effects', icon: 'tune' },
+    { href: '/effects/', label: 'screens.effects', icon: 'equalizer' },
     { href: '/favorites/', label: 'screens.favorites', icon: 'favorite' },
-    { href: '/queue/', label: 'screens.queue', icon: 'queue_music' },
+    { href: '/queue/', label: 'screens.queue', icon: 'list' },
 ];
 
 const playlistSkeletonWidths = ['55%', '40%', '70%', '45%'];

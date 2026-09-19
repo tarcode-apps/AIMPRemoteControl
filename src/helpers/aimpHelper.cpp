@@ -4,7 +4,6 @@
 
 #include "apiFileManager.h"
 #include "apiMUI.h"
-#include "remoteControlIdManager.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -93,64 +92,28 @@ std::string GetPlaylistAIMPId(IAIMPPlaylist *playlist)
 	return aimpId;
 }
 
-namespace
+IAIMPPlaylist *LoadedPlaylistByAIMPId(IAIMPCore *core, const std::string &aimpId)
 {
-	IAIMPPlaylist *LoadedPlaylistByAIMPId(IAIMPCore *core, const std::string &aimpId)
-	{
-		if (aimpId.empty())
-			return nullptr;
-
-		IAIMPServicePlaylistManager *mgr = nullptr;
-		if (Failed(core->QueryInterface(IID_IAIMPServicePlaylistManager, reinterpret_cast<void **>(&mgr))) || !mgr)
-			return nullptr;
-
-		IAIMPPlaylist *playlist = nullptr;
-		if (IAIMPString *key = StringToIAIMPString(core, aimpId))
-		{
-			if (Failed(mgr->GetLoadedPlaylistByID(key, &playlist)))
-				playlist = nullptr;
-			key->Release();
-		}
-		mgr->Release();
-		return playlist;
-	}
-}
-
-IAIMPPlaylist *FindPlaylist(IAIMPCore *core, RemoteControlIdManager &idManager, std::int32_t playlistId)
-{
-	return LoadedPlaylistByAIMPId(core, idManager.PlaylistGetKey(playlistId));
-}
-
-IAIMPPlaylistItem *FindPlaylistItem(IAIMPCore *core, RemoteControlIdManager &idManager, std::int32_t trackId,
-									IAIMPPlaylist **playlist)
-{
-	if (playlist)
-		*playlist = nullptr;
-
-	const PlaylistItemKey key = idManager.PlaylistItemGetKey(trackId);
-	IAIMPPlaylist *owner = LoadedPlaylistByAIMPId(core, key.AIMPPlaylistId);
-	if (!owner)
+	if (aimpId.empty())
 		return nullptr;
 
-	IAIMPPlaylistItem *item = nullptr;
-	if (key.Index < 0 || key.Index >= owner->GetItemCount() ||
-		Failed(owner->GetItem(key.Index, IID_IAIMPPlaylistItem, reinterpret_cast<void **>(&item))))
-		item = nullptr;
+	IAIMPServicePlaylistManager *mgr = nullptr;
+	if (Failed(core->QueryInterface(IID_IAIMPServicePlaylistManager, reinterpret_cast<void **>(&mgr))) || !mgr)
+		return nullptr;
 
-	if (item && playlist)
-		*playlist = owner;
-	else
-		owner->Release();
-	return item;
+	IAIMPPlaylist *playlist = nullptr;
+	if (IAIMPString *key = StringToIAIMPString(core, aimpId))
+	{
+		if (Failed(mgr->GetLoadedPlaylistByID(key, &playlist)))
+			playlist = nullptr;
+		key->Release();
+	}
+	mgr->Release();
+	return playlist;
 }
 
-HRESULT AddFilesToPlaylist(IAIMPCore *core, RemoteControlIdManager &idManager, std::int32_t playlistId,
-						   const std::vector<std::string> &fileUris)
+HRESULT AddFilesToPlaylist(IAIMPCore *core, IAIMPPlaylist *playlist, const std::vector<std::string> &fileUris)
 {
-	IAIMPPlaylist *playlist = FindPlaylist(core, idManager, playlistId);
-	if (!playlist)
-		return E_INVALIDARG;
-
 	HRESULT hr = E_FAIL;
 	IAIMPObjectList *list = nullptr;
 	if (Succeeded(core->CreateObject(IID_IAIMPObjectList, reinterpret_cast<void **>(&list))) && list)
@@ -166,7 +129,6 @@ HRESULT AddFilesToPlaylist(IAIMPCore *core, RemoteControlIdManager &idManager, s
 		hr = playlist->AddList(list, 0, -1); // -1: append
 		list->Release();
 	}
-	playlist->Release();
 	return hr;
 }
 

@@ -1,0 +1,37 @@
+.menu {
+    inset: auto;
+    margin: 4px 0;
+    position-area: block-start span-inline-start;
+    position-try-fallbacks: flip-block;
+    min-width: 200px;
+    padding: 8px 0;
+    border: 0;
+    border-radius: 8px;
+    background: var(--color-surface-raised);
+    color: var(--color-text);
+    box-shadow: 0 4px 16px var(--color-shadow);
+}
+
+.item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 16px;
+    text-align: left;
+    white-space: nowrap;
+
+    &:hover:not(:disabled) {
+        background: var(--color-hover);
+    }
+
+    &:disabled {
+        color: var(--color-text-secondary);
+        cursor: default;
+    }
+}
+
+.item:focus-visible {
+    outline: none;
+    background: var(--color-hover);
+}

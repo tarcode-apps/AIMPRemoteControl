@@ -20,9 +20,10 @@
 #include "joinPumpingMessages.h"
 #include "moduleDirectory.h"
 #include "networkWatcher.h"
-#include "remoteControlCommand.h"
+#include "apiController.h"
+#include "apiErrors.h"
 
-struct AIMPRemoteControlServer::Impl : IRpcRegistrar
+struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 {
 	struct Listener
 	{
@@ -33,7 +34,7 @@ struct AIMPRemoteControlServer::Impl : IRpcRegistrar
 
 	static constexpr std::size_t MaxJsonPayload = static_cast<std::size_t>(16) * 1024 * 1024;
 
-	std::vector<std::unique_ptr<IRemoteControlCommand>> Commands;
+	std::vector<std::unique_ptr<IApiController>> Commands;
 	std::vector<std::function<void(httplib::Server &)>> Routes;
 	std::vector<std::regex> UploadPaths;
 	std::vector<std::regex> AuthenticatedPaths;
@@ -51,7 +52,7 @@ struct AIMPRemoteControlServer::Impl : IRpcRegistrar
 
 	const std::filesystem::path WwwRoot = ModuleDirectory() / "wwwroot";
 
-	Impl(std::vector<std::unique_ptr<IRemoteControlCommand>> commands, NetworkWatcher &network, MessageLocalizer localize)
+	Impl(std::vector<std::unique_ptr<IApiController>> commands, NetworkWatcher &network, MessageLocalizer localize)
 		: Commands(std::move(commands)), Network(network), LocalizeMessage(std::move(localize))
 	{
 		Routes.push_back([this](httplib::Server &http)
@@ -86,7 +87,7 @@ struct AIMPRemoteControlServer::Impl : IRpcRegistrar
 						  { return Reconcile(allowed); });
 	}
 
-	void Add(const std::string &name, RpcMethod method) override
+	void MapRpc(const std::string &name, RpcMethod method) override
 	{
 		std::function<nlohmann::json(nlohmann::json)> handler =
 			[this, method = std::move(method)](nlohmann::json params)
@@ -107,7 +108,7 @@ struct AIMPRemoteControlServer::Impl : IRpcRegistrar
 		Rpc.Add(name, jsonrpc::GetHandle(handler));
 	}
 
-	void AddGet(const std::string &pathPattern, HttpGetHandler handler) override
+	void MapGet(const std::string &pathPattern, HttpGetHandler handler) override
 	{
 		AuthenticatedPaths.emplace_back(pathPattern);
 		Routes.push_back([pathPattern, handler = std::move(handler)](httplib::Server &http)
@@ -130,7 +131,7 @@ struct AIMPRemoteControlServer::Impl : IRpcRegistrar
 					res.set_content(content->Body, content->ContentType); }); });
 	}
 
-	void AddUpload(const std::string &pathPattern, HttpUploadHandler handler) override
+	void MapUpload(const std::string &pathPattern, HttpUploadHandler handler) override
 	{
 		UploadPaths.emplace_back(pathPattern);
 		Routes.push_back([pathPattern, handler = std::move(handler)](httplib::Server &http)
@@ -165,7 +166,7 @@ struct AIMPRemoteControlServer::Impl : IRpcRegistrar
 		throw std::invalid_argument("unsupported API method");
 	}
 
-	void AddApi(HttpMethod method, const std::string &pathPattern, ApiHandler handler) override
+	void MapApi(HttpMethod method, const std::string &pathPattern, ApiHandler handler) override
 	{
 		const HttpRoute route = RouteFor(method);
 		AuthenticatedPaths.emplace_back(pathPattern);
@@ -224,7 +225,7 @@ struct AIMPRemoteControlServer::Impl : IRpcRegistrar
 		httplib::DataSink &FSink;
 	};
 
-	void AddEventStream(const std::string &pathPattern, EventStreamHandler handler) override
+	void MapEventStream(const std::string &pathPattern, EventStreamHandler handler) override
 	{
 		AuthenticatedPaths.emplace_back(pathPattern);
 		Routes.push_back([pathPattern, handler = std::move(handler)](httplib::Server &http)
@@ -406,7 +407,7 @@ struct AIMPRemoteControlServer::Impl : IRpcRegistrar
 	}
 };
 
-AIMPRemoteControlServer::AIMPRemoteControlServer(std::vector<std::unique_ptr<IRemoteControlCommand>> commands, NetworkWatcher &network, MessageLocalizer localize)
+AIMPRemoteControlServer::AIMPRemoteControlServer(std::vector<std::unique_ptr<IApiController>> commands, NetworkWatcher &network, MessageLocalizer localize)
 	: FImpl(std::make_unique<Impl>(std::move(commands), network, std::move(localize))) {}
 
 AIMPRemoteControlServer::~AIMPRemoteControlServer() { Stop(); }

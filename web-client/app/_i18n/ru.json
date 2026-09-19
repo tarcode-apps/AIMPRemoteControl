@@ -33,16 +33,29 @@
     "repeat": "Повтор"
   },
   "playlists": {
-    "tracks_one": "{{count}} трек",
-    "tracks_few": "{{count}} трека",
-    "tracks_many": "{{count}} треков",
-    "tracks_other": "{{count}} трека"
+    "summary": "{{count}} / {{duration}} / {{size}}"
   },
   "playlist": {
     "add": "Добавить",
     "select": "Выбрать треки",
     "sort": "Сортировка",
     "search": "Поиск",
-    "more": "Ещё"
+    "more": "Ещё",
+    "empty": "Плейлист пуст",
+    "collapseGroup": "Свернуть группу",
+    "expandGroup": "Развернуть группу",
+    "collapseAll": "Свернуть все группы",
+    "expandAll": "Развернуть все группы",
+    "searchPlaceholder": "Поиск в плейлисте",
+    "closeSearch": "Закрыть поиск",
+    "closeSelection": "Завершить выбор",
+    "selectAll": "Выделить всё",
+    "deselectAll": "Снять выделение",
+    "selectItem": "Выбрать трек",
+    "selectGroup": "Выбрать группу",
+    "noResults": "Ничего не найдено",
+    "selectedActions": "Действия с выбранными треками",
+    "removeSelected": "Удалить из плейлиста",
+    "enqueueSelected": "Добавить в очередь"
   }
 }

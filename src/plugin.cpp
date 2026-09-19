@@ -8,41 +8,41 @@
 #include "apiPlayer.h"
 #include "mainThreadRunner.h"
 
-#include "remoteControlCommands/addFilesCommand.h"
-#include "remoteControlCommands/addUrlToPlaylistCommand.h"
-#include "remoteControlCommands/browseFilesCommand.h"
-#include "remoteControlCommands/createPlaylistCommand.h"
-#include "remoteControlCommands/downloadTrackCommand.h"
-#include "remoteControlCommands/enqueueTrackCommand.h"
-#include "remoteControlCommands/equalizerCommand.h"
-#include "remoteControlCommands/lyricsCommand.h"
-#include "remoteControlCommands/playlistRenameCommand.h"
-#include "remoteControlCommands/playlistRemoveCommand.h"
-#include "remoteControlCommands/removeTrackCommand.h"
-#include "remoteControlCommands/removeTrackFromPlayQueueCommand.h"
-#include "remoteControlCommands/schedulerCommand.h"
-#include "remoteControlCommands/getCoverCommand.h"
-#include "remoteControlCommands/getFormatsCommand.h"
-#include "remoteControlCommands/getPlayerControlPanelStateCommand.h"
-#include "remoteControlCommands/getPlaylistEntriesCommand.h"
-#include "remoteControlCommands/getPlaylistEntryInfoCommand.h"
-#include "remoteControlCommands/getPlaylistsCommand.h"
-#include "remoteControlCommands/getQueuedEntriesCommand.h"
-#include "remoteControlCommands/pauseCommand.h"
-#include "remoteControlCommands/playCommand.h"
-#include "remoteControlCommands/playNextCommand.h"
-#include "remoteControlCommands/playPreviousCommand.h"
-#include "remoteControlCommands/pluginCapabilitiesCommand.h"
-#include "remoteControlCommands/setTrackEnabledCommand.h"
-#include "remoteControlCommands/setTrackRatingCommand.h"
-#include "remoteControlCommands/showMessageCommand.h"
-#include "remoteControlCommands/statusCommand.h"
-#include "remoteControlCommands/stopCommand.h"
-#include "remoteControlCommands/subscribeOnAIMPStateUpdateEventCommand.h"
-#include "remoteControlCommands/uploadTrackCommand.h"
-#include "remoteControlCommands/versionCommand.h"
-#include "webCommands/eventsCommand.h"
-#include "webCommands/playlistsCommand.h"
+#include "rpcApi/addFilesCommand.h"
+#include "rpcApi/addUrlToPlaylistCommand.h"
+#include "rpcApi/browseFilesCommand.h"
+#include "rpcApi/createPlaylistCommand.h"
+#include "rpcApi/downloadTrackCommand.h"
+#include "rpcApi/enqueueTrackCommand.h"
+#include "rpcApi/equalizerCommand.h"
+#include "rpcApi/lyricsCommand.h"
+#include "rpcApi/playlistRenameCommand.h"
+#include "rpcApi/playlistRemoveCommand.h"
+#include "rpcApi/removeTrackCommand.h"
+#include "rpcApi/removeTrackFromPlayQueueCommand.h"
+#include "rpcApi/schedulerCommand.h"
+#include "rpcApi/getCoverCommand.h"
+#include "rpcApi/getFormatsCommand.h"
+#include "rpcApi/getPlayerControlPanelStateCommand.h"
+#include "rpcApi/getPlaylistEntriesCommand.h"
+#include "rpcApi/getPlaylistEntryInfoCommand.h"
+#include "rpcApi/getPlaylistsCommand.h"
+#include "rpcApi/getQueuedEntriesCommand.h"
+#include "rpcApi/pauseCommand.h"
+#include "rpcApi/playCommand.h"
+#include "rpcApi/playNextCommand.h"
+#include "rpcApi/playPreviousCommand.h"
+#include "rpcApi/pluginCapabilitiesCommand.h"
+#include "rpcApi/setTrackEnabledCommand.h"
+#include "rpcApi/setTrackRatingCommand.h"
+#include "rpcApi/showMessageCommand.h"
+#include "rpcApi/statusCommand.h"
+#include "rpcApi/stopCommand.h"
+#include "rpcApi/subscribeOnAIMPStateUpdateEventCommand.h"
+#include "rpcApi/uploadTrackCommand.h"
+#include "rpcApi/versionCommand.h"
+#include "webApi/eventsController.h"
+#include "webApi/playlistsController.h"
 
 namespace
 {
@@ -105,42 +105,42 @@ HRESULT WINAPI AIMPPlugin::Initialize(IAIMPCore *Core)
 	FSleepTimer.Start(Core, FStateEvents);
 	FDiscoveryServer.Start(FNetworkWatcher);
 
-	std::vector<std::unique_ptr<IRemoteControlCommand>> commands;
-	commands.push_back(std::make_unique<VersionCommand>(Core));
-	commands.push_back(std::make_unique<GetPlaylistsCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<GetQueuedEntriesCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<GetPlaylistEntriesCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<GetPlaylistEntryInfoCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<GetCoverCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<GetPlayerControlPanelStateCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<PauseCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<StopCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<PlayCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<PlayNextCommand>(Core, FIdManager, FStateEvents));
-	commands.push_back(std::make_unique<PlayPreviousCommand>(Core, FIdManager, FStateEvents));
-	commands.push_back(std::make_unique<PluginCapabilitiesCommand>(FSettings));
-	commands.push_back(std::make_unique<ShowMessageCommand>(Core));
-	commands.push_back(std::make_unique<SetTrackRatingCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<SetTrackEnabledCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<EnqueueTrackCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<RemoveTrackCommand>(Core, FIdManager, FSettings));
-	commands.push_back(std::make_unique<PlaylistRenameCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<CreatePlaylistCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<PlaylistRemoveCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<RemoveTrackFromPlayQueueCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<EqualizerCommand>(Core));
-	commands.push_back(std::make_unique<LyricsCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<SchedulerCommand>(FSleepTimer, FSettings));
-	commands.push_back(std::make_unique<DownloadTrackCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<GetFormatsCommand>(Core));
-	commands.push_back(std::make_unique<BrowseFilesCommand>(Core, FSettings));
-	commands.push_back(std::make_unique<AddFilesCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<AddUrlToPlaylistCommand>(Core, FIdManager));
-	commands.push_back(std::make_unique<UploadTrackCommand>(Core, FIdManager, FSettings));
-	commands.push_back(std::make_unique<StatusCommand>(Core));
-	commands.push_back(std::make_unique<SubscribeOnAIMPStateUpdateEventCommand>(Core, FIdManager, FStateEvents, FSleepTimer));
-	commands.push_back(std::make_unique<web::PlaylistsCommand>(Core));
-	commands.push_back(std::make_unique<web::EventsCommand>(FStateEvents));
+	std::vector<std::unique_ptr<IApiController>> commands;
+	commands.push_back(std::make_unique<rpcapi::VersionCommand>(Core));
+	commands.push_back(std::make_unique<rpcapi::GetPlaylistsCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::GetQueuedEntriesCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::GetPlaylistEntriesCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::GetPlaylistEntryInfoCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::GetCoverCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::GetPlayerControlPanelStateCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::PauseCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::StopCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::PlayCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::PlayNextCommand>(Core, FIdManager, FStateEvents));
+	commands.push_back(std::make_unique<rpcapi::PlayPreviousCommand>(Core, FIdManager, FStateEvents));
+	commands.push_back(std::make_unique<rpcapi::PluginCapabilitiesCommand>(FSettings));
+	commands.push_back(std::make_unique<rpcapi::ShowMessageCommand>(Core));
+	commands.push_back(std::make_unique<rpcapi::SetTrackRatingCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::SetTrackEnabledCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::EnqueueTrackCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::RemoveTrackCommand>(Core, FIdManager, FSettings));
+	commands.push_back(std::make_unique<rpcapi::PlaylistRenameCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::CreatePlaylistCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::PlaylistRemoveCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::RemoveTrackFromPlayQueueCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::EqualizerCommand>(Core));
+	commands.push_back(std::make_unique<rpcapi::LyricsCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::SchedulerCommand>(FSleepTimer, FSettings));
+	commands.push_back(std::make_unique<rpcapi::DownloadTrackCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::GetFormatsCommand>(Core));
+	commands.push_back(std::make_unique<rpcapi::BrowseFilesCommand>(Core, FSettings));
+	commands.push_back(std::make_unique<rpcapi::AddFilesCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::AddUrlToPlaylistCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::UploadTrackCommand>(Core, FIdManager, FSettings));
+	commands.push_back(std::make_unique<rpcapi::StatusCommand>(Core));
+	commands.push_back(std::make_unique<rpcapi::SubscribeOnAIMPStateUpdateEventCommand>(Core, FIdManager, FStateEvents, FSleepTimer));
+	commands.push_back(std::make_unique<webapi::PlaylistsController>(Core, FStateEvents));
+	commands.push_back(std::make_unique<webapi::EventsController>(FStateEvents));
 	FRemoteControlServer = std::make_unique<AIMPRemoteControlServer>(std::move(commands), FNetworkWatcher,
 		[core = FCore](const std::string &keyPath)
 		{

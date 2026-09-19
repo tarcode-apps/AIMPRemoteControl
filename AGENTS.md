@@ -9,7 +9,7 @@ constraints and conventions that are not obvious from the code.
 - **The wire protocol is frozen.** The Android app (v2.0.31) is unmaintained
   and will never update, so compatibility with it is the prime directive.
   [docs/remote-control-protocol.md](docs/remote-control-protocol.md) is the
-  contract — read it before changing anything in `src/remoteControlCommands/`
+  contract — read it before changing anything in `src/rpcApi/`
   or the servers. The `Version` command must keep reporting protocol version
   `1.2.0.5`; deliberate differences from the original plugin are called out in
   the protocol doc.
@@ -95,15 +95,18 @@ The player side and the client side are separate builds that meet in
 `src/plugin.cpp` is the entry point: it wires settings, the HTTP/JSON-RPC
 server (`remoteControlServer.*`, one listener per allowed interface), the UDP
 discovery responder (`serviceDiscoveryServer.*`), the options page
-(`optionsFrame.*`) and one command class per RPC method / HTTP endpoint under
-`src/remoteControlCommands/`. `src/helpers/` holds AIMP SDK wrappers, JSON
+(`optionsFrame.*`), one command class per RPC method / HTTP endpoint under
+`src/rpcApi/` (namespace `rpcapi`) and one controller class per
+`/api/v1` resource under `src/webApi/` (namespace `webapi`); all of them
+implement `IApiController` and map their routes through `IEndpointRouteBuilder`.
+`src/helpers/` holds AIMP SDK wrappers, JSON
 helpers and the network-interface watcher.
 
 Two protocols share one player: `src/player/` holds protocol-neutral
 operations on AIMP (C++ types, AIMP identifiers, main-thread only), and the
-command folders are thin adapters over it — `src/remoteControlCommands/` for
+adapter folders are thin layers over it — `src/rpcApi/` for
 the frozen `/RPC_JSON` (CRC ids, percentages, numeric error codes) and
-`src/webCommands/` for `/api/v1` ([docs/web-api.md](docs/web-api.md)).
+`src/webApi/` for `/api/v1` ([docs/web-api.md](docs/web-api.md)).
 Legacy representation belongs in the legacy adapter, never in `src/player/`.
 
 Things that bite:

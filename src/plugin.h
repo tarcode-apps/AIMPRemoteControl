@@ -4,7 +4,7 @@
 #include "IUnknownImpl.h"
 #include "networkWatcher.h"
 #include "optionsFrame.h"
-#include "remoteControlIdManager.h"
+#include "rpcApi/helpers/remoteControlIdManager.h"
 #include "remoteControlServer.h"
 #include "serviceDiscoveryServer.h"
 #include "sleepTimer.h"

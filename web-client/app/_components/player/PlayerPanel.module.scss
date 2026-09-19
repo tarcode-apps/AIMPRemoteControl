@@ -25,6 +25,10 @@
             display: none;
         }
 
+        &:not(.expanded, .dragging) {
+            pointer-events: none;
+        }
+
         &.expanded {
             --sheet-progress: 1;
 
@@ -48,6 +52,7 @@
     flex: none;
     height: var(--mini-player-height);
     background: var(--color-surface);
+    pointer-events: auto;
     opacity: calc(1 - var(--sheet-progress));
     transition: opacity var(--sheet-transition);
 

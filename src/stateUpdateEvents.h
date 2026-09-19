@@ -5,9 +5,14 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <map>
 #include <mutex>
+#include <string>
+#include <thread>
+#include <vector>
 
 class IAIMPCore;
+class IAIMPPlaylist;
 
 class StateUpdateEvents
 {
@@ -35,6 +40,12 @@ public:
 	Versions Current();
 	std::bitset<KindCount> WaitAny(Versions &seen, std::chrono::milliseconds timeout);
 
+	// Per-playlist change counters keyed by AIMP playlist id; a playlist that is not
+	// loaded has no entry.
+	using PlaylistRevisions = std::map<std::string, std::uint64_t>;
+	PlaylistRevisions CurrentPlaylistRevisions();
+	std::uint64_t PlaylistRevision(const std::string &playlistId);
+
 	void Notify(Kind kind);
 	bool IsStopped();
 
@@ -43,13 +54,21 @@ private:
 	class PlaylistListener;
 	class PlaylistManagerListener;
 
+	void WatchPlaylist(IAIMPPlaylist *playlist);
+	void PlaylistChanged(const std::string &playlistId);
+	void PlaylistRemoved(const std::string &playlistId);
+	void AllPlaylistsChanged();
+	void PollPlaylistSettings();
+
 	IAIMPCore *FCore = nullptr;
 	MessageHook *FMessageHook = nullptr;
-	PlaylistListener *FPlaylistListener = nullptr;
+	std::vector<PlaylistListener *> FPlaylistListeners;
 	PlaylistManagerListener *FPlaylistManagerListener = nullptr;
+	std::thread FSettingsPoller;
 
 	std::mutex FMutex;
 	std::condition_variable FChanged;
 	std::uint64_t FVersions[KindCount] = {};
+	PlaylistRevisions FPlaylistRevisions;
 	bool FStopped = false;
 };

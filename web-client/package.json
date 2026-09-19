@@ -9,15 +9,16 @@
   },
   "dependencies": {
     "@fontsource-utils/scss": "^0.2.4",
-    "@fontsource-variable/material-symbols-outlined": "^5.3.4",
-    "@tanstack/react-query": "^5.102.8",
+    "@fontsource-variable/material-symbols-outlined": "^5.3.6",
+    "@tanstack/react-query": "^5.103.1",
+    "@tanstack/react-virtual": "^3.14.13",
     "clsx": "^2.1.1",
     "i18next": "^26.4.2",
     "i18next-browser-languagedetector": "^8.2.1",
-    "next": "16.3.4",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "react-i18next": "^17.0.13"
+    "next": "16.3.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-i18next": "^17.0.14"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -26,10 +27,10 @@
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^9.39.4",
-    "eslint-config-next": "16.3.4",
-    "prettier": "^3.9.6",
+    "eslint-config-next": "16.3.5",
+    "prettier": "^3.9.8",
     "prettier-plugin-organize-imports": "^4.3.0",
-    "sass": "^1.103.1",
+    "sass": "^1.104.1",
     "typescript": "^5.9.3",
     "webpack-license-plugin": "^4.5.1"
   }

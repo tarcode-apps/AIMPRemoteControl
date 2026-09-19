@@ -1,6 +1,27 @@
+@use "../../_styles/mixins" as mixins;
+
+// Fixed slots, so a button that replaces another in a different mode stays put.
 .toolbar {
     flex: 1;
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    justify-items: center;
     align-items: center;
-    justify-content: space-around;
+
+    @include mixins.drawer-docked {
+        grid-template-columns: minmax(0, 1fr) repeat(4, 52px);
+        justify-items: start;
+        padding: 0 8px 0 16px;
+    }
+}
+
+.toolbar .search {
+    justify-self: stretch;
+    max-width: 480px;
+    margin-right: 16px;
+    background: var(--color-surface-raised);
+}
+
+.active {
+    color: var(--color-accent);
 }

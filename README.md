@@ -138,7 +138,7 @@ so build with `--debug`.
 | `src/plugin.cpp` | AIMP plugin entry point, wiring of servers and commands |
 | `src/remoteControlServer.*` | HTTP/JSON‑RPC server (one listener per allowed address) |
 | `src/serviceDiscoveryServer.*` | UDP discovery responder |
-| `src/remoteControlCommands/` | one class per RPC method / HTTP endpoint |
+| `src/rpcApi/` | one class per RPC method / HTTP endpoint |
 | `src/helpers/` | AIMP SDK helpers, network interface enumeration and watcher, JSON helpers |
 | `src/optionsFrame.*`, `Langs/` | options page and its localization |
 | `src/sleepTimer.*` | timer behind the `Scheduler` command |

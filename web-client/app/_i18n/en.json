@@ -33,14 +33,29 @@
     "repeat": "Repeat"
   },
   "playlists": {
-    "tracks_one": "{{count}} track",
-    "tracks_other": "{{count}} tracks"
+    "summary": "{{count}} / {{duration}} / {{size}}"
   },
   "playlist": {
     "add": "Add",
     "select": "Select tracks",
     "sort": "Sort",
     "search": "Search",
-    "more": "More"
+    "more": "More",
+    "empty": "The playlist is empty",
+    "collapseGroup": "Collapse group",
+    "expandGroup": "Expand group",
+    "collapseAll": "Collapse all groups",
+    "expandAll": "Expand all groups",
+    "searchPlaceholder": "Search in playlist",
+    "closeSearch": "Close search",
+    "closeSelection": "Close selection",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "selectItem": "Select track",
+    "selectGroup": "Select group",
+    "noResults": "Nothing found",
+    "selectedActions": "Actions with selected tracks",
+    "removeSelected": "Remove from playlist",
+    "enqueueSelected": "Add to queue"
   }
 }

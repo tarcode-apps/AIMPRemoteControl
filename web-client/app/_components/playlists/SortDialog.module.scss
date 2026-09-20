@@ -1,0 +1,26 @@
+.option {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 48px;
+    cursor: pointer;
+}
+
+.label {
+    flex: 1;
+}
+
+.disabled {
+    color: var(--color-text-secondary);
+    cursor: default;
+}
+
+.template {
+    width: 100%;
+    margin: 0 0 12px;
+}
+
+.error {
+    margin: 8px 0 0;
+    color: var(--color-accent);
+}

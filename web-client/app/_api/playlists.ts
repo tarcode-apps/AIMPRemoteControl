@@ -1,6 +1,6 @@
 import { queryOptions, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { request } from './client';
-import type { Playlist, PlaylistGroups, PlaylistItemsPage } from './types';
+import type { MoveRequest, Playlist, PlaylistGroups, PlaylistItemsPage, SortRequest } from './types';
 
 export type ItemsRange = {
     offset: number;
@@ -97,5 +97,19 @@ export function useSetGroupExpanded(id: string) {
         onError: (_error, _variables, context) => {
             for (const [queryKey, data] of context?.previous ?? []) client.setQueryData(queryKey, data);
         },
+    });
+}
+
+export function useSortPlaylist(id: string) {
+    return useMutation({
+        mutationFn: (body: SortRequest) =>
+            request<unknown>('POST', `/playlists/${encodeURIComponent(id)}/sort`, { body }),
+    });
+}
+
+export function useMovePlaylistItems(id: string) {
+    return useMutation({
+        mutationFn: (body: MoveRequest) =>
+            request<unknown>('POST', `/playlists/${encodeURIComponent(id)}/items/move`, { body }),
     });
 }

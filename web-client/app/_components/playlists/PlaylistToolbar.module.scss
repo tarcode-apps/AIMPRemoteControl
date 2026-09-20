@@ -3,6 +3,8 @@
 // Fixed slots, so a button that replaces another in a different mode stays put.
 .toolbar {
     flex: 1;
+    align-self: stretch;
+    overflow: hidden; // clips the buttons' ripples; menus and dialogs live in the top layer
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     justify-items: center;

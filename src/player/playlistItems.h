@@ -64,13 +64,44 @@ namespace player
 	std::optional<std::vector<PlaylistGroup>> GetPlaylistGroups(IAIMPCore *core, const std::string &playlistId,
 																  const std::string &search = {});
 
-	enum class GroupResult
+	enum class MutationResult
 	{
 		Ok,
 		PlaylistNotFound,
-		GroupNotFound
+		PlaylistReadOnly,
+		GroupNotFound,
+		ItemNotFound,
+		Failed
 	};
 
 	// Collapses or expands one group, or every group when `index` is nullopt.
-	GroupResult SetGroupExpanded(IAIMPCore *core, const std::string &playlistId, std::optional<std::int32_t> index, bool expanded);
+	MutationResult SetGroupExpanded(IAIMPCore *core, const std::string &playlistId, std::optional<std::int32_t> index, bool expanded);
+
+	enum class SortMode
+	{
+		Title,
+		FileName,
+		Duration,
+		Artist,
+		Inverse,
+		Random,
+		RandomGroups,
+		RandomGroupItems,
+		RandomAll,
+		Template
+	};
+
+	struct SortOptions
+	{
+		SortMode Mode = SortMode::Title;
+		std::string Template;	 // a file info formatter template, for SortMode::Template
+		bool Descending = false; // for sorts by a field: the sort is followed by an inversion
+	};
+
+	MutationResult SortPlaylist(IAIMPCore *core, const std::string &playlistId, const SortOptions &options);
+
+	// Moves the items at `indexes` to `target`, the index the first of them gets in the
+	// resulting playlist. They keep their relative order.
+	MutationResult MovePlaylistItems(IAIMPCore *core, const std::string &playlistId, std::vector<std::int32_t> indexes,
+									 std::int32_t target);
 }

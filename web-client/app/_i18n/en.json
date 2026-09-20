@@ -1,6 +1,8 @@
 {
   "actions": {
-    "retry": "Retry"
+    "retry": "Retry",
+    "ok": "OK",
+    "cancel": "Cancel"
   },
   "errors": {
     "network": "The player is unreachable",
@@ -56,6 +58,23 @@
     "noResults": "Nothing found",
     "selectedActions": "Actions with selected tracks",
     "removeSelected": "Remove from playlist",
-    "enqueueSelected": "Add to queue"
+    "enqueueSelected": "Add to queue",
+    "closeSort": "Finish sorting",
+    "sortBy": "Sort by…",
+    "dragHandle": "Drag to reorder",
+    "descending": "Descending",
+    "sortTemplateExample": "%Artist %Album %TrackNumber",
+    "sortModes": {
+      "title": "Title",
+      "fileName": "File name",
+      "duration": "Duration",
+      "artist": "Artist",
+      "template": "Template",
+      "inverse": "Reverse the order",
+      "random": "Shuffle",
+      "randomGroups": "Shuffle groups",
+      "randomGroupItems": "Shuffle tracks within groups",
+      "randomAll": "Shuffle groups and tracks"
+    }
   }
 }

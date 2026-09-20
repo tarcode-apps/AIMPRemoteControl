@@ -21,8 +21,10 @@
     text-align: left;
     white-space: nowrap;
 
-    &:hover:not(:disabled) {
-        background: var(--color-hover);
+    mixins.hover-capable {
+        &:hover:not(:disabled) {
+            background: var(--color-hover);
+        }
     }
 
     &:disabled {

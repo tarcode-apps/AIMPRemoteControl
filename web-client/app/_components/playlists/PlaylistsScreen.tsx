@@ -6,8 +6,8 @@ import { formatDuration, formatSize } from '@/app/_utils/format';
 import { useTranslation } from 'react-i18next';
 import { SearchField } from '../inputs';
 import { Screen } from '../pages';
+import { PlaylistModeProvider, usePlaylistMode } from './PlaylistMode';
 import { PlaylistPager } from './PlaylistPager';
-import { PlaylistSearchProvider, usePlaylistSearch } from './PlaylistSearch';
 import { usePlaylistSelection } from './PlaylistSelection';
 import styles from './PlaylistsScreen.module.scss';
 import { PlaylistTabs } from './PlaylistTabs';
@@ -15,9 +15,9 @@ import { PlaylistToolbar } from './PlaylistToolbar';
 
 export function PlaylistsScreen() {
     return (
-        <PlaylistSearchProvider>
+        <PlaylistModeProvider>
             <PlaylistsScreenContent />
-        </PlaylistSearchProvider>
+        </PlaylistModeProvider>
     );
 }
 
@@ -25,8 +25,8 @@ function PlaylistsScreenContent() {
     const { t, i18n } = useTranslation();
     const docked = useMediaQuery(media.drawerDocked);
     const { selected } = usePlaylistSelection();
-    const search = usePlaylistSearch();
-    const mobileSearch = !docked && search.query !== null;
+    const mode = usePlaylistMode();
+    const mobileSearch = !docked && mode.query !== null;
 
     return (
         <Screen
@@ -43,10 +43,10 @@ function PlaylistsScreenContent() {
                 mobileSearch ? (
                     <SearchField
                         className={styles.search}
-                        value={search.query ?? ''}
+                        value={mode.query ?? ''}
                         autoFocus
-                        onChange={search.setQuery}
-                        onClose={() => search.setQuery(null)}
+                        onChange={mode.setQuery}
+                        onClose={() => mode.setQuery(null)}
                     />
                 ) : (
                     <PlaylistTabs />

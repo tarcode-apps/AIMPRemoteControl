@@ -1,0 +1,23 @@
+// An underlined field, as in the player's dialogs: no box, the line lights up on focus.
+.textField {
+    height: 40px;
+    padding: 0;
+    border: 0;
+    border-bottom: 2px solid var(--color-divider);
+    background: none;
+    color: inherit;
+    font: inherit;
+    outline: none;
+
+    &::placeholder {
+        color: var(--color-text-secondary);
+    }
+
+    &::selection {
+        background: var(--color-selection-soft);
+    }
+
+    &:focus {
+        border-bottom-color: var(--color-accent);
+    }
+}

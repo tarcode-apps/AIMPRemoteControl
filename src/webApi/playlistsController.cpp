@@ -94,35 +94,103 @@ namespace
 		};
 	}
 
-	// Both PATCH endpoints take {"expanded": bool, "revision"?: number}; a revision
-	// that no longer matches means the group indexes may have shifted.
-	std::pair<bool, std::optional<std::int32_t>> GroupPatch(const ApiRequest &request, StateUpdateEvents &events,
-															const std::string &playlistId, std::optional<std::int32_t> index)
+	void ThrowUnlessOk(player::MutationResult result)
 	{
-		const nlohmann::json &body = request.Body;
-		if (!body.is_object() || !body.contains("expanded") || !body["expanded"].is_boolean())
-			throw ApiError(400, "invalidBody");
-		if (body.contains("revision"))
+		switch (result)
 		{
-			if (!body["revision"].is_number_unsigned())
-				throw ApiError(400, "invalidBody");
-			if (body["revision"].get<std::uint64_t>() != events.PlaylistRevision(playlistId))
-				throw ApiError(409, "playlistChanged");
+		case player::MutationResult::Ok:
+			return;
+		case player::MutationResult::PlaylistNotFound:
+			throw ApiError(404, "playlistNotFound");
+		case player::MutationResult::PlaylistReadOnly:
+			throw ApiError(403, "playlistReadOnly");
+		case player::MutationResult::GroupNotFound:
+			throw ApiError(404, "groupNotFound");
+		case player::MutationResult::ItemNotFound:
+			throw ApiError(404, "itemNotFound");
+		case player::MutationResult::Failed:
+			throw ApiError(500, "playlistUpdateFailed");
 		}
-		return {body["expanded"].get<bool>(), index};
+	}
+
+	// Indexes and group indexes are only meaningful within one revision, so bodies
+	// may carry the revision they were computed against.
+	void CheckRevision(const nlohmann::json &body, StateUpdateEvents &events, const std::string &playlistId)
+	{
+		if (!body.contains("revision"))
+			return;
+		if (!body["revision"].is_number_unsigned())
+			throw ApiError(400, "invalidBody");
+		if (body["revision"].get<std::uint64_t>() != events.PlaylistRevision(playlistId))
+			throw ApiError(409, "playlistChanged");
 	}
 
 	nlohmann::json ApplyGroupPatch(IAIMPCore *core, StateUpdateEvents &events, const ApiRequest &request,
 								   const std::string &playlistId, std::optional<std::int32_t> index)
 	{
-		const auto [expanded, target] = GroupPatch(request, events, playlistId, index);
-		const player::GroupResult result = RunOnMainThread(core, [&]
-														   { return player::SetGroupExpanded(core, playlistId, target, expanded); });
-		if (result == player::GroupResult::PlaylistNotFound)
-			throw ApiError(404, "playlistNotFound");
-		if (result == player::GroupResult::GroupNotFound)
-			throw ApiError(404, "groupNotFound");
+		const nlohmann::json &body = request.Body;
+		if (!body.is_object() || !body.contains("expanded") || !body["expanded"].is_boolean())
+			throw ApiError(400, "invalidBody");
+		CheckRevision(body, events, playlistId);
+		const bool expanded = body["expanded"].get<bool>();
+		ThrowUnlessOk(RunOnMainThread(core, [&]
+									  { return player::SetGroupExpanded(core, playlistId, index, expanded); }));
 		return nlohmann::json::object();
+	}
+
+	player::SortOptions SortBody(const nlohmann::json &body)
+	{
+		using player::SortMode;
+		static const std::pair<const char *, SortMode> modes[] = {
+			{"title", SortMode::Title},
+			{"fileName", SortMode::FileName},
+			{"duration", SortMode::Duration},
+			{"artist", SortMode::Artist},
+			{"inverse", SortMode::Inverse},
+			{"random", SortMode::Random},
+			{"randomGroups", SortMode::RandomGroups},
+			{"randomGroupItems", SortMode::RandomGroupItems},
+			{"randomAll", SortMode::RandomAll},
+			{"template", SortMode::Template},
+		};
+		if (!body.is_object() || !body.contains("by") || !body["by"].is_string())
+			throw ApiError(400, "invalidBody");
+		const std::string by = body["by"].get<std::string>();
+		const auto mode = std::find_if(std::begin(modes), std::end(modes), [&](const auto &entry)
+									   { return by == entry.first; });
+		if (mode == std::end(modes))
+			throw ApiError(400, "invalidBody");
+
+		player::SortOptions options;
+		options.Mode = mode->second;
+		if (body.contains("descending"))
+		{
+			if (!body["descending"].is_boolean())
+				throw ApiError(400, "invalidBody");
+			options.Descending = body["descending"].get<bool>();
+		}
+		if (options.Mode == SortMode::Template)
+		{
+			if (!body.contains("template") || !body["template"].is_string() || body["template"].get<std::string>().empty())
+				throw ApiError(400, "invalidBody");
+			options.Template = body["template"].get<std::string>();
+		}
+		return options;
+	}
+
+	std::pair<std::vector<std::int32_t>, std::int32_t> MoveBody(const nlohmann::json &body)
+	{
+		if (!body.is_object() || !body.contains("indexes") || !body["indexes"].is_array() || body["indexes"].empty() ||
+			!body.contains("target") || !body["target"].is_number_integer())
+			throw ApiError(400, "invalidBody");
+		std::vector<std::int32_t> indexes;
+		for (const nlohmann::json &index : body["indexes"])
+		{
+			if (!index.is_number_integer())
+				throw ApiError(400, "invalidBody");
+			indexes.push_back(index.get<std::int32_t>());
+		}
+		return {std::move(indexes), body["target"].get<std::int32_t>()};
 	}
 }
 
@@ -187,4 +255,22 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 
 	endpoints.MapApi(HttpMethod::Patch, R"(/api/v1/playlists/([^/]+)/groups/(\d+))", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   { return ApplyGroupPatch(core, events, request, request.PathMatches.at(0), std::stoi(request.PathMatches.at(1))); });
+
+	endpoints.MapApi(HttpMethod::Post, R"(/api/v1/playlists/([^/]+)/sort)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
+			   {
+		const std::string playlistId = request.PathMatches.at(0);
+		const player::SortOptions options = SortBody(request.Body);
+		CheckRevision(request.Body, events, playlistId);
+		ThrowUnlessOk(RunOnMainThread(core, [&]
+									  { return player::SortPlaylist(core, playlistId, options); }));
+		return nlohmann::json::object(); });
+
+	endpoints.MapApi(HttpMethod::Post, R"(/api/v1/playlists/([^/]+)/items/move)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
+			   {
+		const std::string playlistId = request.PathMatches.at(0);
+		const auto move = MoveBody(request.Body);
+		CheckRevision(request.Body, events, playlistId);
+		ThrowUnlessOk(RunOnMainThread(core, [&]
+									  { return player::MovePlaylistItems(core, playlistId, move.first, move.second); }));
+		return nlohmann::json::object(); });
 }

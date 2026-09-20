@@ -216,17 +216,17 @@ std::optional<std::vector<player::PlaylistGroup>> player::GetPlaylistGroups(IAIM
 	return groups;
 }
 
-player::GroupResult player::SetGroupExpanded(IAIMPCore *core, const std::string &playlistId, std::optional<std::int32_t> index, bool expanded)
+player::MutationResult player::SetGroupExpanded(IAIMPCore *core, const std::string &playlistId, std::optional<std::int32_t> index, bool expanded)
 {
 	IAIMPPlaylist *playlist = LoadedPlaylistByAIMPId(core, playlistId);
 	if (!playlist)
-		return GroupResult::PlaylistNotFound;
+		return MutationResult::PlaylistNotFound;
 
 	const INT32 count = playlist->GetGroupCount();
 	if (index && (*index < 0 || *index >= count))
 	{
 		playlist->Release();
-		return GroupResult::GroupNotFound;
+		return MutationResult::GroupNotFound;
 	}
 
 	const INT32 first = index ? *index : 0;
@@ -243,5 +243,132 @@ player::GroupResult player::SetGroupExpanded(IAIMPCore *core, const std::string 
 	}
 	playlist->EndUpdate();
 	playlist->Release();
-	return GroupResult::Ok;
+	return MutationResult::Ok;
+}
+
+namespace
+{
+	bool IsReadOnly(IAIMPPlaylist *playlist)
+	{
+		IAIMPPlaylistProperties *props = nullptr;
+		if (Failed(playlist->QueryInterface(IID_IAIMPPlaylistProperties, reinterpret_cast<void **>(&props))) || !props)
+			return false;
+		INT32 readOnly = 0;
+		props->GetValueAsInt32(AIMP_PLAYLIST_PROPID_READONLY, &readOnly);
+		props->Release();
+		return readOnly != 0;
+	}
+
+	HRESULT Sort(IAIMPCore *core, IAIMPPlaylist *playlist, const player::SortOptions &options)
+	{
+		using player::SortMode;
+		switch (options.Mode)
+		{
+		case SortMode::Title:
+			return playlist->Sort(AIMP_PLAYLIST_SORTMODE_TITLE);
+		case SortMode::FileName:
+			return playlist->Sort(AIMP_PLAYLIST_SORTMODE_FILENAME);
+		case SortMode::Duration:
+			return playlist->Sort(AIMP_PLAYLIST_SORTMODE_DURATION);
+		case SortMode::Artist:
+			return playlist->Sort(AIMP_PLAYLIST_SORTMODE_ARTIST);
+		case SortMode::Inverse:
+			return playlist->Sort(AIMP_PLAYLIST_SORTMODE_INVERSE);
+		case SortMode::Random:
+			return playlist->Sort(AIMP_PLAYLIST_SORTMODE_RANDOMIZE);
+		case SortMode::RandomGroups:
+			return playlist->Sort(AIMP_PLAYLIST_SORTMODE_RANDOMIZE_GROUPS);
+		case SortMode::RandomGroupItems:
+			return playlist->Sort(AIMP_PLAYLIST_SORTMODE_RANDOMIZE_GROUPITEMS);
+		case SortMode::RandomAll:
+			return playlist->Sort(AIMP_PLAYLIST_SORTMODE_RANDOMIZE_GROUPS_AND_IT_ITEMS);
+		case SortMode::Template:
+		{
+			IAIMPString *sortTemplate = StringToIAIMPString(core, options.Template);
+			if (!sortTemplate)
+				return E_OUTOFMEMORY;
+			const HRESULT result = playlist->Sort2(sortTemplate);
+			sortTemplate->Release();
+			return result;
+		}
+		}
+		return E_INVALIDARG;
+	}
+}
+
+player::MutationResult player::SortPlaylist(IAIMPCore *core, const std::string &playlistId, const SortOptions &options)
+{
+	IAIMPPlaylist *playlist = LoadedPlaylistByAIMPId(core, playlistId);
+	if (!playlist)
+		return MutationResult::PlaylistNotFound;
+	if (IsReadOnly(playlist))
+	{
+		playlist->Release();
+		return MutationResult::PlaylistReadOnly;
+	}
+
+	playlist->BeginUpdate();
+	HRESULT result = Sort(core, playlist, options);
+	if (Succeeded(result) && options.Descending)
+		result = playlist->Sort(AIMP_PLAYLIST_SORTMODE_INVERSE);
+	playlist->EndUpdate();
+	playlist->Release();
+	return Succeeded(result) ? MutationResult::Ok : MutationResult::Failed;
+}
+
+player::MutationResult player::MovePlaylistItems(IAIMPCore *core, const std::string &playlistId, std::vector<std::int32_t> indexes,
+												 std::int32_t target)
+{
+	IAIMPPlaylist *playlist = LoadedPlaylistByAIMPId(core, playlistId);
+	if (!playlist)
+		return MutationResult::PlaylistNotFound;
+	if (IsReadOnly(playlist))
+	{
+		playlist->Release();
+		return MutationResult::PlaylistReadOnly;
+	}
+
+	std::sort(indexes.begin(), indexes.end());
+	indexes.erase(std::unique(indexes.begin(), indexes.end()), indexes.end());
+	const std::int32_t count = playlist->GetItemCount();
+	const std::int32_t moved = static_cast<std::int32_t>(indexes.size());
+	if (moved == 0 || indexes.front() < 0 || indexes.back() >= count || target < 0 || target > count - moved)
+	{
+		playlist->Release();
+		return MutationResult::ItemNotFound;
+	}
+
+	// Writing the index of an item takes it out of the playlist and puts it back at
+	// the new index. `pivot` is the current index of the item that will follow the
+	// moved block. The items above it go just before it, from the bottom up, each one
+	// landing before the previously placed one; the items below it go right after it,
+	// from the top down. In both directions the remaining indexes stay valid.
+	std::int32_t pivot = 0;
+	for (std::int32_t skipped = 0; pivot < count && pivot - skipped < target; ++pivot)
+		if (skipped < moved && indexes[skipped] == pivot)
+			++skipped;
+	while (pivot < count && std::binary_search(indexes.begin(), indexes.end(), pivot))
+		++pivot;
+
+	std::vector<IAIMPPlaylistItem *> items(moved, nullptr);
+	bool found = true;
+	for (std::int32_t i = 0; i < moved && found; ++i)
+		found = Succeeded(playlist->GetItem(indexes[i], IID_IAIMPPlaylistItem, reinterpret_cast<void **>(&items[i]))) && items[i];
+
+	HRESULT result = found ? S_OK : E_FAIL;
+	if (found)
+	{
+		playlist->BeginUpdate();
+		const auto below = std::lower_bound(indexes.begin(), indexes.end(), pivot) - indexes.begin();
+		for (std::int32_t i = static_cast<std::int32_t>(below) - 1, placed = 0; i >= 0 && Succeeded(result); --i, ++placed)
+			result = items[i]->SetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_INDEX, pivot - 1 - placed);
+		for (std::int32_t i = static_cast<std::int32_t>(below), placed = 0; i < moved && Succeeded(result); ++i, ++placed)
+			result = items[i]->SetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_INDEX, pivot + placed);
+		playlist->EndUpdate();
+	}
+	for (IAIMPPlaylistItem *item : items)
+		if (item)
+			item->Release();
+	playlist->Release();
+	return found ? (Succeeded(result) ? MutationResult::Ok : MutationResult::Failed) : MutationResult::ItemNotFound;
 }

@@ -1,6 +1,8 @@
 {
   "actions": {
-    "retry": "Повторить"
+    "retry": "Повторить",
+    "ok": "ОК",
+    "cancel": "Отмена"
   },
   "errors": {
     "network": "Плеер недоступен",
@@ -56,6 +58,23 @@
     "noResults": "Ничего не найдено",
     "selectedActions": "Действия с выбранными треками",
     "removeSelected": "Удалить из плейлиста",
-    "enqueueSelected": "Добавить в очередь"
+    "enqueueSelected": "Добавить в очередь",
+    "closeSort": "Завершить сортировку",
+    "sortBy": "Сортировать по…",
+    "dragHandle": "Перетащите, чтобы изменить порядок",
+    "descending": "В обратном порядке",
+    "sortTemplateExample": "%Artist %Album %TrackNumber",
+    "sortModes": {
+      "title": "Заголовку",
+      "fileName": "Имени файла",
+      "duration": "Длительности",
+      "artist": "Артисту",
+      "template": "Шаблону",
+      "inverse": "Инвертировать порядок",
+      "random": "Перемешать",
+      "randomGroups": "Перемешать группы",
+      "randomGroupItems": "Перемешать треки внутри групп",
+      "randomAll": "Перемешать группы и треки"
+    }
   }
 }

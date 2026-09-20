@@ -26,6 +26,9 @@ Error codes so far:
 | `404` | `playlistNotFound` | no loaded playlist has this `id` |
 | `404` | `groupNotFound` | the playlist has no group with this index |
 | `409` | `playlistChanged` | the `revision` in the request is not the playlist's current one |
+| `403` | `playlistReadOnly` | the playlist is read-only in the player, so it cannot be sorted or reordered |
+| `404` | `itemNotFound` | an item index in the request is outside the playlist |
+| `500` | `playlistUpdateFailed` | the player refused the change |
 
 ## Playlists
 
@@ -156,6 +159,46 @@ The same body applied to every group of the playlist at once, for "collapse
 all" and "expand all".
 
 Errors: `400 invalidBody`, `404 playlistNotFound`, `409 playlistChanged`.
+
+### `POST /api/v1/playlists/{id}/sort`
+
+Sorts the playlist in the player. `by` names the order, `descending` (optional,
+default `false`) inverts it after sorting and only makes sense for the orders
+by a field: `title`, `fileName`, `duration`, `artist` and `template`. With
+`template` the body also carries the `template` itself, a file info formatter
+template such as `%Album %TrackNumber`, which the player evaluates for every
+item. `inverse` reverses the current order; `random`, `randomGroups`,
+`randomGroupItems` and `randomAll` shuffle the items, the groups, the items
+inside each group, or both.
+
+```json
+{ "by": "template", "template": "%Year %Album", "descending": true, "revision": 7 }
+```
+
+`revision` is optional and works as in the group requests. The response is an
+empty object; the new order comes back through the `playlists` event.
+
+Errors: `400 invalidBody`, `403 playlistReadOnly`, `404 playlistNotFound`,
+`409 playlistChanged`, `500 playlistUpdateFailed`.
+
+### `POST /api/v1/playlists/{id}/items/move`
+
+Moves items to a new place in the playlist. `indexes` are the items to move,
+in any order; they keep their playlist order relative to each other. `target`
+is the index the first of them has once they are moved, counted in the
+resulting playlist, so it ranges from `0` to the item count minus the number
+of moved items.
+
+```json
+{ "indexes": [12, 13], "target": 40, "revision": 7 }
+```
+
+Moving items across group boundaries is allowed; the player splits or merges
+groups as its grouping settings dictate. `revision` is optional and works as in
+the group requests. The response is an empty object.
+
+Errors: `400 invalidBody`, `403 playlistReadOnly`, `404 playlistNotFound`,
+`404 itemNotFound`, `409 playlistChanged`, `500 playlistUpdateFailed`.
 
 ## Events
 

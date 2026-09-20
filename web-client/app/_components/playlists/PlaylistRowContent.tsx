@@ -2,9 +2,11 @@
 
 import type { Playlist, PlaylistGroup, PlaylistItem } from '@/app/_api/types';
 import { formatDuration } from '@/app/_utils/format';
+import clsx from 'clsx';
+import type { PointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '../icons';
-import { Checkbox } from '../inputs';
+import { ListCheckbox } from '../inputs';
 import { Skeleton } from '../skeleton';
 import styles from './PlaylistPage.module.scss';
 
@@ -15,6 +17,7 @@ export type RowProps = {
     // size itself by: the rows are positioned absolutely and share no grid.
     widestNumber: string;
     selecting: boolean;
+    sorting: boolean;
 };
 
 export type ItemRowProps = RowProps & {
@@ -22,15 +25,46 @@ export type ItemRowProps = RowProps & {
     number: number;
     selected: boolean;
     onSelect(selected: boolean): void;
+    onDragStart?(event: PointerEvent): void;
 };
 
-export function ItemRow({ item, number, playlist, docked, widestNumber, selecting, selected, onSelect }: ItemRowProps) {
+export function DragHandle({
+    onDragStart,
+    className,
+}: {
+    onDragStart?(event: PointerEvent): void;
+    className?: string;
+}) {
+    const { t } = useTranslation();
+    return (
+        <span
+            className={clsx(styles.handle, className)}
+            title={onDragStart && t('playlist.dragHandle')}
+            onPointerDown={onDragStart}
+        >
+            <Icon>drag_indicator</Icon>
+        </span>
+    );
+}
+
+export function ItemRow({
+    item,
+    number,
+    playlist,
+    docked,
+    widestNumber,
+    selecting,
+    sorting,
+    selected,
+    onSelect,
+    onDragStart,
+}: ItemRowProps) {
     const { t } = useTranslation();
     const label = playlist.showNumbers && `${number}.`;
     return (
         <>
             {selecting && (
-                <Checkbox
+                <ListCheckbox
                     title={t('playlist.selectItem')}
                     tabIndex={-1}
                     className={styles.checkbox}
@@ -39,6 +73,7 @@ export function ItemRow({ item, number, playlist, docked, widestNumber, selectin
                     onClick={event => event.stopPropagation()}
                 />
             )}
+            {sorting && <DragHandle onDragStart={onDragStart} />}
             {label && docked && (
                 <div className={styles.number} data-widest={widestNumber}>
                     {label}
@@ -56,10 +91,11 @@ export function ItemRow({ item, number, playlist, docked, widestNumber, selectin
     );
 }
 
-export function SkeletonRow({ playlist, docked, widestNumber, selecting }: RowProps) {
+export function SkeletonRow({ playlist, docked, widestNumber, selecting, sorting }: RowProps) {
     return (
         <>
             {selecting && <Skeleton shape="rect" className={styles.checkbox} width={16} height={16} />}
+            {sorting && <DragHandle />}
             {playlist.showNumbers && docked && (
                 <div className={styles.number} data-widest={widestNumber}>
                     <Skeleton width="100%" />

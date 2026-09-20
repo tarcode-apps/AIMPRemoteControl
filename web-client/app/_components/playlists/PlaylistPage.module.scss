@@ -75,8 +75,10 @@
     color: var(--color-accent);
     font-weight: var(--font-weight-medium);
 
-    &:hover {
-        background: var(--color-hover);
+    mixins.hover-capable {
+        &:hover {
+            background: var(--color-hover);
+        }
     }
 }
 
@@ -102,8 +104,10 @@
     text-align: left;
 }
 
-.groupRow:has(button):hover {
-    background: var(--color-surface-raised);
+@include mixins.hover-capable {
+    .groupRow:has(button):hover {
+        background: var(--color-surface-raised);
+    }
 }
 
 .groupName {
@@ -205,4 +209,54 @@
 
 .groupButton:focus {
     outline: none;
+}
+
+.handle {
+    flex: none;
+    display: inline-flex;
+    color: var(--color-text-secondary);
+    cursor: grab;
+    user-select: none;
+}
+
+// Outranks the pager's `.pane *` rule, which allows vertical panning on mobile.
+.page .handle,
+.page .handle * {
+    touch-action: none;
+}
+
+.groupHandle {
+    margin-left: 16px;
+}
+
+// Kept in the DOM: a touch is cancelled when its target is removed.
+.hidden {
+    visibility: hidden;
+}
+
+.ghost {
+    z-index: 1;
+    background: var(--color-surface-raised);
+    box-shadow: 0 4px 16px var(--color-shadow);
+    pointer-events: none;
+}
+
+.dragging {
+    .row,
+    .groupRow {
+        transition: transform 0.15s;
+    }
+
+    .ghost {
+        transition: none;
+    }
+}
+
+@include mixins.drawer-docked {
+    .handle {
+        grid-column: 1;
+        grid-row: 1;
+        align-self: center;
+        margin-right: 16px;
+    }
 }

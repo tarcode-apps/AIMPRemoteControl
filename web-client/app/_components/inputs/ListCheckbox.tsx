@@ -1,16 +1,16 @@
 'use client';
 
-// The checkbox of forms and dialogs, styled like Radio; lists use ListCheckbox.
+// The compact checkbox of list rows, drawn in the text colour.
 import clsx from 'clsx';
 import { useEffect, useRef, type InputHTMLAttributes } from 'react';
-import styles from './Checkbox.module.scss';
+import styles from './ListCheckbox.module.scss';
 
-export type CheckboxProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & {
+export type ListCheckboxProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & {
     title: string;
     indeterminate?: boolean;
 };
 
-export function Checkbox({ title, indeterminate = false, className, ...rest }: CheckboxProps) {
+export function ListCheckbox({ title, indeterminate = false, className, ...rest }: ListCheckboxProps) {
     const ref = useRef<HTMLInputElement>(null);
 
     useEffect(() => {

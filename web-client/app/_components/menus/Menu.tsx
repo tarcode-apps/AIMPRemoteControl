@@ -1,7 +1,8 @@
 'use client';
 
-import { useId, type CSSProperties, type KeyboardEvent, type ToggleEvent } from 'react';
-import { IconButton } from '../buttons';
+import { anchorName } from '@/app/_utils/anchorName';
+import { useId, type ComponentType, type CSSProperties, type KeyboardEvent, type ToggleEvent } from 'react';
+import { IconButton, type IconButtonProps } from '../buttons';
 import { Icon } from '../icons';
 import styles from './Menu.module.scss';
 
@@ -17,11 +18,12 @@ export type MenuProps = {
     icon: string;
     items: MenuItem[];
     className?: string;
+    Button?: ComponentType<IconButtonProps>;
 };
 
-export function Menu({ title, icon, items, className }: MenuProps) {
+export function Menu({ title, icon, items, className, Button = IconButton }: MenuProps) {
     const id = useId();
-    const anchor = `--menu-${id.replace(/[^a-zA-Z0-9-]/g, '')}`;
+    const anchor = anchorName('menu', id);
 
     // The items are always mounted, so autoFocus would not fire when the popover opens.
     const onToggle = (event: ToggleEvent<HTMLDivElement>) => {
@@ -58,14 +60,14 @@ export function Menu({ title, icon, items, className }: MenuProps) {
 
     return (
         <div className={className}>
-            <IconButton
+            <Button
                 title={title}
                 aria-haspopup="menu"
                 popoverTarget={id}
                 style={{ anchorName: anchor } as CSSProperties}
             >
                 <Icon>{icon}</Icon>
-            </IconButton>
+            </Button>
             <div
                 id={id}
                 popover="auto"

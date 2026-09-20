@@ -1,21 +1,22 @@
 'use client';
 
 import { errorMessage } from '@/app/_api/errors';
-import { usePlaylistItems, useSetGroupExpanded } from '@/app/_api/playlists';
+import { useMovePlaylistItems, usePlaylistItems, useSetGroupExpanded } from '@/app/_api/playlists';
 import type { Playlist, PlaylistGroup, PlaylistItem } from '@/app/_api/types';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { media } from '@/app/_styles/media';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import clsx from 'clsx';
-import { useId, useRef, type KeyboardEvent, type MouseEvent } from 'react';
+import { useId, useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Checkbox } from '../inputs';
+import { ListCheckbox } from '../inputs';
+import { usePlaylistMode } from './PlaylistMode';
 import styles from './PlaylistPage.module.scss';
-import { GroupRow, ItemRow, SkeletonRow } from './PlaylistRowContent';
+import { DragHandle, GroupRow, ItemRow, SkeletonRow } from './PlaylistRowContent';
 import type { PlaylistRow } from './playlistRows';
-import { usePlaylistSearch } from './PlaylistSearch';
 import { usePlaylistSelection } from './PlaylistSelection';
 import { useActiveRow } from './useActiveRow';
+import { usePlaylistDrag } from './usePlaylistDrag';
 import { pageSize, usePlaylistLayout } from './usePlaylistLayout';
 
 const twoLineRowHeight = 56;
@@ -43,23 +44,29 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const listId = useId();
     const { selected } = usePlaylistSelection();
-    const search = usePlaylistSearch();
+    const mode = usePlaylistMode();
     // The pager keeps the neighbouring playlists mounted with their plain lists.
     const mine = selected?.id === playlist.id;
-    const text = mine ? search.text : '';
+    const text = mine ? mode.text : '';
     const searching = text !== '';
-    const selecting = mine && search.active;
+    const selecting = mine && mode.selecting;
+    const sorting = mine && mode.mode === 'sort';
+    const sortable = sorting && !playlist.readOnly;
     const itemRowHeight = playlist.showSecondLine ? twoLineRowHeight : oneLineRowHeight;
 
-    const layout = usePlaylistLayout(playlist, text);
+    const layout = usePlaylistLayout(playlist, text, searching || sorting);
     const { rows } = layout;
     const setExpanded = useSetGroupExpanded(playlist.id);
+    const moveItems = useMovePlaylistItems(playlist.id);
 
+    // Filled in by the drag hook below, which needs the virtualizer first.
+    const collapsed = useRef<(row: number) => boolean>(() => false);
     // eslint-disable-next-line react-hooks/incompatible-library -- the compiler skips this component, which is fine here
     const virtualizer = useVirtualizer({
         count: rows.count,
         getScrollElement: () => scrollRef.current,
-        estimateSize: row => (rows.at(row).kind === 'group' ? groupRowHeight : itemRowHeight),
+        estimateSize: row =>
+            collapsed.current(row) ? 0 : rows.at(row).kind === 'group' ? groupRowHeight : itemRowHeight,
         overscan: overscanRows,
     });
     const active = useActiveRow(row => virtualizer.scrollToIndex(row, { align: 'auto' }));
@@ -83,6 +90,44 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
         const page = loaded.get(Math.floor(position / pageSize));
         return page?.items[position - page.offset];
     };
+
+    // The ghost keeps the item it started with: its page may unload while dragging far.
+    const draggedItem = useRef<PlaylistItem | undefined>(undefined);
+    const drag = usePlaylistDrag({
+        enabled: sortable,
+        scrollRef,
+        rows,
+        virtualizer,
+        revisionOf: row => {
+            const source = rows.at(row);
+            return source.kind === 'group'
+                ? layout.groupsRevision
+                : loaded.get(Math.floor(source.position / pageSize))?.revision;
+        },
+        onDrop: (row, boundary) => {
+            const source = rows.at(row);
+            const before = boundary < rows.count ? rows.at(boundary) : null;
+            const position = !before
+                ? playlist.itemCount
+                : before.kind === 'item'
+                  ? before.position
+                  : before.group.firstPosition;
+            const [firstIndex, count] =
+                source.kind === 'group' ? [source.group.firstPosition, source.group.count] : [source.position, 1];
+            const target = position > firstIndex ? position - count : position;
+            if (target === firstIndex) {
+                drag.reset();
+                return;
+            }
+            const indexes = Array.from({ length: count }, (_, i) => firstIndex + i);
+            moveItems.mutate({ indexes, target, revision: playlist.revision }, { onError: () => drag.reset() });
+        },
+    });
+    collapsed.current = drag.hidden;
+    // Sizes are cached by index: a moved group changes which indexes are headers, and
+    // a drag collapses a block.
+    const dragged = drag.state?.source;
+    useLayoutEffect(() => virtualizer.measure(), [rows, virtualizer, dragged]);
 
     const numberOf = (row: PlaylistRow, item: PlaylistItem | undefined) => {
         if (row.kind !== 'item') return undefined;
@@ -109,7 +154,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
             const item = itemAt(position);
             if (!item) continue;
             loadedCount++;
-            if (search.isSelected(item.index)) selectedCount++;
+            if (mode.isSelected(item.index)) selectedCount++;
         }
         const checked = loadedCount === group.count && selectedCount === loadedCount && loadedCount > 0;
         return { checked, indeterminate: !checked && selectedCount > 0 };
@@ -118,14 +163,14 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
     const play = (item: PlaylistItem) => console.log('PLAY', item.index);
 
     const toggleGroup = (group: PlaylistGroup) => {
-        if (!searching)
+        if (!searching && !sorting)
             setExpanded.mutate({ index: group.index, expanded: !group.expanded, revision: playlist.revision });
     };
 
     const toggleSelected = (row: PlaylistRow, item: PlaylistItem | undefined) => {
         if (row.kind === 'group')
-            void search.setRangeSelected(row.group.firstPosition, row.group.count, !groupSelection(row.group).checked);
-        else if (item) search.setSelected([item.index], !search.isSelected(item.index));
+            void mode.setRangeSelected(row.group.firstPosition, row.group.count, !groupSelection(row.group).checked);
+        else if (item) mode.setSelected([item.index], !mode.isSelected(item.index));
     };
 
     const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -136,7 +181,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
         if (active.move(event.key, rows.count, pageRows)) event.preventDefault();
         else if (event.key === 'Enter' && current) {
             if (current.kind === 'group') toggleGroup(current.group);
-            else if (item) play(item);
+            else if (item && !sorting) play(item);
             event.preventDefault();
         } else if (event.key === ' ' && current && selecting) {
             toggleSelected(current, item);
@@ -145,11 +190,12 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
     };
 
     const onItemClick = (event: MouseEvent, row: number, item: PlaylistItem) => {
-        if (search.selecting) {
-            search.setSelected([item.index], !search.isSelected(item.index));
+        if (mode.mode === 'select') {
+            mode.setSelected([item.index], !mode.isSelected(item.index));
             return;
         }
         active.select(row);
+        if (sorting) return;
         // Decided per gesture rather than per device: a tap plays at once, a mouse
         // click only selects and the double click plays.
         const { pointerType } = event.nativeEvent as PointerEvent;
@@ -157,7 +203,35 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
     };
 
     const rowId = (row: number) => `${listId}-${row}`;
-    const rowProps = { playlist, docked, widestNumber, selecting };
+    const rowProps = { playlist, docked, widestNumber, selecting, sorting: sortable };
+
+    let ghost = null;
+    if (drag.state) {
+        const row = rows.at(drag.state.source.row);
+        const item = row.kind === 'item' ? (itemAt(row.position) ?? draggedItem.current) : undefined;
+        const style = { height: drag.state.source.ghostHeight, transform: `translateY(${drag.state.top}px)` };
+        ghost =
+            row.kind === 'group' ? (
+                <div className={clsx(styles.groupRow, styles.ghost)} style={style}>
+                    <DragHandle className={styles.groupHandle} />
+                    <GroupRow group={row.group} />
+                </div>
+            ) : (
+                <div className={clsx(styles.row, styles.ghost)} style={style}>
+                    {item ? (
+                        <ItemRow
+                            {...rowProps}
+                            item={item}
+                            number={numberOf(row, item) ?? 0}
+                            selected={false}
+                            onSelect={() => {}}
+                        />
+                    ) : (
+                        <SkeletonRow {...rowProps} />
+                    )}
+                </div>
+            );
+    }
 
     return (
         <section
@@ -195,10 +269,15 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
             ) : empty ? (
                 <p className={styles.message}>{t(searching ? 'playlist.noResults' : 'playlist.empty')}</p>
             ) : (
-                <div className={styles.list} style={{ height: virtualizer.getTotalSize() }}>
+                <div
+                    className={clsx(styles.list, drag.state && !drag.settled && styles.dragging)}
+                    style={{ height: virtualizer.getTotalSize() + (drag.state?.source.ghostHeight ?? 0) }}
+                >
                     {virtualRows.map(({ index, start }) => {
                         const row = rows.at(index);
                         const isActive = active.row === index;
+                        const hidden = drag.hidden(index);
+                        const transform = `translateY(${start + drag.shift(index)}px)`;
                         if (row.kind === 'group')
                             return (
                                 <div
@@ -206,18 +285,22 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                                     id={rowId(index)}
                                     role="option"
                                     aria-selected={isActive}
-                                    className={clsx(styles.groupRow, isActive && styles.active)}
-                                    style={{ height: groupRowHeight, transform: `translateY(${start}px)` }}
+                                    className={clsx(
+                                        styles.groupRow,
+                                        isActive && styles.active,
+                                        hidden && styles.hidden,
+                                    )}
+                                    style={{ height: groupRowHeight, transform }}
                                     onClick={() => active.select(index)}
                                 >
                                     {selecting && (
-                                        <Checkbox
+                                        <ListCheckbox
                                             title={t('playlist.selectGroup')}
                                             tabIndex={-1}
                                             className={styles.groupCheckbox}
                                             {...groupSelection(row.group)}
                                             onChange={event =>
-                                                search.setRangeSelected(
+                                                mode.setRangeSelected(
                                                     row.group.firstPosition,
                                                     row.group.count,
                                                     event.target.checked,
@@ -225,9 +308,15 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                                             }
                                         />
                                     )}
+                                    {sortable && rows.spanAt(index)?.rowCount !== rows.count && (
+                                        <DragHandle
+                                            className={styles.groupHandle}
+                                            onDragStart={event => drag.start(index, event)}
+                                        />
+                                    )}
                                     <GroupRow
                                         group={row.group}
-                                        onToggle={searching ? undefined : () => toggleGroup(row.group)}
+                                        onToggle={searching || sorting ? undefined : () => toggleGroup(row.group)}
                                     />
                                 </div>
                             );
@@ -238,18 +327,27 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                                 id={rowId(index)}
                                 role="option"
                                 aria-selected={isActive}
-                                className={clsx(styles.row, index % 2 && styles.odd, isActive && styles.active)}
-                                style={{ height: itemRowHeight, transform: `translateY(${start}px)` }}
+                                className={clsx(
+                                    styles.row,
+                                    index % 2 && styles.odd,
+                                    isActive && styles.active,
+                                    hidden && styles.hidden,
+                                )}
+                                style={{ height: itemRowHeight, transform }}
                                 onClick={event => item && onItemClick(event, index, item)}
-                                onDoubleClick={() => item && !search.selecting && !searching && play(item)}
+                                onDoubleClick={() => item && mode.mode === null && play(item)}
                             >
                                 {item ? (
                                     <ItemRow
                                         {...rowProps}
                                         item={item}
                                         number={numberOf(row, item) ?? 0}
-                                        selected={selecting && search.isSelected(item.index)}
-                                        onSelect={selected => search.setSelected([item.index], selected)}
+                                        selected={selecting && mode.isSelected(item.index)}
+                                        onSelect={selected => mode.setSelected([item.index], selected)}
+                                        onDragStart={event => {
+                                            draggedItem.current = item;
+                                            drag.start(index, event);
+                                        }}
                                     />
                                 ) : (
                                     <SkeletonRow {...rowProps} />
@@ -257,6 +355,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                             </div>
                         );
                     })}
+                    {ghost}
                 </div>
             )}
         </section>

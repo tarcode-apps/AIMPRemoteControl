@@ -25,14 +25,25 @@
     "queue": "Queue"
   },
   "player": {
-    "noTrack": "Nothing is playing",
     "expand": "Show player",
     "collapse": "Hide player",
     "previous": "Previous track",
     "play": "Play",
+    "pause": "Pause",
+    "stop": "Stop",
+    "holdToStop": "{{action}} (hold to stop)",
+    "holdToSeek": "{{action}} (hold to seek)",
     "next": "Next track",
-    "shuffle": "Shuffle",
-    "repeat": "Repeat"
+    "shuffle": "Shuffle playback",
+    "repeat": "Repeat: playlist / track / off",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "volume": "Volume",
+    "volumeLevel": "Volume {{percent}}%",
+    "position": "Playback position",
+    "noTime": "--:--",
+    "trackNumbers": "#{{number}} - {{position}}/{{count}}",
+    "trackPosition": "{{position}}/{{count}}"
   },
   "playlists": {
     "summary": "{{count}} / {{duration}} / {{size}}"

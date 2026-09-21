@@ -1,0 +1,4 @@
+// The transport glyphs fill their box less than the other icons, so they are drawn larger.
+.button {
+    --icon-size: 32px;
+}

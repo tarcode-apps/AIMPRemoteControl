@@ -25,14 +25,25 @@
     "queue": "Очередь"
   },
   "player": {
-    "noTrack": "Ничего не играет",
     "expand": "Открыть плеер",
     "collapse": "Свернуть плеер",
     "previous": "Предыдущий трек",
     "play": "Воспроизвести",
+    "pause": "Пауза",
+    "stop": "Стоп",
+    "holdToStop": "{{action}} (удерживайте для остановки)",
+    "holdToSeek": "{{action}} (удерживайте для перемотки)",
     "next": "Следующий трек",
-    "shuffle": "Перемешать",
-    "repeat": "Повтор"
+    "shuffle": "Проигрывание вразнобой",
+    "repeat": "Повтор: плейлист / трек / выкл",
+    "mute": "Выключить звук",
+    "unmute": "Включить звук",
+    "volume": "Громкость",
+    "volumeLevel": "Громкость {{percent}}%",
+    "position": "Позиция воспроизведения",
+    "noTime": "--:--",
+    "trackNumbers": "#{{number}} - {{position}}/{{count}}",
+    "trackPosition": "{{position}}/{{count}}"
   },
   "playlists": {
     "summary": "{{count}} / {{duration}} / {{size}}"

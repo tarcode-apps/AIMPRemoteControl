@@ -8,6 +8,8 @@
     height: 48px;
     border-radius: 50%;
     color: var(--color-text);
+    user-select: none;
+    -webkit-touch-callout: none;
     transition: background-color 0.15s;
 
     @include mixins.hover-capable {
@@ -16,7 +18,8 @@
         }
     }
 
-    &:active {
+    &:active,
+    &[data-pressed] {
         background: var(--color-pressed);
     }
 

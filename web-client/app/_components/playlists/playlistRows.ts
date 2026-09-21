@@ -3,6 +3,9 @@ import type { PlaylistGroup } from '@/app/_api/types';
 export type PlaylistRow =
     { kind: 'group'; group: PlaylistGroup } | { kind: 'item'; position: number; group?: PlaylistGroup };
 
+// Names a row by what it shows, so that it survives groups folding.
+export type PlaylistRowKey = { kind: 'item'; position: number } | { kind: 'group'; index: number };
+
 export type RowSpan = {
     startRow: number;
     rowCount: number;
@@ -47,6 +50,23 @@ export class PlaylistRows {
         return span && { startRow: span.startRow, rowCount: span.rowCount };
     }
 
+    keyAt(row: number): PlaylistRowKey {
+        const entry = this.at(row);
+        return entry.kind === 'group'
+            ? { kind: 'group', index: entry.group.index }
+            : { kind: 'item', position: entry.position };
+    }
+
+    // The row showing `key`; an item folded away is stood in for by its group's
+    // header. Null when the key names nothing in this layout.
+    rowOf(key: PlaylistRowKey): number | null {
+        if (key.kind === 'group') return this.spans.find(span => span.group.index === key.index)?.startRow ?? null;
+        if (!this.spans.length) return key.position;
+        const span = this.spanBefore(key.position, span => span.group.firstPosition);
+        if (!span || key.position >= span.group.firstPosition + span.group.count) return null;
+        return span.group.expanded ? span.startRow + 1 + key.position - span.group.firstPosition : span.startRow;
+    }
+
     positions(fromRow: number, toRow: number): [number, number] | null {
         let first: number | null = null;
         let last: number | null = null;
@@ -60,12 +80,18 @@ export class PlaylistRows {
     }
 
     private spanOf(row: number): GroupSpan | null {
+        return this.spanBefore(row, span => span.startRow);
+    }
+
+    // The last span whose `keyOf` does not exceed `value`; the spans are sorted by
+    // rows and by positions alike.
+    private spanBefore(value: number, keyOf: (span: GroupSpan) => number): GroupSpan | null {
         if (!this.spans.length) return null;
         let low = 0;
         let high = this.spans.length - 1;
         while (low < high) {
             const mid = (low + high + 1) >> 1;
-            if (this.spans[mid].startRow <= row) low = mid;
+            if (keyOf(this.spans[mid]) <= value) low = mid;
             else high = mid - 1;
         }
         return this.spans[low];

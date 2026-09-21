@@ -25,6 +25,7 @@ export type PointerDragOptions = {
 type Gesture = {
     pointerId: number;
     start: number;
+    crossStart: number;
     startTime: number;
     // The gesture is on once the pointer travelled past the threshold or the hold elapsed.
     active: boolean;
@@ -83,6 +84,8 @@ export function usePointerDrag({
     }, [dragging, onDragEnd]);
 
     const position = (event: { clientX: number; clientY: number }) => (axis === 'x' ? event.clientX : event.clientY);
+    const crossPosition = (event: { clientX: number; clientY: number }) =>
+        axis === 'x' ? event.clientY : event.clientX;
 
     const onPointerDown = (event: ReactPointerEvent) => {
         if (!enabled || event.button !== 0 || gesture.current) return;
@@ -98,6 +101,7 @@ export function usePointerDrag({
         const current: Gesture = {
             pointerId: event.pointerId,
             start: position(event),
+            crossStart: crossPosition(event),
             startTime: event.timeStamp,
             active: false,
             dragged: false,
@@ -128,6 +132,14 @@ export function usePointerDrag({
             if ((event.buttons & 1) === 0) return finish(event, true);
             const delta = position(event) - current.start;
             if (!current.dragged) {
+                // A move mostly along the other axis is another gesture's, such as the
+                // sheet's under a seek bar: the pointer is let go of before the hold.
+                const across = Math.abs(crossPosition(event) - current.crossStart);
+                if (!current.active && across >= threshold && across > Math.abs(delta)) {
+                    current.detach();
+                    gesture.current = null;
+                    return;
+                }
                 if (Math.abs(delta) < threshold) return;
                 if (hold && !current.active) {
                     current.detach();

@@ -1,0 +1,47 @@
+.slider {
+    --track: linear-gradient(to right, var(--color-accent) var(--fill), var(--color-surface-raised) var(--fill));
+
+    appearance: none;
+    display: block;
+    width: 100%;
+    height: 24px;
+    margin: 0;
+    background: none;
+    cursor: pointer;
+    touch-action: pan-y;
+
+    &::-webkit-slider-runnable-track {
+        height: 4px;
+        border-radius: 2px;
+        background: var(--track);
+    }
+
+    &::-webkit-slider-thumb {
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        margin-top: -5px;
+        border-radius: 50%;
+        background: var(--color-accent);
+    }
+
+    &::-moz-range-track {
+        height: 4px;
+        border-radius: 2px;
+        background: var(--track);
+    }
+
+    &::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border: 0;
+        border-radius: 50%;
+        background: var(--color-accent);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 2px;
+        border-radius: 12px;
+    }
+}

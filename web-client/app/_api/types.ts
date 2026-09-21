@@ -91,3 +91,43 @@ export type MoveRequest = {
     target: number;
     revision?: number;
 };
+
+export type PlaybackState = 'playing' | 'paused' | 'stopped';
+
+export type RepeatMode = 'off' | 'playlist' | 'track';
+
+export type PlayingTrack = {
+    playlistId: string;
+    // `index` is only valid for this revision of the playlist.
+    playlistRevision: number;
+    index: number;
+    // As tagged, "3" or "3/12"; empty without a tag.
+    trackNumber: string;
+    title: string;
+    artist: string;
+    album: string;
+    isUrl: boolean;
+};
+
+export type PlayerState = {
+    state: PlaybackState;
+    position: number;
+    duration: number;
+    volume: number;
+    mute: boolean;
+    repeat: RepeatMode;
+    shuffle: boolean;
+    radioCapture: boolean;
+    // Empty while stopped, as the player's own window is.
+    track: PlayingTrack | null;
+};
+
+export type PlayerCommand = 'play' | 'pause' | 'stop' | 'next' | 'previous';
+
+export type PlayTrackRequest = {
+    playlistId: string;
+    index: number;
+    revision?: number;
+};
+
+export type PlayerPatch = Partial<Pick<PlayerState, 'position' | 'volume' | 'mute' | 'repeat' | 'shuffle'>>;

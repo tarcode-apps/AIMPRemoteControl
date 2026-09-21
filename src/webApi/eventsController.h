@@ -2,6 +2,7 @@
 
 #include "apiController.h"
 
+class IAIMPCore;
 class StateUpdateEvents;
 
 namespace webapi
@@ -9,11 +10,12 @@ namespace webapi
 	class EventsController : public IApiController
 	{
 	public:
-		explicit EventsController(StateUpdateEvents &events) : FEvents(events) {}
+		EventsController(IAIMPCore *core, StateUpdateEvents &events) : FCore(core), FEvents(events) {}
 
 		void Register(IEndpointRouteBuilder &endpoints) override;
 
 	private:
+		IAIMPCore *FCore;
 		StateUpdateEvents &FEvents;
 	};
 }

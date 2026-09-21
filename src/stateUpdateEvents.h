@@ -55,6 +55,7 @@ private:
 	class PlaylistManagerListener;
 
 	void WatchPlaylist(IAIMPPlaylist *playlist);
+	void PlayerChanged();
 	void PlaylistChanged(const std::string &playlistId);
 	void PlaylistRemoved(const std::string &playlistId);
 	void AllPlaylistsChanged();
@@ -70,5 +71,7 @@ private:
 	std::condition_variable FChanged;
 	std::uint64_t FVersions[KindCount] = {};
 	PlaylistRevisions FPlaylistRevisions;
+	// Its changes move the playing item's index, so they count as player changes too.
+	std::string FPlayingPlaylistId;
 	bool FStopped = false;
 };

@@ -1,13 +1,14 @@
 'use client';
 
 import { errorMessage } from '@/app/_api/errors';
+import { usePlayer, usePlayTrack } from '@/app/_api/player';
 import { useMovePlaylistItems, usePlaylistItems, useSetGroupExpanded } from '@/app/_api/playlists';
 import type { Playlist, PlaylistGroup, PlaylistItem } from '@/app/_api/types';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { media } from '@/app/_styles/media';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import clsx from 'clsx';
-import { useId, useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent } from 'react';
+import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ListCheckbox } from '../inputs';
 import { usePlaylistMode } from './PlaylistMode';
@@ -69,7 +70,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
             collapsed.current(row) ? 0 : rows.at(row).kind === 'group' ? groupRowHeight : itemRowHeight,
         overscan: overscanRows,
     });
-    const active = useActiveRow(row => virtualizer.scrollToIndex(row, { align: 'auto' }));
+    const active = useActiveRow(rows, row => virtualizer.scrollToIndex(row, { align: 'auto' }));
     const virtualRows = virtualizer.getVirtualItems();
     const first = virtualRows.at(0)?.index;
     const last = virtualRows.at(-1)?.index;
@@ -160,7 +161,28 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
         return { checked, indeterminate: !checked && selectedCount > 0 };
     };
 
-    const play = (item: PlaylistItem) => console.log('PLAY', item.index);
+    const playTrack = usePlayTrack();
+    const play = (item: PlaylistItem) =>
+        playTrack.mutate({ playlistId: playlist.id, index: item.index, revision: playlist.revision });
+    const { data: player } = usePlayer();
+    const playingTrack = player?.track;
+    // The index is only valid for the revision it was read at, and the snapshot and
+    // the list catch up with a change one after the other: while their revisions
+    // differ the last index stays in use, or the highlight would blink. The active
+    // row follows the track, as in the player, except in a search, which lists
+    // other positions.
+    const [lastIndex, setLastIndex] = useState<number | null>(null);
+    const matchedIndex =
+        playingTrack?.playlistId === playlist.id
+            ? playingTrack.playlistRevision === playlist.revision
+                ? playingTrack.index
+                : undefined
+            : null;
+    const playingIndex = matchedIndex === undefined ? lastIndex : matchedIndex;
+    if (playingIndex !== null && playingIndex !== lastIndex) {
+        setLastIndex(playingIndex);
+        if (!searching) active.select({ kind: 'item', position: playingIndex });
+    }
 
     const toggleGroup = (group: PlaylistGroup) => {
         if (!searching && !sorting)
@@ -194,7 +216,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
             mode.setSelected([item.index], !mode.isSelected(item.index));
             return;
         }
-        active.select(row);
+        active.select(rows.keyAt(row));
         if (sorting) return;
         // Decided per gesture rather than per device: a tap plays at once, a mouse
         // click only selects and the double click plays.
@@ -291,7 +313,6 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                                         hidden && styles.hidden,
                                     )}
                                     style={{ height: groupRowHeight, transform }}
-                                    onClick={() => active.select(index)}
                                 >
                                     {selecting && (
                                         <ListCheckbox
@@ -331,6 +352,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                                     styles.row,
                                     index % 2 && styles.odd,
                                     isActive && styles.active,
+                                    item && item.index === playingIndex && styles.playing,
                                     hidden && styles.hidden,
                                 )}
                                 style={{ height: itemRowHeight, transform }}

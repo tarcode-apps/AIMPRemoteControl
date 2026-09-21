@@ -196,6 +196,14 @@
     }
 }
 
+// The active row's fill already marks it, so the colour steps back there.
+.row.playing:not(.active) {
+    .title,
+    .number {
+        color: var(--color-accent);
+    }
+}
+
 .row.active,
 .page.keyboard .groupRow.active {
     background: var(--color-selection);

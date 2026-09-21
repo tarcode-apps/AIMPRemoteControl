@@ -41,26 +41,9 @@
 }
 
 // After the hover rule and as specific, so that pressing wins while hovered.
-.button.pressed:not(:disabled) .ripple {
+.button[data-pressed]:not(:disabled) .ripple {
     opacity: 0.3;
     transition-duration: 0.1s;
-}
-
-// A light plate with dark text in both themes, as the player draws its hints.
-.tooltip {
-    inset: auto;
-    margin: 0 0 28px;
-    position-area: block-start;
-    position-try-fallbacks: flip-block;
-    padding: 8px 16px;
-    border: 0;
-    border-radius: 4px;
-    background: var(--color-tooltip-bg);
-    color: var(--color-tooltip-text);
-    font-size: 14px;
-    white-space: nowrap;
-    box-shadow: 0 2px 8px var(--color-shadow);
-    pointer-events: none;
 }
 
 // Compact slots next to the search field: a ripple would overlap the neighbours.
@@ -79,7 +62,7 @@
             }
         }
 
-        &.pressed {
+        &[data-pressed] {
             background: var(--color-pressed);
         }
     }

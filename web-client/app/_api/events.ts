@@ -1,13 +1,13 @@
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import { useEffect } from 'react';
+import { playerKeys, snapshot } from './player';
 import { playlistKeys } from './playlists';
-import type { Playlist } from './types';
+import type { PlayerState, Playlist } from './types';
 
 type Hello = { pluginVersion: string };
 type PlaylistsChanged = { playlists: { id: string; revision: number }[] };
 
 const invalidations: Record<string, QueryKey> = {
-    player: ['player'],
     queue: ['queue'],
     timer: ['timer'],
 };
@@ -42,6 +42,9 @@ export function useEventStream(client: QueryClient) {
         });
         source.addEventListener('playlists', (event: MessageEvent<string>) => {
             invalidateChangedPlaylists(client, JSON.parse(event.data) as PlaylistsChanged);
+        });
+        source.addEventListener('player', (event: MessageEvent<string>) => {
+            client.setQueryData(playerKeys.state, snapshot(JSON.parse(event.data) as PlayerState));
         });
         for (const [name, queryKey] of Object.entries(invalidations))
             source.addEventListener(name, () => client.invalidateQueries({ queryKey }));

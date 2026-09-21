@@ -42,6 +42,7 @@
 #include "rpcApi/uploadTrackCommand.h"
 #include "rpcApi/versionCommand.h"
 #include "webApi/eventsController.h"
+#include "webApi/playerController.h"
 #include "webApi/playlistsController.h"
 
 namespace
@@ -140,7 +141,8 @@ HRESULT WINAPI AIMPPlugin::Initialize(IAIMPCore *Core)
 	commands.push_back(std::make_unique<rpcapi::StatusCommand>(Core));
 	commands.push_back(std::make_unique<rpcapi::SubscribeOnAIMPStateUpdateEventCommand>(Core, FIdManager, FStateEvents, FSleepTimer));
 	commands.push_back(std::make_unique<webapi::PlaylistsController>(Core, FStateEvents));
-	commands.push_back(std::make_unique<webapi::EventsController>(FStateEvents));
+	commands.push_back(std::make_unique<webapi::PlayerController>(Core, FStateEvents));
+	commands.push_back(std::make_unique<webapi::EventsController>(Core, FStateEvents));
 	FRemoteControlServer = std::make_unique<AIMPRemoteControlServer>(std::move(commands), FNetworkWatcher,
 		[core = FCore](const std::string &keyPath)
 		{

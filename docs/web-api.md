@@ -29,6 +29,7 @@ Error codes so far:
 | `403` | `playlistReadOnly` | the playlist is read-only in the player, so it cannot be sorted or reordered |
 | `404` | `itemNotFound` | an item index in the request is outside the playlist |
 | `500` | `playlistUpdateFailed` | the player refused the change |
+| `500` | `playerCommandFailed` | the player refused a playback command or setting |
 
 ## Playlists
 
@@ -200,6 +201,92 @@ the group requests. The response is an empty object.
 Errors: `400 invalidBody`, `403 playlistReadOnly`, `404 playlistNotFound`,
 `404 itemNotFound`, `409 playlistChanged`, `500 playlistUpdateFailed`.
 
+## Player
+
+### `GET /api/v1/player`
+
+The player's state at request time.
+
+```json
+{
+  "state": "playing",
+  "position": 83.2,
+  "duration": 266.4,
+  "volume": 0.75,
+  "mute": false,
+  "repeat": "off",
+  "shuffle": true,
+  "radioCapture": false,
+  "track": {
+    "playlistId": "{A1B2C3D4-...}",
+    "playlistRevision": 7,
+    "index": 12,
+    "trackNumber": "3",
+    "title": "Track One",
+    "artist": "Artist A",
+    "album": "Album X",
+    "isUrl": false
+  }
+}
+```
+
+`state` is `playing`, `paused` or `stopped`. `position` and `duration` are in
+seconds, `volume` is `0..1`. `repeat` is `off`, `playlist` (the player's
+"repeat playlist" action at the end of the playlist) or `track`. `trackNumber`
+is the tag as written, `"3"` or `"3/12"`, empty when there is none. `track` is the item the player is playing or
+paused on, `null` when stopped: like the player's own window, a stopped player
+shows nothing, even though it remembers what to restart. `index` is the item's
+index in its playlist and is only valid for `playlistRevision`; when that
+playlist changes, a new `player` event carries the current index. For a
+stream, `title`, `artist` and `album` describe what the station is playing
+now, not the station itself.
+
+The API sends nothing while the position merely advances: the client keeps
+time itself from the moment it received the state and reads it again when it
+comes back to the foreground. A seek, a track switch and every other change
+come through the [`player` event](#get-apiv1events).
+
+### `POST /api/v1/player/play`
+
+With a body, plays one item:
+
+```json
+{ "playlistId": "{A1B2C3D4-...}", "index": 12, "revision": 7 }
+```
+
+`revision` is optional and works as in the group requests. Without a body the
+request does what the player's own play button does: resumes a paused track,
+and after a stop restarts the track the player last played. The response is an
+empty object.
+
+Errors: `400 invalidBody`, `404 playlistNotFound`, `404 itemNotFound`,
+`409 playlistChanged`, `500 playlistUpdateFailed`, `500 playerCommandFailed`.
+
+### `POST /api/v1/player/pause`, `.../stop`, `.../next`, `.../previous`
+
+The player's own commands, with no body. `pause` toggles the pause like the
+player's button, so it resumes a paused track. A command that has nothing to
+do, such as `pause` while stopped, succeeds and changes nothing. The response
+is an empty object.
+
+Errors: `500 playerCommandFailed`.
+
+### `PATCH /api/v1/player`
+
+Changes any of the settings below; the others stay as they are. An empty body
+is refused.
+
+```json
+{ "position": 120.5, "volume": 0.5, "mute": false, "repeat": "playlist", "shuffle": false }
+```
+
+`position` is in seconds and applies to the playing track, `volume` is
+`0..1`, `repeat` is `off`, `playlist` or `track`; leaving `playlist` restores
+the player's default action at the end of the playlist (jump to the next one)
+unless it is set to do nothing. The response is an empty object.
+
+Errors: `400 invalidBody`, `500 playerCommandFailed`.
+
 ## Events
 
 ### `GET /api/v1/events`
@@ -212,10 +299,14 @@ change; the payload is a JSON object.
 | `event` | When | `data` |
 |---|---|---|
 | `hello` | once, right after connecting | `{"pluginVersion": "1.3.1.0"}` — compare with the previous connection's value to learn that the plugin was updated while the page was open |
-| `player` | playback state, track, position, volume, mute, repeat, shuffle, radio capture | `{}` |
+| `player` | playback state, track, a seek, volume, mute, repeat, shuffle, radio capture, or a change of the playing playlist that may have moved the track's index | the same object as [`GET /api/v1/player`](#get-apiv1player) |
 | `playlists` | a playlist was added, removed, renamed or its content changed | `{"playlists": [{"id": "{A1B2C3D4-...}", "revision": 7}, …]}` — every loaded playlist with its current revision |
 | `queue` | the playback queue changed | `{}` |
 | `timer` | the sleep timer was set, cancelled or fired | `{}` |
+
+A track switch raises several player changes within a few milliseconds, with
+a stopped player in between; the stream waits for a 100 ms lull and sends one
+`player` event with the state after the burst.
 
 A comment line (`: ping`) goes out after 30 s without events; it keeps
 intermediaries from closing an idle connection and lets the server notice a

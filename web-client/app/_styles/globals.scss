@@ -21,10 +21,10 @@
 
 :root {
     --drawer-width: 300px;
-    --player-width: 360px;
+    --player-width: 480px;
     --app-bar-height: 56px;
     --toolbar-bar-height: 56px;
-    --mini-player-bar-height: 64px;
+    --mini-player-bar-height: 58px;
     --toolbar-height: 0px;
     --mini-player-height: calc(var(--mini-player-bar-height) + var(--safe-bottom));
     --safe-top: env(safe-area-inset-top, 0px);

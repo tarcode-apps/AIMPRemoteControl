@@ -9,6 +9,7 @@
 #include "IUnknownImpl.h"
 #include "joinPumpingMessages.h"
 #include "mainThreadRunner.h"
+#include "player/playerState.h"
 #include "player/playlists.h"
 
 class StateUpdateEvents::MessageHook : public IUnknownImpl<IAIMPMessageHook>
@@ -27,7 +28,7 @@ public:
 		case AIMP_MSG_EVENT_STREAM_START_SUBTRACK:
 		case AIMP_MSG_EVENT_STREAM_END:
 		case AIMP_MSG_EVENT_PLAYING_FILE_INFO:
-			FOwner.Notify(ControlPanel);
+			FOwner.PlayerChanged();
 			break;
 		case AIMP_MSG_EVENT_PROPERTY_VALUE:
 			switch (param1)
@@ -35,6 +36,7 @@ public:
 			case AIMP_MSG_PROPERTY_VOLUME:
 			case AIMP_MSG_PROPERTY_MUTE:
 			case AIMP_MSG_PROPERTY_REPEAT:
+			case AIMP_MSG_PROPERTY_ACTION_ON_END_OF_PLAYLIST:
 			case AIMP_MSG_PROPERTY_SHUFFLE:
 			case AIMP_MSG_PROPERTY_RADIOCAP:
 			case AIMP_MSG_PROPERTY_PLAYER_POSITION:
@@ -230,13 +232,27 @@ void StateUpdateEvents::WatchPlaylist(IAIMPPlaylist *playlist)
 	Notify(Playlists);
 }
 
+// Called from the player's own thread, where the playing playlist can be read.
+void StateUpdateEvents::PlayerChanged()
+{
+	const std::string playing = player::PlayingPlaylistId(FCore);
+	{
+		std::lock_guard lock(FMutex);
+		FPlayingPlaylistId = playing;
+	}
+	Notify(ControlPanel);
+}
+
 void StateUpdateEvents::PlaylistChanged(const std::string &playlistId)
 {
 	{
 		std::lock_guard lock(FMutex);
 		++FPlaylistRevisions[playlistId];
+		++FVersions[Playlists];
+		if (playlistId == FPlayingPlaylistId)
+			++FVersions[ControlPanel];
 	}
-	Notify(Playlists);
+	FChanged.notify_all();
 }
 
 void StateUpdateEvents::PlaylistRemoved(const std::string &playlistId)

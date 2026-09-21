@@ -2,38 +2,29 @@
 
 #include <cmath>
 #include <cstdint>
-#include <functional>
 
 #include "apiCore.h"
 #include "apiFileManager.h"
-#include "apiMessages.h"
 #include "apiPlayer.h"
 #include "apiPlaylists.h"
 #include "aimpHelper.h"
 #include "mainThreadRunner.h"
+#include "player/playerState.h"
 #include "helpers/remoteControlIdManager.h"
 
 namespace
 {
-	const char *PlaybackStateName(INT32 state)
+	const char *PlaybackStateName(player::PlaybackState state)
 	{
 		switch (state)
 		{
-		case AIMP_PLAYER_STATE_PLAYING:
+		case player::PlaybackState::Playing:
 			return "playing";
-		case AIMP_PLAYER_STATE_PAUSED:
+		case player::PlaybackState::Paused:
 			return "paused";
 		default:
 			return "stopped";
 		}
-	}
-
-	bool GetBoolProperty(IAIMPServiceMessageDispatcher *dispatcher, DWORD property)
-	{
-		BOOL value = 0;
-		if (!dispatcher || Failed(dispatcher->Send(property, AIMP_MSG_PROPVALUE_GET, &value)))
-			return false;
-		return value != 0;
 	}
 
 	bool IsUrl(IAIMPCore *core, IAIMPPlaylistItem *item)
@@ -55,6 +46,8 @@ namespace
 		return result;
 	}
 
+	// The app cannot show an empty player, so a stopped player reports the focused
+	// item, then the playback cursor, then the first item.
 	IAIMPPlaylistItem *CurrentItemOf(IAIMPCore *core, IAIMPServicePlayer *player)
 	{
 		IAIMPPlaylistItem *item = nullptr;
@@ -87,10 +80,14 @@ namespace
 		return item;
 	}
 
-	void AddCurrentTrack(nlohmann::json &state, IAIMPCore *core, IAIMPServicePlayer *player,
+	void AddCurrentTrack(nlohmann::json &state, IAIMPCore *core, const player::PlayerState &playerState,
 						 RemoteControlIdManager &idManager)
 	{
+		IAIMPServicePlayer *player = nullptr;
+		if (Failed(core->QueryInterface(IID_IAIMPServicePlayer, reinterpret_cast<void **>(&player))) || !player)
+			return;
 		IAIMPPlaylistItem *item = CurrentItemOf(core, player);
+		player->Release();
 		if (!item)
 			return;
 
@@ -106,13 +103,10 @@ namespace
 		state["playlist_id"] = idManager.PlaylistGetOrGeneratePluginId(playlistAIMPId);
 		state["track_id"] = idManager.PlaylistItemGetOrGeneratePluginId(playlistAIMPId, itemIndex);
 
-		if (player->GetState() != AIMP_PLAYER_STATE_STOPPED)
+		if (playerState.State != player::PlaybackState::Stopped)
 		{
-			DOUBLE duration = 0.0, position = 0.0;
-			player->GetDuration(&duration);
-			player->GetPosition(&position);
-			state["track_length"] = static_cast<std::int64_t>(std::ceil(duration)); // AIMP rounds duration up
-			state["track_position"] = static_cast<std::int64_t>(position);
+			state["track_length"] = static_cast<std::int64_t>(std::ceil(playerState.Duration)); // AIMP rounds duration up
+			state["track_position"] = static_cast<std::int64_t>(playerState.Position);
 			state["current_track_source_radio"] = IsUrl(core, item);
 		}
 
@@ -122,36 +116,16 @@ namespace
 
 nlohmann::json rpcapi::GetPlayerControlPanelStateCommand::BuildState(IAIMPCore *core, RemoteControlIdManager &idManager)
 {
-	nlohmann::json state = nlohmann::json::object();
-
-	IAIMPServicePlayer *player = nullptr;
-	if (Failed(core->QueryInterface(IID_IAIMPServicePlayer, reinterpret_cast<void **>(&player))) || !player)
-	{
-		state["playback_state"] = "stopped";
-		return state;
-	}
-
-	state["playback_state"] = PlaybackStateName(player->GetState());
-
-	SINGLE volume = 0.0f;
-	player->GetVolume(&volume);
-	state["volume"] = static_cast<int>(std::lround(volume * 100.0f));
-
-	BOOL mute = 0;
-	player->GetMute(&mute);
-	state["mute_mode_on"] = mute != 0;
-
-	IAIMPServiceMessageDispatcher *dispatcher = nullptr;
-	core->QueryInterface(IID_IAIMPServiceMessageDispatcher, reinterpret_cast<void **>(&dispatcher));
-	state["repeat_mode_on"] = GetBoolProperty(dispatcher, AIMP_MSG_PROPERTY_REPEAT);
-	state["shuffle_mode_on"] = GetBoolProperty(dispatcher, AIMP_MSG_PROPERTY_SHUFFLE);
-	state["radio_capture_mode_on"] = GetBoolProperty(dispatcher, AIMP_MSG_PROPERTY_RADIOCAP);
-	if (dispatcher)
-		dispatcher->Release();
-
-	AddCurrentTrack(state, core, player, idManager);
-
-	player->Release();
+	const player::PlayerState playerState = player::GetPlayerState(core);
+	nlohmann::json state = {
+		{"playback_state", PlaybackStateName(playerState.State)},
+		{"volume", static_cast<int>(std::lround(playerState.Volume * 100.0f))},
+		{"mute_mode_on", playerState.Mute},
+		{"repeat_mode_on", playerState.Repeat == player::RepeatMode::Track},
+		{"shuffle_mode_on", playerState.Shuffle},
+		{"radio_capture_mode_on", playerState.RadioCapture},
+	};
+	AddCurrentTrack(state, core, playerState, idManager);
 	return state;
 }
 

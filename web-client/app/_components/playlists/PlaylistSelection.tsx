@@ -1,5 +1,6 @@
 'use client';
 
+import { usePlayer } from '@/app/_api/player';
 import { usePlaylists } from '@/app/_api/playlists';
 import type { Playlist } from '@/app/_api/types';
 import { createContext, useContext, useState, type ReactNode } from 'react';
@@ -20,8 +21,13 @@ export function usePlaylistSelection(): PlaylistSelectionContextValue {
 
 export function PlaylistSelectionProvider({ children }: { children: ReactNode }) {
     const { data: playlists } = usePlaylists();
+    const player = usePlayer();
     const [selectedId, setSelectedId] = useState<string | null>(null);
-    const selected = playlists?.find(playlist => playlist.id === selectedId) ?? playlists?.[0];
+    // Opens on the playing playlist, once both are known; the choice then stays.
+    if (selectedId === null && playlists?.length && !player.isPending)
+        setSelectedId(player.data?.track?.playlistId ?? playlists[0].id);
+    const selected =
+        selectedId === null ? undefined : (playlists?.find(playlist => playlist.id === selectedId) ?? playlists?.[0]);
 
     const value: PlaylistSelectionContextValue = {
         playlists,

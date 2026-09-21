@@ -1,11 +1,22 @@
 @use "../../_styles/mixins" as mixins;
 
 .miniPlayer {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 12px;
     height: var(--mini-player-bar-height);
-    padding: 0 calc(4px + var(--safe-right)) 0 calc(8px + var(--safe-left));
+    padding: 0 calc(12px + var(--safe-right)) 0 calc(8px + var(--safe-left));
+}
+
+.expand {
+    position: absolute;
+    // Stops short of the progress line, so the focus ring does not cover it.
+    inset: 0 0 2px;
+
+    &:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: -2px;
+    }
 }
 
 .cover {
@@ -25,23 +36,41 @@
 .track {
     flex: 1;
     min-width: 0;
+    margin: 0 2px 0 6px;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    align-self: stretch;
-    justify-content: center;
-    text-align: left;
+    pointer-events: none;
 }
 
-.title {
+.title,
+.artist {
     @include mixins.ellipsis;
 
     max-width: 100%;
     font-size: var(--font-size-subtitle);
+}
+
+.artist {
+    font-size: 13px;
     color: var(--color-text-secondary);
 }
 
 .controls {
+    position: relative;
     flex: none;
     display: flex;
+    gap: 8px;
+
+    > button {
+        --icon-size: 24px;
+
+        width: 36px;
+        height: 36px;
+    }
+}
+
+.progress {
+    position: absolute;
+    inset: auto 0 0;
 }

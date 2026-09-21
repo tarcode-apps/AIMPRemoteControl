@@ -1,0 +1,28 @@
+.seekBar {
+    --track: linear-gradient(to right, var(--color-accent) var(--fill), var(--color-surface-raised) var(--fill));
+
+    // The line is drawn along the bottom edge; the height above it is the target.
+    height: 11px;
+    background: var(--track) bottom / 100% 2px no-repeat;
+    cursor: pointer;
+    touch-action: none;
+
+    &[aria-disabled] {
+        cursor: default;
+    }
+
+    // The ring is centred on the line rather than on the target, hanging below it;
+    // it is placed against the bar, which the mini player positions.
+    &:focus-visible {
+        outline: none;
+
+        &::after {
+            content: "";
+            position: absolute;
+            inset: auto 0 -7px;
+            height: 12px;
+            border: 2px solid var(--color-accent);
+            pointer-events: none;
+        }
+    }
+}

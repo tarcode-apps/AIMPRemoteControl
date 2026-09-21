@@ -5,9 +5,9 @@ import { usePointerDrag } from '@/app/_hooks/usePointerDrag';
 import { media } from '@/app/_styles/media';
 import clsx from 'clsx';
 import { useRef, type CSSProperties } from 'react';
+import { usePlaylistMode } from './PlaylistMode';
 import { PlaylistPage } from './PlaylistPage';
 import styles from './PlaylistPager.module.scss';
-import { usePlaylistMode } from './PlaylistMode';
 import { usePlaylistSelection } from './PlaylistSelection';
 
 const flingVelocity = 0.5;
@@ -33,7 +33,10 @@ export function PlaylistPager() {
         },
         onMove: delta => {
             const beyondEdge = (index === 0 && delta > 0) || (index === last && delta < 0);
-            const offset = Math.min(Math.max(beyondEdge ? delta * edgeResistance : delta, -width.current), width.current);
+            const offset = Math.min(
+                Math.max(beyondEdge ? delta * edgeResistance : delta, -width.current),
+                width.current,
+            );
             trackRef.current?.style.setProperty('--drag-x', `${offset}px`);
         },
         onRelease: ({ delta, velocity, cancelled }) => {

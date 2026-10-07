@@ -63,6 +63,23 @@
     min-width: 0;
 }
 
+.badge {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 36px;
+    // About as far from the pill edge as from its top and bottom; the pill has 16px padding.
+    margin-right: -9px;
+    padding: 0 10px;
+    border-radius: 18px;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    background: var(--color-surface-raised);
+    color: var(--color-text);
+}
+
 .divider {
     margin: 0 20px;
     border: 0;

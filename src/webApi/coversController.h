@@ -3,16 +3,16 @@
 #include <optional>
 #include <string>
 
+#include "albumArt.h"
 #include "apiController.h"
-#include "player/coverSource.h"
+#include "helpers/coverIndex.h"
 
 class IAIMPCore;
+class IAIMPFileInfo;
 class StateUpdateEvents;
 
 namespace webapi
 {
-	class CoverIndex;
-
 	// An item's cover URL redirects to the image by its hash, which the player
 	// state carries directly for the playing track.
 	class CoversController : public IApiController
@@ -26,7 +26,9 @@ namespace webapi
 	private:
 		HttpContent ItemCover(const ApiRequest &request);
 		HttpContent CoverByHash(const ApiRequest &request);
-		std::optional<player::CoverSource> PlayingCoverSource(const std::string &hash);
+		std::optional<CoverLocator> PlayingCover(const std::string &hash);
+		IAIMPFileInfo *FileInfoAt(const CoverLocator &locator);
+		std::optional<albumArt::Cover> LoadAt(const CoverLocator &locator, const std::string &hash, bool original);
 
 		IAIMPCore *FCore;
 		StateUpdateEvents &FEvents;

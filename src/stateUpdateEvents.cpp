@@ -12,6 +12,7 @@
 #include "mainThreadRunner.h"
 #include "player/playerState.h"
 #include "player/playlists.h"
+#include "player/queue.h"
 #include "playlistChangeFilter.h"
 
 class StateUpdateEvents::MessageHook : public IUnknownImpl<IAIMPMessageHook>
@@ -51,7 +52,7 @@ public:
 			}
 			break;
 		case AIMP_MSG_EVENT_PLAYBACK_QUEUE:
-			FOwner.Notify(Queue);
+			FOwner.QueueChanged();
 			break;
 		// View and formatting settings of playlists live in the options and have no
 		// playlist-level notification, so any options change counts for every playlist.
@@ -136,6 +137,22 @@ private:
 	StateUpdateEvents &FOwner;
 };
 
+// The queue's changes come through its listener; the message hook's queue event
+// never fired for them on the bench and is kept only as a fallback.
+class StateUpdateEvents::QueueListener : public IUnknownImpl<IAIMPPlaylistQueueListener>
+{
+public:
+	explicit QueueListener(StateUpdateEvents &owner) : FOwner(owner) {}
+
+	BOOL isOurRIID(REFIID riid) override { return EqualGUID(riid, IID_IAIMPPlaylistQueueListener); }
+
+	void WINAPI ContentChanged() override { FOwner.QueueChanged(); }
+	void WINAPI StateChanged() override { FOwner.QueueChanged(); }
+
+private:
+	StateUpdateEvents &FOwner;
+};
+
 StateUpdateEvents::StateUpdateEvents() = default;
 
 StateUpdateEvents::~StateUpdateEvents()
@@ -162,6 +179,20 @@ void StateUpdateEvents::Start(IAIMPCore *core)
 	FPlaylistManagerListener = new PlaylistManagerListener(*this);
 	FPlaylistManagerListener->AddRef();
 	core->RegisterExtension(IID_IAIMPServicePlaylistManager, FPlaylistManagerListener);
+
+	if (IAIMPPlaylistQueue2 *queue = AcquireService<IAIMPPlaylistQueue2>(core, IID_IAIMPPlaylistQueue2))
+	{
+		FQueueListener = new QueueListener(*this);
+		FQueueListener->AddRef();
+		queue->ListenerAdd(FQueueListener);
+		queue->Release();
+	}
+	{
+		const player::QueueState state = player::GetQueueState(core);
+		std::lock_guard lock(FMutex);
+		FQueue.Count = state.Count;
+		FQueue.Suspended = state.Suspended;
+	}
 
 	IAIMPServicePlaylistManager *mgr = nullptr;
 	if (Succeeded(core->QueryInterface(IID_IAIMPServicePlaylistManager, reinterpret_cast<void **>(&mgr))) && mgr)
@@ -213,6 +244,16 @@ void StateUpdateEvents::Stop()
 		FCore->UnregisterExtension(FPlaylistManagerListener);
 		FPlaylistManagerListener->Release();
 		FPlaylistManagerListener = nullptr;
+	}
+	if (FQueueListener)
+	{
+		if (IAIMPPlaylistQueue2 *queue = AcquireService<IAIMPPlaylistQueue2>(FCore, IID_IAIMPPlaylistQueue2))
+		{
+			queue->ListenerRemove(FQueueListener);
+			queue->Release();
+		}
+		FQueueListener->Release();
+		FQueueListener = nullptr;
 	}
 	for (PlaylistListener *listener : FPlaylistListeners)
 	{
@@ -279,6 +320,31 @@ void StateUpdateEvents::PlaylistRemoved(const std::string &playlistId)
 	if (FChangeFilter)
 		FChangeFilter->Forget(playlistId);
 	Notify(Playlists);
+}
+
+// Called on the player's own thread, where the queue can be read.
+void StateUpdateEvents::QueueChanged()
+{
+	const player::QueueState state = player::GetQueueState(FCore);
+	{
+		std::lock_guard lock(FMutex);
+		++FQueue.Revision;
+		FQueue.Count = state.Count;
+		FQueue.Suspended = state.Suspended;
+	}
+	Notify(Queue);
+}
+
+StateUpdateEvents::QueueInfo StateUpdateEvents::CurrentQueue()
+{
+	std::lock_guard lock(FMutex);
+	return FQueue;
+}
+
+std::uint64_t StateUpdateEvents::QueueRevision()
+{
+	std::lock_guard lock(FMutex);
+	return FQueue.Revision;
 }
 
 void StateUpdateEvents::FilterChange(const std::string &playlistId, unsigned long flags, std::int32_t itemCount)

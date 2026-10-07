@@ -1,5 +1,6 @@
 'use client';
 
+import { useBackGesture } from '@/app/_hooks/useBackGesture';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { media } from '@/app/_styles/media';
 import clsx from 'clsx';
@@ -15,6 +16,9 @@ export type DrawerContextValue = {
     secondary: boolean;
     open(): void;
     close(): void;
+    // Closes the drawer, then does `after`: a navigation from the drawer must not
+    // land on the drawer's own history entry.
+    closeThen(after: () => void): void;
     goBack(): void;
 };
 
@@ -42,6 +46,7 @@ export function DrawerContainer({ children }: { children: ReactNode }) {
     const drawerRef = useRef<HTMLElement>(null);
 
     const [opened, setOpened] = useState(false);
+    const back = useBackGesture(opened, () => setOpened(false));
     // Number of in-app navigations since the page was loaded: tells whether
     // history.back() stays inside the app or would leave it.
     const [visited, setVisited] = useState({ pathname, depth: 0 });
@@ -79,6 +84,7 @@ export function DrawerContainer({ children }: { children: ReactNode }) {
             if (!secondary) setOpened(true);
         },
         close: () => setOpened(false),
+        closeThen: after => back.dismiss(after),
         goBack: () => {
             if (visited.depth > 0) router.back();
             else router.replace('/');

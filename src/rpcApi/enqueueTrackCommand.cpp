@@ -12,6 +12,7 @@
 #include "helpers/idLookup.h"
 #include "mainThreadRunner.h"
 #include "helpers/remoteControlIdManager.h"
+#include "player/queue.h"
 
 namespace
 {
@@ -33,13 +34,7 @@ void rpcapi::EnqueueTrackCommand::Register(IEndpointRouteBuilder &endpoints)
 			IAIMPPlaylistItem *item = FindPlaylistItem(core, idManager, trackId);
 			if (!item)
 				return E_INVALIDARG;
-			HRESULT hr = E_FAIL;
-			IAIMPPlaylistQueue *queue = nullptr;
-			if (Succeeded(core->QueryInterface(IID_IAIMPPlaylistQueue, reinterpret_cast<void **>(&queue))) && queue)
-			{
-				hr = queue->Add(item, atBeginning);
-				queue->Release();
-			}
+			const HRESULT hr = player::EnqueueItem(core, item, atBeginning) == player::MutationResult::Ok ? S_OK : E_FAIL;
 			item->Release();
 			return hr;
 		});

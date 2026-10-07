@@ -48,6 +48,20 @@
   "playlists": {
     "summary": "{{count}} / {{duration}} / {{size}}"
   },
+  "selection": {
+    "title": "Multiple selection"
+  },
+  "queue": {
+    "title": "Queue manager",
+    "searchPlaceholder": "Search in queue",
+    "empty": "The queue is empty",
+    "suspended": "The queue is suspended",
+    "suspend": "Suspend the queue",
+    "resume": "Resume the queue",
+    "resumeShort": "Resume",
+    "clear": "Clear the queue",
+    "remove": "Remove from queue"
+  },
   "playlist": {
     "add": "Add",
     "select": "Select tracks",
@@ -69,7 +83,10 @@
     "noResults": "Nothing found",
     "selectedActions": "Actions with selected tracks",
     "removeSelected": "Remove from playlist",
-    "enqueueSelected": "Add to queue",
+    "enqueue": "Add to queue",
+    "enqueueFirst": "Add to the beginning of the queue",
+    "itemActions": "Track actions",
+    "inQueue": "Position in the queue",
     "closeSort": "Finish sorting",
     "sortBy": "Sort by…",
     "dragHandle": "Drag to reorder",

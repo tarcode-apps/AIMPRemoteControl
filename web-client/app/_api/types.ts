@@ -25,6 +25,7 @@ export type PlaylistItem = {
     displayText: string;
     secondLine: string;
     duration: number;
+    size: number;
     rating: number;
     enabled: boolean;
     isUrl: boolean;
@@ -91,6 +92,48 @@ export type SortRequest = {
 export type MoveRequest = {
     indexes: number[];
     // The index the first moved item gets in the resulting playlist.
+    target: number;
+    revision?: number;
+};
+
+// Which items of a playlist a request means: these indexes, or everything the
+// search finds but the indexes in `except`.
+export type ItemSelection = { indexes: number[] } | { search: string; except: number[] };
+
+export type ItemsSummary = {
+    count: number;
+    duration: number;
+    size: number;
+};
+
+// An entry of the playback queue: the same track may be queued several times, so
+// an entry is named by its position.
+export type QueueItem = PlaylistItem & {
+    position: number;
+    playlistId: string;
+};
+
+export type Queue = {
+    revision: number;
+    // Kept but not played from.
+    suspended: boolean;
+    items: QueueItem[];
+};
+
+export type EnqueueRequest = ItemSelection & {
+    playlistId: string;
+    atBeginning?: boolean;
+    revision?: number;
+};
+
+export type QueueRemoveRequest = {
+    positions: number[];
+    revision?: number;
+};
+
+export type QueueMoveRequest = {
+    positions: number[];
+    // The position the first moved entry gets in the resulting queue.
     target: number;
     revision?: number;
 };

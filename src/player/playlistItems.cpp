@@ -21,66 +21,105 @@ namespace
 						  { return std::tolower(x) == std::tolower(y); });
 	}
 
-	class SecondLineFormatter
+}
+
+player::SecondLineFormatter::SecondLineFormatter(IAIMPCore *core, IAIMPPlaylist *playlist, bool evenWhenHidden)
+{
+	IAIMPPlaylistProperties *props = nullptr;
+	if (!playlist || Failed(playlist->QueryInterface(IID_IAIMPPlaylistProperties, reinterpret_cast<void **>(&props))) || !props)
+		return;
+	INT32 visible = 0;
+	props->GetValueAsInt32(AIMP_PLAYLIST_PROPID_VIEW_SECOND_LINE, &visible);
+	if (visible || evenWhenHidden)
 	{
-	public:
-		SecondLineFormatter(IAIMPCore *core, IAIMPPlaylist *playlist)
-		{
-			IAIMPPlaylistProperties *props = nullptr;
-			if (Failed(playlist->QueryInterface(IID_IAIMPPlaylistProperties, reinterpret_cast<void **>(&props))) || !props)
-				return;
-			INT32 visible = 0;
-			props->GetValueAsInt32(AIMP_PLAYLIST_PROPID_VIEW_SECOND_LINE, &visible);
-			if (visible)
-			{
-				props->GetValueAsObject(AIMP_PLAYLIST_PROPID_FORMATING_LINE2_TEMPLATE, IID_IAIMPString, reinterpret_cast<void **>(&FTemplate));
-				core->QueryInterface(IID_IAIMPServiceFileInfoFormatter, reinterpret_cast<void **>(&FFormatter));
-			}
-			props->Release();
-		}
-
-		~SecondLineFormatter()
-		{
-			if (FTemplate)
-				FTemplate->Release();
-			if (FFormatter)
-				FFormatter->Release();
-		}
-
-		std::string Format(IAIMPFileInfo *fileInfo) const
-		{
-			if (!FTemplate || !FFormatter || !fileInfo)
-				return {};
-			IAIMPString *result = nullptr;
-			if (Failed(FFormatter->Format(FTemplate, fileInfo, AIMP_FILEINFO_FORMATTER_ID_BASIC, nullptr, &result)) || !result)
-				return {};
-			std::string text = IAIMPStringToString(result);
-			result->Release();
-			return text;
-		}
-
-	private:
-		IAIMPString *FTemplate = nullptr;
-		IAIMPServiceFileInfoFormatter *FFormatter = nullptr;
-	};
-
-	player::PlaylistItem ReadItem(const PlaylistItemContext &ctx, INT32 index, const SecondLineFormatter &secondLine)
-	{
-		player::PlaylistItem item;
-		item.Index = index;
-		item.DisplayText = GetPropertyAsString(ctx.Item, AIMP_PLAYLISTITEM_PROPID_DISPLAYTEXT);
-		item.SecondLine = secondLine.Format(ctx.FileInfo);
-		if (ctx.FileInfo)
-			ctx.FileInfo->GetValueAsFloat(AIMP_FILEINFO_PROPID_DURATION, &item.Duration);
-		ctx.Item->GetValueAsFloat(AIMP_PLAYLISTITEM_PROPID_MARK, &item.Rating);
-		INT32 enabled = 1;
-		ctx.Item->GetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_PLAYINGSWITCH, &enabled);
-		item.Enabled = enabled != 0;
-		item.IsUrl = ctx.FileUriService && ctx.FileUri && ctx.FileUriService->IsURL(ctx.FileUri) == S_OK;
-		if (ctx.FileInfo)
-			item.Cover = player::DescribeCoverSource(ctx.FileInfo, item.IsUrl);
-		return item;
+		props->GetValueAsObject(AIMP_PLAYLIST_PROPID_FORMATING_LINE2_TEMPLATE, IID_IAIMPString, reinterpret_cast<void **>(&FTemplate));
+		core->QueryInterface(IID_IAIMPServiceFileInfoFormatter, reinterpret_cast<void **>(&FFormatter));
 	}
+	props->Release();
+}
+
+player::SecondLineFormatter::~SecondLineFormatter()
+{
+	if (FTemplate)
+		FTemplate->Release();
+	if (FFormatter)
+		FFormatter->Release();
+}
+
+std::string player::SecondLineFormatter::Format(IAIMPFileInfo *fileInfo) const
+{
+	if (!FTemplate || !FFormatter || !fileInfo)
+		return {};
+	IAIMPString *result = nullptr;
+	if (Failed(FFormatter->Format(FTemplate, fileInfo, AIMP_FILEINFO_FORMATTER_ID_BASIC, nullptr, &result)) || !result)
+		return {};
+	std::string text = IAIMPStringToString(result);
+	result->Release();
+	return text;
+}
+
+player::PlaylistItem player::ReadPlaylistItem(const PlaylistItemContext &ctx, std::int32_t index, const SecondLineFormatter &secondLine)
+{
+	PlaylistItem item;
+	item.Index = index;
+	item.DisplayText = GetPropertyAsString(ctx.Item, AIMP_PLAYLISTITEM_PROPID_DISPLAYTEXT);
+	item.SecondLine = secondLine.Format(ctx.FileInfo);
+	if (ctx.FileInfo)
+	{
+		ctx.FileInfo->GetValueAsFloat(AIMP_FILEINFO_PROPID_DURATION, &item.Duration);
+		INT64 size = 0;
+		ctx.FileInfo->GetValueAsInt64(AIMP_FILEINFO_PROPID_FILESIZE, &size);
+		item.Size = size;
+	}
+	ctx.Item->GetValueAsFloat(AIMP_PLAYLISTITEM_PROPID_MARK, &item.Rating);
+	INT32 enabled = 1;
+	ctx.Item->GetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_PLAYINGSWITCH, &enabled);
+	item.Enabled = enabled != 0;
+	item.IsUrl = ctx.FileUriService && ctx.FileUri && ctx.FileUriService->IsURL(ctx.FileUri) == S_OK;
+	if (ctx.FileInfo)
+		item.Cover = DescribeCoverSource(ctx.FileInfo, item.IsUrl);
+	return item;
+}
+
+bool player::NormalizeIndexes(std::vector<std::int32_t> &indexes, std::int32_t count)
+{
+	std::sort(indexes.begin(), indexes.end());
+	indexes.erase(std::unique(indexes.begin(), indexes.end()), indexes.end());
+	return indexes.empty() || (indexes.front() >= 0 && indexes.back() < count);
+}
+
+bool player::VisitSelectedItems(IAIMPCore *core, IAIMPPlaylist *playlist, const ItemSelection &selection, const ItemVisitor &visit)
+{
+	if (selection.Search)
+	{
+		std::vector<std::int32_t> except = selection.Except;
+		std::sort(except.begin(), except.end());
+		ItemsQuery query;
+		query.Limit = INT32_MAX;
+		query.Search = *selection.Search;
+		VisitPlaylistItems(core, playlist, query, [&](const PlaylistItemContext &ctx, std::int32_t index)
+						   {
+			if (!std::binary_search(except.begin(), except.end(), index))
+				visit(ctx, index); });
+		return true;
+	}
+
+	std::vector<std::int32_t> indexes = selection.Indexes;
+	if (!NormalizeIndexes(indexes, playlist->GetItemCount()))
+		return false;
+	IAIMPServiceFileURI *fileUriService = AcquireService<IAIMPServiceFileURI>(core, IID_IAIMPServiceFileURI);
+	for (const std::int32_t index : indexes)
+	{
+		IAIMPPlaylistItem *item = nullptr;
+		if (Failed(playlist->GetItem(index, IID_IAIMPPlaylistItem, reinterpret_cast<void **>(&item))) || !item)
+			continue;
+		const PlaylistItemContext ctx(fileUriService, item);
+		visit(ctx, index);
+		item->Release();
+	}
+	if (fileUriService)
+		fileUriService->Release();
+	return true;
 }
 
 std::int32_t player::VisitPlaylistItems(IAIMPCore *core, IAIMPPlaylist *playlist, const ItemsQuery &query, const ItemVisitor &visit)
@@ -127,7 +166,7 @@ std::optional<player::ItemsPage> player::GetPlaylistItems(IAIMPCore *core, const
 	ItemsPage page;
 	page.Offset = query.Offset;
 	page.Total = VisitPlaylistItems(core, playlist, query, [&](const PlaylistItemContext &ctx, std::int32_t index)
-									{ page.Items.push_back(ReadItem(ctx, index, secondLine)); });
+									{ page.Items.push_back(ReadPlaylistItem(ctx, index, secondLine)); });
 	playlist->Release();
 	return page;
 }
@@ -230,6 +269,29 @@ player::MutationResult player::FindPlaylistItem(IAIMPCore *core, const std::stri
 		item = nullptr;
 	playlist->Release();
 	return item ? MutationResult::Ok : MutationResult::ItemNotFound;
+}
+
+player::MutationResult player::SummarizePlaylistItems(IAIMPCore *core, const std::string &playlistId, const ItemSelection &selection,
+														ItemsSummary &summary)
+{
+	IAIMPPlaylist *playlist = LoadedPlaylistByAIMPId(core, playlistId);
+	if (!playlist)
+		return MutationResult::PlaylistNotFound;
+	summary = {};
+	const bool found = VisitSelectedItems(core, playlist, selection, [&](const PlaylistItemContext &ctx, std::int32_t)
+										  {
+		if (ctx.FileInfo)
+		{
+			DOUBLE duration = 0;
+			INT64 size = 0;
+			ctx.FileInfo->GetValueAsFloat(AIMP_FILEINFO_PROPID_DURATION, &duration);
+			ctx.FileInfo->GetValueAsInt64(AIMP_FILEINFO_PROPID_FILESIZE, &size);
+			summary.Duration += duration;
+			summary.Size += size;
+		}
+		++summary.Count; });
+	playlist->Release();
+	return found ? MutationResult::Ok : MutationResult::ItemNotFound;
 }
 
 player::MutationResult player::SetGroupExpanded(IAIMPCore *core, const std::string &playlistId, std::optional<std::int32_t> index, bool expanded)
@@ -344,11 +406,10 @@ player::MutationResult player::MovePlaylistItems(IAIMPCore *core, const std::str
 		return MutationResult::PlaylistReadOnly;
 	}
 
-	std::sort(indexes.begin(), indexes.end());
-	indexes.erase(std::unique(indexes.begin(), indexes.end()), indexes.end());
 	const std::int32_t count = playlist->GetItemCount();
+	const bool inside = NormalizeIndexes(indexes, count);
 	const std::int32_t moved = static_cast<std::int32_t>(indexes.size());
-	if (moved == 0 || indexes.front() < 0 || indexes.back() >= count || target < 0 || target > count - moved)
+	if (!inside || moved == 0 || target < 0 || target > count - moved)
 	{
 		playlist->Release();
 		return MutationResult::ItemNotFound;

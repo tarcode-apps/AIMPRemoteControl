@@ -11,10 +11,11 @@ export type SearchFieldProps = {
     onChange(value: string): void;
     onClose?(): void;
     autoFocus?: boolean;
+    placeholder?: string;
     className?: string;
 };
 
-export function SearchField({ value, onChange, onClose, autoFocus, className }: SearchFieldProps) {
+export function SearchField({ value, onChange, onClose, autoFocus, placeholder, className }: SearchFieldProps) {
     const { t } = useTranslation();
     const clear = () => {
         onChange('');
@@ -28,7 +29,7 @@ export function SearchField({ value, onChange, onClose, autoFocus, className }: 
                 type="search"
                 className={styles.input}
                 value={value}
-                placeholder={t('playlist.searchPlaceholder')}
+                placeholder={placeholder ?? t('playlist.searchPlaceholder')}
                 autoFocus={autoFocus}
                 enterKeyHint="search"
                 onChange={event => onChange(event.target.value)}

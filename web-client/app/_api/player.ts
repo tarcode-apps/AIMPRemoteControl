@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { request } from './client';
+import { useOptimisticMutation } from './helpers/optimistic';
+import { request } from './helpers/request';
 import type { PlayerCommand, PlayerPatch, PlayerState, PlayTrackRequest } from './types';
 
 // The state with the moment it was read: the position counts on from there.
@@ -52,27 +53,11 @@ export function usePlayerPosition(state: PlayerSnapshot | undefined, enabled: bo
     return state ? positionOf(state, Math.max(now, state.receivedAt)) : 0;
 }
 
-// The prediction is shown until the `player` event confirms or corrects it, and
-// taken back if the request fails.
 function useOptimisticPlayerMutation<TVariables>(
     mutationFn: (variables: TVariables) => Promise<unknown>,
     predict: (state: PlayerSnapshot, variables: TVariables) => PlayerSnapshot | undefined,
 ) {
-    const client = useQueryClient();
-    return useMutation({
-        mutationFn,
-        onMutate: async variables => {
-            await client.cancelQueries({ queryKey: playerKeys.state });
-            const previous = client.getQueryData<PlayerSnapshot>(playerKeys.state);
-            const predicted = previous && predict(previous, variables);
-            if (predicted) client.setQueryData(playerKeys.state, predicted);
-            return { previous, predicted };
-        },
-        onError: (_error, _variables, context) => {
-            if (context?.predicted && client.getQueryData(playerKeys.state) === context.predicted)
-                client.setQueryData(playerKeys.state, context.previous);
-        },
-    });
+    return useOptimisticMutation<PlayerSnapshot, TVariables>(playerKeys.state, mutationFn, predict);
 }
 
 function predictCommand(state: PlayerSnapshot, command: PlayerCommand): PlayerSnapshot | undefined {

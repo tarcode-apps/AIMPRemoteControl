@@ -1,6 +1,14 @@
 import { queryOptions, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { request } from './client';
-import type { MoveRequest, Playlist, PlaylistGroups, PlaylistItemsPage, SortRequest } from './types';
+import { request } from './helpers/request';
+import type {
+    ItemSelection,
+    ItemsSummary,
+    MoveRequest,
+    Playlist,
+    PlaylistGroups,
+    PlaylistItemsPage,
+    SortRequest,
+} from './types';
 
 export type ItemsRange = {
     offset: number;
@@ -18,6 +26,7 @@ export const playlistKeys = {
     items: (id: string, range: ItemsRange) => ['playlists', id, 'items', range] as const,
     groups: (id: string) => ['playlists', id, 'groups'] as const,
     groupsView: (id: string, search: string) => ['playlists', id, 'groups', search] as const,
+    summary: (id: string, selection: ItemSelection) => ['playlists', id, 'summary', selection] as const,
 };
 
 function searchParam(search: string | undefined) {
@@ -60,6 +69,20 @@ export function usePlaylistGroups(id: string, enabled: boolean, search = '') {
                 },
             ),
         enabled,
+    });
+}
+
+// The totals of the selected items; the playlist's cache key keeps it current.
+export function useSelectionSummary(id: string, selection: ItemSelection | undefined) {
+    return useQuery({
+        queryKey: playlistKeys.summary(id, selection ?? { indexes: [] }),
+        queryFn: ({ signal }) =>
+            request<ItemsSummary>('POST', `/playlists/${encodeURIComponent(id)}/items/summary`, {
+                body: selection,
+                signal,
+            }),
+        enabled: selection !== undefined,
+        placeholderData: previous => previous,
     });
 }
 

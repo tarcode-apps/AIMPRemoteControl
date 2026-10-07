@@ -1,10 +1,10 @@
 'use client';
 
+import { Skeleton } from '@/app/_components/skeleton';
+import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import clsx from 'clsx';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Skeleton } from '../skeleton';
-import { usePlaylistSelection } from './PlaylistSelection';
 import styles from './PlaylistTabs.module.scss';
 
 const skeletonWidths = [96, 72, 110];

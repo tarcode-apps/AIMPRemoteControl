@@ -8,11 +8,11 @@
 
 #include "albumArt.h"
 #include "apiFileManager.h"
-#include "coverIndex.h"
+#include "helpers/coverIndex.h"
+#include "helpers/requestHelpers.h"
 #include "mainThreadRunner.h"
 #include "player/covers.h"
 #include "player/playerState.h"
-#include "requestHelpers.h"
 #include "stateUpdateEvents.h"
 
 namespace
@@ -78,7 +78,7 @@ HttpContent webapi::CoversController::ItemCover(const ApiRequest &request)
 								  { return player::GetCoverTarget(FCore, playlistId, *index, target); }));
 	std::string hash;
 	if (player::CoverKey(target.Source) == key)
-		hash = FCovers.HashFor(target.Source, tagWrites, target.FileInfo);
+		hash = FCovers.HashFor(CoverLocator{target.Source, playlistId, *index}, tagWrites, target.FileInfo);
 	target.FileInfo->Release();
 	if (hash.empty())
 		throw NotFound();
@@ -93,36 +93,64 @@ HttpContent webapi::CoversController::ItemCover(const ApiRequest &request)
 // A client may hold the playing track's hash from before a restart, with the image
 // gone from its cache, and ask for it before it reads the state again. That cover
 // can always be found.
-std::optional<player::CoverSource> webapi::CoversController::PlayingCoverSource(const std::string &hash)
+std::optional<webapi::CoverLocator> webapi::CoversController::PlayingCover(const std::string &hash)
 {
 	const player::PlayerState state = RunOnMainThread(FCore, [&]
 													  { return player::GetPlayerState(FCore); });
-	if (!state.Track || FCovers.HashFor(state.Track->Cover, FEvents.TagWrites(state.Track->PlaylistId)) != hash)
+	if (!state.Track)
 		return std::nullopt;
-	return state.Track->Cover;
+	const CoverLocator playing{state.Track->Cover, state.Track->PlaylistId, state.Track->Index};
+	if (FCovers.HashFor(playing, FEvents.TagWrites(state.Track->PlaylistId)) != hash)
+		return std::nullopt;
+	return playing;
+}
+
+// The file info the cover was seen through: the playlist item's while the item is
+// still that file, otherwise one for the file alone. Released by the caller.
+IAIMPFileInfo *webapi::CoversController::FileInfoAt(const CoverLocator &locator)
+{
+	return RunOnMainThread(FCore, [&]() -> IAIMPFileInfo *
+						   {
+		if (locator.Index >= 0)
+		{
+			player::CoverTarget target;
+			if (player::GetCoverTarget(FCore, locator.PlaylistId, locator.Index, target) == player::MutationResult::Ok)
+			{
+				if (player::CoverKey(target.Source) == player::CoverKey(locator.Source))
+					return target.FileInfo;
+				target.FileInfo->Release();
+			}
+		}
+		return player::ResolveCoverFileInfo(FCore, locator.Source); });
+}
+
+// The image with this hash as the locator finds it now; nothing when the cover
+// there has changed since, which is a different hash.
+std::optional<albumArt::Cover> webapi::CoversController::LoadAt(const CoverLocator &locator, const std::string &hash, bool original)
+{
+	IAIMPFileInfo *fileInfo = FileInfoAt(locator);
+	if (!fileInfo)
+		return std::nullopt;
+	std::optional<albumArt::Cover> cover = albumArt::LoadCover(FCore, fileInfo);
+	if (cover && albumArt::ContentHash(*cover) != hash)
+		cover.reset();
+	else if (cover && original)
+		cover = albumArt::LoadCover(FCore, fileInfo, albumArt::Original);
+	fileInfo->Release();
+	return cover;
 }
 
 HttpContent webapi::CoversController::CoverByHash(const ApiRequest &request)
 {
 	const std::string &hash = request.PathMatches.at(0);
 	const Variant variant = CoverVariant(request);
-	std::optional<player::CoverSource> source = FCovers.SourceOf(hash);
-	if (!source)
-		source = PlayingCoverSource(hash);
-	if (!source)
-		throw NotFound();
-
-	IAIMPFileInfo *fileInfo = RunOnMainThread(FCore, [&]
-											  { return player::ResolveCoverFileInfo(FCore, *source); });
-	if (!fileInfo)
-		throw NotFound();
-	std::optional<albumArt::Cover> cover = albumArt::LoadCover(FCore, fileInfo);
-	// A cover that changed since is a different hash: the client asks the item again.
-	if (cover && albumArt::ContentHash(*cover) == hash && variant.Original)
-		cover = albumArt::LoadCover(FCore, fileInfo, albumArt::Original);
-	else if (cover && albumArt::ContentHash(*cover) != hash)
-		cover.reset();
-	fileInfo->Release();
+	std::optional<albumArt::Cover> cover;
+	for (const CoverLocator &locator : FCovers.LocatorsOf(hash))
+		if ((cover = LoadAt(locator, hash, variant.Original)))
+			break;
+	if (!cover)
+		if (const std::optional<CoverLocator> playing = PlayingCover(hash))
+			cover = LoadAt(*playing, hash, variant.Original);
 	if (cover && variant.Size)
 		cover = albumArt::ScaleCover(FCore, *cover, variant.Size);
 	if (!cover)

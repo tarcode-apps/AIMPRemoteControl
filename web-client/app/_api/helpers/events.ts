@@ -1,14 +1,15 @@
+import { playerKeys, snapshot } from '@/app/_api/player';
+import { playlistKeys } from '@/app/_api/playlists';
+import { queueKeys } from '@/app/_api/queue';
+import type { PlayerState, Playlist, Queue } from '@/app/_api/types';
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { playerKeys, snapshot } from './player';
-import { playlistKeys } from './playlists';
-import type { PlayerState, Playlist } from './types';
 
 type Hello = { pluginVersion: string };
 type PlaylistsChanged = { playlists: { id: string; revision: number }[] };
 
 const invalidations: Record<string, QueryKey> = {
-    queue: ['queue'],
+    queue: queueKeys.all,
     timer: ['timer'],
 };
 
@@ -19,11 +20,21 @@ let knownPluginVersion: string | undefined;
 function invalidateChangedPlaylists(client: QueryClient, { playlists }: PlaylistsChanged) {
     const known = new Map(client.getQueryData<Playlist[]>(playlistKeys.all)?.map(p => [p.id, p.revision]));
     client.invalidateQueries({ queryKey: playlistKeys.all, exact: true });
+    const changed = new Set<string>();
     for (const { id, revision } of playlists) {
-        if (known.get(id) !== revision) client.invalidateQueries({ queryKey: playlistKeys.playlist(id) });
+        if (known.get(id) !== revision) {
+            client.invalidateQueries({ queryKey: playlistKeys.playlist(id) });
+            changed.add(id);
+        }
         known.delete(id);
     }
-    for (const id of known.keys()) client.removeQueries({ queryKey: playlistKeys.playlist(id) });
+    for (const id of known.keys()) {
+        client.removeQueries({ queryKey: playlistKeys.playlist(id) });
+        changed.add(id);
+    }
+    // Queued items point at playlist indexes.
+    const queue = client.getQueryData<Queue>(queueKeys.all);
+    if (queue?.items.some(item => changed.has(item.playlistId))) client.invalidateQueries({ queryKey: queueKeys.all });
 }
 
 export function useEventStream(client: QueryClient) {

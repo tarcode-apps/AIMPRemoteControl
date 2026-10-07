@@ -7,7 +7,10 @@
 @include fontsource.faces(
     $metadata: material-symbols.$metadata,
     $directory: "~@fontsource-variable/material-symbols-outlined/files",
-    $axes: (fill, wght),
+    $axes: (
+        fill,
+        wght,
+    ),
     $display: block
 );
 

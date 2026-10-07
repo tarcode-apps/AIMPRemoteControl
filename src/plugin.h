@@ -9,7 +9,7 @@
 #include "serviceDiscoveryServer.h"
 #include "sleepTimer.h"
 #include "stateUpdateEvents.h"
-#include "webApi/coverIndex.h"
+#include "webApi/helpers/coverIndex.h"
 
 #include <memory>
 

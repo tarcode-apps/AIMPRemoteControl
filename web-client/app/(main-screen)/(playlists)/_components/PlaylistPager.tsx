@@ -2,13 +2,13 @@
 
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { usePointerDrag } from '@/app/_hooks/usePointerDrag';
+import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import { media } from '@/app/_styles/media';
 import clsx from 'clsx';
 import { useRef, type CSSProperties } from 'react';
 import { usePlaylistMode } from './PlaylistMode';
 import { PlaylistPage } from './PlaylistPage';
 import styles from './PlaylistPager.module.scss';
-import { usePlaylistSelection } from './PlaylistSelection';
 
 const flingVelocity = 0.5;
 const edgeResistance = 0.3;

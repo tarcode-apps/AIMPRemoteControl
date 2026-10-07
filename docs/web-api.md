@@ -31,6 +31,7 @@ Error codes so far:
 | `500` | `playlistUpdateFailed` | the player refused the change |
 | `500` | `playerCommandFailed` | the player refused a playback command or setting |
 | `404` | `coverNotFound` | the item has no cover, the `key` is not the item's current one, or the image named by this hash is no longer known |
+| `409` | `queueChanged` | the `revision` in the request is not the playback queue's current one |
 
 ## Playlists
 
@@ -111,8 +112,8 @@ it is only valid for the `revision` the page was read at.
 
 `displayText` and `secondLine` are the two lines the player itself shows for
 the item, formatted by the playlist's own templates; `secondLine` is empty
-when the playlist hides its second line. `duration` is in seconds, `rating` is `0..5`,
-`enabled` is the check box in front of the track, `isUrl` marks streams. `cover` is the
+when the playlist hides its second line. `duration` is in seconds, `size` in bytes,
+`rating` is `0..5`, `enabled` is the check box in front of the track, `isUrl` marks streams. `cover` is the
 key the item's [cover URL](#get-apiv1playlistsiditemsindexcoverkeysize) takes: it
 names the file, so it only changes when the file is replaced. The client shows the covers of
 the playlists whose `showThumbnails` is on.
@@ -120,6 +121,20 @@ Every page is read from the player at request time, nothing is cached in the
 plugin; a search is one pass over the whole playlist per page.
 
 Errors: `404 playlistNotFound`, `400 invalidQuery`.
+
+### `POST /api/v1/playlists/{id}/items/summary`
+
+The count, total `duration` and total `size` of a selection of items, for a
+"multiple selection" heading. The body names the items as
+[`POST /api/v1/queue/items`](#post-apiv1queueitems) does, `playlistId` aside:
+`indexes`, or `search` with `except`, plus an optional `revision`.
+
+```json
+{"count": 12, "duration": 2954.6, "size": 118222848}
+```
+
+Errors: `400 invalidBody`, `404 playlistNotFound`, `404 itemNotFound`,
+`409 playlistChanged`.
 
 ### `GET /api/v1/playlists/{id}/groups`
 
@@ -211,6 +226,99 @@ the group requests. The response is an empty object.
 
 Errors: `400 invalidBody`, `403 playlistReadOnly`, `404 playlistNotFound`,
 `404 itemNotFound`, `409 playlistChanged`, `500 playlistUpdateFailed`.
+
+## Queue
+
+The playback queue holds playlist items that the player plays next, before it
+goes on with the playing playlist. A track may be queued any number of times,
+so an entry is named by its `position`; `playlistId` and `index` say which
+track it is, `index` being valid for the playlist's current revision.
+
+### `GET /api/v1/queue`
+
+```json
+{
+  "revision": 12,
+  "suspended": false,
+  "items": [
+    {
+      "position": 0,
+      "playlistId": "{A1B2C3D4-...}",
+      "index": 17,
+      "displayText": "Artist - Title",
+      "secondLine": "MP3 :: 44 kHz :: 320 kbps :: Stereo",
+      "duration": 237.4,
+      "rating": 0,
+      "enabled": true,
+      "isUrl": false,
+      "cover": "3f9a1c2e5b7d8e01"
+    }
+  ]
+}
+```
+
+The whole queue, in playing order. `revision` is a change counter of the
+queue, kept while the player runs; positions in a request are only meaningful
+for one revision, so the requests below take it the way the playlist requests
+take theirs. `suspended` is the player's "suspend the queue" switch: the queue
+is kept but not played from. The items carry the same fields as
+[playlist items](#get-apiv1playlistsiditems); `secondLine` follows the
+playlist's template whether or not the playlist shows it, and `cover` works
+with the item's [cover URL](#get-apiv1playlistsiditemsindexcoverkeysize).
+
+### `POST /api/v1/queue/items`
+
+Adds items of one playlist to the queue, in playlist order, at the end or,
+with `atBeginning`, at the beginning. The items are either named by index or
+chosen by search:
+
+```json
+{"playlistId": "{A1B2C3D4-...}", "indexes": [3, 4, 9], "atBeginning": false, "revision": 7}
+{"playlistId": "{A1B2C3D4-...}", "search": "beatles", "except": [12], "revision": 7}
+```
+
+`search` selects every item the search would list (an empty string is the
+whole playlist) but the indexes in `except`; a client that selected everything
+in a long result does not have to send the indexes. `revision` is the
+playlist's and optional, as in the group requests. The response is an empty
+object.
+
+Errors: `400 invalidBody`, `404 playlistNotFound`, `404 itemNotFound`,
+`409 playlistChanged`, `500 playlistUpdateFailed`.
+
+### `POST /api/v1/queue/remove`
+
+```json
+{"positions": [2, 5], "revision": 12}
+```
+
+Takes the entries at `positions` out of the queue; other entries of the same
+tracks stay. Errors: `400 invalidBody`, `404 itemNotFound`,
+`409 queueChanged`, `500 playlistUpdateFailed`.
+
+### `POST /api/v1/queue/move`
+
+```json
+{"positions": [5], "target": 0, "revision": 12}
+```
+
+Moves the entries at `positions` so that the first of them lands at `target`
+in the resulting queue; they keep their relative order. Errors:
+`400 invalidBody`, `404 itemNotFound`, `409 queueChanged`,
+`500 playlistUpdateFailed`.
+
+### `DELETE /api/v1/queue`
+
+Empties the queue. The body is optional and may carry `revision`. Errors:
+`400 invalidBody`, `409 queueChanged`, `500 playlistUpdateFailed`.
+
+### `PATCH /api/v1/queue`
+
+```json
+{"suspended": true}
+```
+
+Errors: `400 invalidBody`, `500 playlistUpdateFailed`.
 
 ## Player
 
@@ -338,10 +446,12 @@ the player's copy whatever the `size`, the original included. JPEG stays JPEG an
 PNG stays PNG; the bytes never change under one hash, so the image is sent with
 `Cache-Control: private, max-age=31536000, immutable`.
 
-The plugin keeps no copy of the images: it remembers which file each hash was
-seen in and looks the cover up again. After a restart it remembers nothing
-until the items are asked again, which the uncached redirect makes certain; the
-playing track's cover is found whether or not it was asked for. A hash the
+The plugin keeps no copy of the images: it remembers the last few places each
+hash was seen, playlist items and files, and looks the cover up there again,
+since the player finds some covers only for an item, by artist and album in its
+own cache. After a restart it remembers nothing until the items are asked
+again, which the uncached redirect makes certain; the playing track's cover is
+found whether or not it was asked for. A hash the
 plugin does not know, or whose cover changed since, is a `404 coverNotFound`
 with `Cache-Control: no-store`.
 
@@ -361,7 +471,7 @@ change; the payload is a JSON object.
 | `hello` | once, right after connecting | `{"pluginVersion": "1.3.1.0"}` — compare with the previous connection's value to learn that the plugin was updated while the page was open |
 | `player` | playback state, track, a seek, volume, mute, repeat, shuffle, radio capture, or a change of the playing playlist that may have moved the track's index | the same object as [`GET /api/v1/player`](#get-apiv1player) |
 | `playlists` | a playlist was added, removed, renamed or its content changed | `{"playlists": [{"id": "{A1B2C3D4-...}", "revision": 7}, …]}` — every loaded playlist with its current revision |
-| `queue` | the playback queue changed | `{}` |
+| `queue` | an entry was added, removed or moved, the player took the next track out, or the queue was suspended or resumed | `{"revision": 12, "count": 3, "suspended": false}` — enough for a badge; the list itself is [`GET /api/v1/queue`](#get-apiv1queue) |
 | `timer` | the sleep timer was set, cancelled or fired | `{}` |
 
 A track switch raises several player changes within a few milliseconds, with

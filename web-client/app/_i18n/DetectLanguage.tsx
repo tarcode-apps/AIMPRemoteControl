@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import i18n from '.';
+import i18n from './';
 
 export function DetectLanguage() {
     useEffect(() => {

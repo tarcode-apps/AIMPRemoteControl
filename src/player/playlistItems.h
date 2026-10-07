@@ -9,8 +9,11 @@
 #include "coverSource.h"
 
 class IAIMPCore;
+class IAIMPFileInfo;
 class IAIMPPlaylist;
 class IAIMPPlaylistItem;
+class IAIMPServiceFileInfoFormatter;
+class IAIMPString;
 class PlaylistItemContext;
 
 namespace player
@@ -21,6 +24,7 @@ namespace player
 		std::string DisplayText; // the first line as the player itself shows it
 		std::string SecondLine;	 // formatted by the playlist's second-line template, empty when hidden
 		double Duration = 0;	 // seconds
+		std::int64_t Size = 0;	 // bytes
 		double Rating = 0;		 // 0..5
 		bool Enabled = true;
 		bool IsUrl = false;
@@ -51,7 +55,49 @@ namespace player
 		std::int32_t FirstPosition = 0; // playlist index of the group's first item
 	};
 
+	// Formats an item's second line by its playlist's template; nothing when the
+	// playlist hides the line, unless `evenWhenHidden`.
+	class SecondLineFormatter
+	{
+	public:
+		SecondLineFormatter(IAIMPCore *core, IAIMPPlaylist *playlist, bool evenWhenHidden = false);
+		~SecondLineFormatter();
+		SecondLineFormatter(const SecondLineFormatter &) = delete;
+		SecondLineFormatter &operator=(const SecondLineFormatter &) = delete;
+
+		std::string Format(IAIMPFileInfo *fileInfo) const;
+
+	private:
+		IAIMPString *FTemplate = nullptr;
+		IAIMPServiceFileInfoFormatter *FFormatter = nullptr;
+	};
+
+	PlaylistItem ReadPlaylistItem(const PlaylistItemContext &ctx, std::int32_t index, const SecondLineFormatter &secondLine);
+
+	// Items of a playlist named in a request: everything that matches `Search` but
+	// the indexes in `Except`, or, without a search, the `Indexes`.
+	struct ItemSelection
+	{
+		std::optional<std::string> Search;
+		std::vector<std::int32_t> Except;
+		std::vector<std::int32_t> Indexes;
+	};
+
+	struct ItemsSummary
+	{
+		std::int32_t Count = 0;
+		double Duration = 0;   // seconds
+		std::int64_t Size = 0; // bytes
+	};
+
 	using ItemVisitor = std::function<void(const PlaylistItemContext &ctx, std::int32_t index)>;
+
+	// Sorts the indexes, drops repeats and tells whether they all lie in `0..count-1`.
+	bool NormalizeIndexes(std::vector<std::int32_t> &indexes, std::int32_t count);
+
+	// Calls `visit` for the selected items in playlist order; false when an index
+	// is outside the playlist.
+	bool VisitSelectedItems(IAIMPCore *core, IAIMPPlaylist *playlist, const ItemSelection &selection, const ItemVisitor &visit);
 
 	// Calls `visit` for the items selected by `query`, in playlist order. Returns how
 	// many items match `Search` in the whole playlist, or the item count when the
@@ -80,6 +126,9 @@ namespace player
 
 	// The item at `index`, for the caller to release.
 	MutationResult FindPlaylistItem(IAIMPCore *core, const std::string &playlistId, std::int32_t index, IAIMPPlaylistItem *&item);
+
+	MutationResult SummarizePlaylistItems(IAIMPCore *core, const std::string &playlistId, const ItemSelection &selection,
+										  ItemsSummary &summary);
 
 	// Collapses or expands one group, or every group when `index` is nullopt.
 	MutationResult SetGroupExpanded(IAIMPCore *core, const std::string &playlistId, std::optional<std::int32_t> index, bool expanded);

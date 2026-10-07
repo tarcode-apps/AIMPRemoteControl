@@ -52,6 +52,16 @@ public:
 	// such as covers may want to look again after one.
 	std::uint64_t TagWrites(const std::string &playlistId);
 
+	struct QueueInfo
+	{
+		std::uint64_t Revision = 1; // changes of the queue, counted from 1
+		std::int32_t Count = 0;
+		bool Suspended = false;
+	};
+	// Read on the player thread when the queue changes, so that a reader needs no trip there.
+	QueueInfo CurrentQueue();
+	std::uint64_t QueueRevision();
+
 	void Notify(Kind kind);
 	bool IsStopped();
 
@@ -59,12 +69,14 @@ private:
 	class MessageHook;
 	class PlaylistListener;
 	class PlaylistManagerListener;
+	class QueueListener;
 
 	void WatchPlaylist(IAIMPPlaylist *playlist);
 	void PlayerChanged(bool trackStarted);
 	void PlaylistChanged(const std::string &playlistId, bool tagsWritten);
 	void FilterChange(const std::string &playlistId, unsigned long flags, std::int32_t itemCount);
 	void PlaylistRemoved(const std::string &playlistId);
+	void QueueChanged();
 	void AllPlaylistsChanged();
 	void PollPlaylistSettings();
 
@@ -72,6 +84,7 @@ private:
 	MessageHook *FMessageHook = nullptr;
 	std::vector<PlaylistListener *> FPlaylistListeners;
 	PlaylistManagerListener *FPlaylistManagerListener = nullptr;
+	QueueListener *FQueueListener = nullptr;
 	std::thread FSettingsPoller;
 	std::unique_ptr<PlaylistChangeFilter> FChangeFilter;
 
@@ -80,6 +93,7 @@ private:
 	std::uint64_t FVersions[KindCount] = {};
 	PlaylistRevisions FPlaylistRevisions;
 	PlaylistRevisions FTagWrites;
+	QueueInfo FQueue;
 	// Its changes move the playing item's index, so they count as player changes too.
 	std::string FPlayingPlaylistId;
 	bool FStopped = false;

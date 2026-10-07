@@ -1,5 +1,6 @@
 'use client';
 
+import { useBackGesture } from '@/app/_hooks/useBackGesture';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { media } from '@/app/_styles/media';
 import clsx from 'clsx';
@@ -36,6 +37,7 @@ export function PlayerPanelProvider({ children }: { children: ReactNode }) {
         setOpened(false);
     }
     const expanded = opened && !docked;
+    useBackGesture(expanded, () => setOpened(false));
 
     useEffect(() => {
         if (!expanded) return;

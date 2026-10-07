@@ -5,14 +5,16 @@
 #include <cmath>
 #include <string>
 
+#include "helpers/coverIndex.h"
+#include "helpers/requestHelpers.h"
 #include "mainThreadRunner.h"
-#include "coverIndex.h"
 #include "player/playerState.h"
-#include "requestHelpers.h"
 #include "stateUpdateEvents.h"
 
 namespace
 {
+	using webapi::OptionalField;
+
 	const char *StateName(player::PlaybackState state)
 	{
 		switch (state)
@@ -68,16 +70,6 @@ namespace
 			throw ApiError(500, "playerCommandFailed");
 	}
 
-	template <typename T>
-	std::optional<T> OptionalField(const nlohmann::json &body, const char *name, bool (nlohmann::json::*isType)() const)
-	{
-		if (!body.contains(name))
-			return std::nullopt;
-		if (!(body[name].*isType)())
-			throw ApiError(400, "invalidBody");
-		return body[name].get<T>();
-	}
-
 	player::PlayerPatch PatchBody(const nlohmann::json &body)
 	{
 		if (!body.is_object() || body.empty())
@@ -104,7 +96,8 @@ nlohmann::json webapi::PlayerController::Snapshot(IAIMPCore *core, StateUpdateEv
 	{
 		// The cover is looked up here, once per track, so that the client can show it
 		// without asking for it first.
-		const std::string coverHash = covers.HashFor(state.Track->Cover, events.TagWrites(state.Track->PlaylistId));
+		const std::string coverHash = covers.HashFor(CoverLocator{state.Track->Cover, state.Track->PlaylistId, state.Track->Index},
+													 events.TagWrites(state.Track->PlaylistId));
 		track = {
 			{"playlistId", state.Track->PlaylistId},
 			{"playlistRevision", events.PlaylistRevision(state.Track->PlaylistId)},

@@ -1,4 +1,4 @@
-import { basePath } from './client';
+import { basePath } from './helpers/request';
 
 // The server only scales down, to any size; the fixed steps keep the browser's
 // cache to one image per cover and density. The player's own copy is already

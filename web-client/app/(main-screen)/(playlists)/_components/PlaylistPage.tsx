@@ -1,30 +1,36 @@
 'use client';
 
-import { errorMessage } from '@/app/_api/errors';
+import { errorMessage } from '@/app/_api/helpers/errors';
 import { usePlayer, usePlayTrack } from '@/app/_api/player';
 import { useMovePlaylistItems, usePlaylistItems, useSetGroupExpanded } from '@/app/_api/playlists';
+import { queueMark, trackKey, useEnqueue, useQueuePositions } from '@/app/_api/queue';
 import type { Playlist, PlaylistGroup, PlaylistItem } from '@/app/_api/types';
+import { ListCheckbox } from '@/app/_components/inputs';
+import type { PlaylistRow } from '@/app/_components/lists';
+import {
+    DragHandle,
+    GroupRow,
+    ItemRow,
+    oneLineRowHeight,
+    SkeletonRow,
+    thumbnailMargin,
+    twoLineRowHeight,
+    useActiveRow,
+    usePlaylistDrag,
+} from '@/app/_components/lists';
+import styles from '@/app/_components/lists/ListPage.module.scss';
+import { useRowMenu } from '@/app/_components/menus';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
+import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import { media } from '@/app/_styles/media';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import clsx from 'clsx';
 import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ListCheckbox } from '../inputs';
 import { usePlaylistMode } from './PlaylistMode';
-import styles from './PlaylistPage.module.scss';
-import { DragHandle, GroupRow, ItemRow, SkeletonRow } from './PlaylistRowContent';
-import type { PlaylistRow } from './playlistRows';
-import { usePlaylistSelection } from './PlaylistSelection';
-import { useActiveRow } from './useActiveRow';
-import { usePlaylistDrag } from './usePlaylistDrag';
 import { pageSize, usePlaylistLayout } from './usePlaylistLayout';
 
-const twoLineRowHeight = 56;
-const oneLineRowHeight = 44;
 const groupRowHeight = 40;
-// The thumbnail is square and leaves this much of the row above and below.
-const thumbnailMargin = 6;
 const overscanRows = 6;
 const bufferPages = 1;
 const pendingRows = 12;
@@ -191,6 +197,23 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
             setExpanded.mutate({ index: group.index, expanded: !group.expanded, revision: playlist.revision });
     };
 
+    const queuePositions = useQueuePositions();
+    const enqueue = useEnqueue();
+    const hasMenu = mode.mode === null || searching;
+    const rowMenu = useRowMenu((item: PlaylistItem) => {
+        const enqueueItem = (atBeginning: boolean) =>
+            enqueue.mutate({
+                playlistId: playlist.id,
+                indexes: [item.index],
+                atBeginning,
+                revision: playlist.revision,
+            });
+        return [
+            { label: t('playlist.enqueue'), icon: 'playlist_add', onSelect: () => enqueueItem(false) },
+            { label: t('playlist.enqueueFirst'), icon: 'playlist_play', onSelect: () => enqueueItem(true) },
+        ];
+    });
+
     const toggleSelected = (row: PlaylistRow, item: PlaylistItem | undefined) => {
         if (row.kind === 'group')
             void mode.setRangeSelected(row.group.firstPosition, row.group.count, !groupSelection(row.group).checked);
@@ -228,7 +251,9 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
 
     const rowId = (row: number) => `${listId}-${row}`;
     const rowProps = {
-        playlist,
+        view: playlist,
+        playlistId: playlist.id,
+        revision: playlist.revision,
         docked,
         thumbnailSize: itemRowHeight - 2 * thumbnailMargin,
         widestNumber,
@@ -373,12 +398,14 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                                         {...rowProps}
                                         item={item}
                                         number={numberOf(row, item) ?? 0}
+                                        queueMark={queueMark(queuePositions.get(trackKey(playlist.id, item.index)))}
                                         selected={selecting && mode.isSelected(item.index)}
                                         onSelect={selected => mode.setSelected([item.index], selected)}
                                         onDragStart={event => {
                                             draggedItem.current = item;
                                             drag.start(index, event);
                                         }}
+                                        menu={hasMenu ? rowMenu.button(index, item) : undefined}
                                     />
                                 ) : (
                                     <SkeletonRow {...rowProps} />
@@ -389,6 +416,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                     {ghost}
                 </div>
             )}
+            {rowMenu.popover}
         </section>
     );
 }

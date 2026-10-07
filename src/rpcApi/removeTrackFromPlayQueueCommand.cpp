@@ -12,6 +12,7 @@
 #include "helpers/idLookup.h"
 #include "mainThreadRunner.h"
 #include "helpers/remoteControlIdManager.h"
+#include "player/queue.h"
 
 namespace
 {
@@ -32,13 +33,7 @@ void rpcapi::RemoveTrackFromPlayQueueCommand::Register(IEndpointRouteBuilder &en
 			IAIMPPlaylistItem *item = FindPlaylistItem(core, idManager, trackId);
 			if (!item)
 				return E_INVALIDARG;
-			HRESULT hr = E_FAIL;
-			IAIMPPlaylistQueue *queue = nullptr;
-			if (Succeeded(core->QueryInterface(IID_IAIMPPlaylistQueue, reinterpret_cast<void **>(&queue))) && queue)
-			{
-				hr = queue->Delete(item);
-				queue->Release();
-			}
+			const HRESULT hr = player::DequeueItem(core, item) == player::MutationResult::Ok ? S_OK : E_FAIL;
 			item->Release();
 			return hr;
 		});

@@ -11,18 +11,21 @@
 
 #include <nlohmann/json.hpp>
 
+#include "helpers/itemJson.h"
+#include "helpers/requestHelpers.h"
 #include "mainThreadRunner.h"
 #include "player/playlistItems.h"
-#include "player/covers.h"
 #include "player/playlists.h"
-#include "requestHelpers.h"
 #include "stateUpdateEvents.h"
 
 namespace
 {
 	using webapi::CheckRevision;
+	using webapi::MoveBody;
+	using webapi::OptionalField;
 	using webapi::QueryInt;
 	using webapi::QueryString;
+	using webapi::SelectionBody;
 	using webapi::ThrowUnlessOk;
 
 	constexpr std::int32_t DefaultLimit = 200;
@@ -55,20 +58,6 @@ namespace
 			{"showSecondLine", playlist.ShowSecondLine},
 			{"showThumbnails", playlist.ShowThumbnails},
 			{"grouping", {{"enabled", playlist.Grouped}, {"template", playlist.GroupingTemplate}, {"autoMerge", playlist.GroupAutoMerge}}},
-		};
-	}
-
-	nlohmann::json ToJson(const player::PlaylistItem &item)
-	{
-		return {
-			{"index", item.Index},
-			{"displayText", item.DisplayText},
-			{"secondLine", item.SecondLine},
-			{"duration", item.Duration},
-			{"rating", item.Rating},
-			{"enabled", item.Enabled},
-			{"isUrl", item.IsUrl},
-			{"cover", player::CoverKey(item.Cover)},
 		};
 	}
 
@@ -122,12 +111,7 @@ namespace
 
 		player::SortOptions options;
 		options.Mode = mode->second;
-		if (body.contains("descending"))
-		{
-			if (!body["descending"].is_boolean())
-				throw ApiError(400, "invalidBody");
-			options.Descending = body["descending"].get<bool>();
-		}
+		options.Descending = OptionalField<bool>(body, "descending", &nlohmann::json::is_boolean).value_or(false);
 		if (options.Mode == SortMode::Template)
 		{
 			if (!body.contains("template") || !body["template"].is_string() || body["template"].get<std::string>().empty())
@@ -135,21 +119,6 @@ namespace
 			options.Template = body["template"].get<std::string>();
 		}
 		return options;
-	}
-
-	std::pair<std::vector<std::int32_t>, std::int32_t> MoveBody(const nlohmann::json &body)
-	{
-		if (!body.is_object() || !body.contains("indexes") || !body["indexes"].is_array() || body["indexes"].empty() ||
-			!body.contains("target") || !body["target"].is_number_integer())
-			throw ApiError(400, "invalidBody");
-		std::vector<std::int32_t> indexes;
-		for (const nlohmann::json &index : body["indexes"])
-		{
-			if (!index.is_number_integer())
-				throw ApiError(400, "invalidBody");
-			indexes.push_back(index.get<std::int32_t>());
-		}
-		return {std::move(indexes), body["target"].get<std::int32_t>()};
 	}
 }
 
@@ -186,13 +155,23 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 
 		nlohmann::json items = nlohmann::json::array();
 		for (const player::PlaylistItem &item : page->Items)
-			items.push_back(ToJson(item));
+			items.push_back(ItemJson(item));
 		return {
 			{"total", page->Total},
 			{"revision", revision},
 			{"offset", page->Offset},
 			{"items", std::move(items)},
 		}; });
+
+	endpoints.MapApi(HttpMethod::Post, R"(/api/v1/playlists/([^/]+)/items/summary)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
+			   {
+		const std::string playlistId = request.PathMatches.at(0);
+		const player::ItemSelection selection = SelectionBody(request.Body);
+		CheckRevision(request.Body, events, playlistId);
+		player::ItemsSummary summary;
+		ThrowUnlessOk(RunOnMainThread(core, [&]
+									  { return player::SummarizePlaylistItems(core, playlistId, selection, summary); }));
+		return {{"count", summary.Count}, {"duration", summary.Duration}, {"size", summary.Size}}; });
 
 	endpoints.MapApi(HttpMethod::Get, R"(/api/v1/playlists/([^/]+)/groups)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {
@@ -227,7 +206,7 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 	endpoints.MapApi(HttpMethod::Post, R"(/api/v1/playlists/([^/]+)/items/move)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {
 		const std::string playlistId = request.PathMatches.at(0);
-		const auto move = MoveBody(request.Body);
+		const auto move = MoveBody(request.Body, "indexes");
 		CheckRevision(request.Body, events, playlistId);
 		ThrowUnlessOk(RunOnMainThread(core, [&]
 									  { return player::MovePlaylistItems(core, playlistId, move.first, move.second); }));

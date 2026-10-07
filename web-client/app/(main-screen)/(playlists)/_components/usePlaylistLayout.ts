@@ -1,8 +1,8 @@
 import { playlistItemsQuery, usePlaylistGroups } from '@/app/_api/playlists';
 import type { Playlist } from '@/app/_api/types';
+import { PlaylistRows } from '@/app/_components/lists';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { PlaylistRows } from './playlistRows';
 
 export const pageSize = 200;
 

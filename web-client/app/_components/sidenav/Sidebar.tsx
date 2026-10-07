@@ -1,15 +1,16 @@
 'use client';
 
-import { errorMessage } from '@/app/_api/errors';
+import { errorMessage } from '@/app/_api/helpers/errors';
 import { usePlaylists } from '@/app/_api/playlists';
+import { useQueue } from '@/app/_api/queue';
+import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import clsx from 'clsx';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '../buttons';
 import { Icon } from '../icons';
 import { usePlayerPanel } from '../player';
-import { usePlaylistSelection } from '../playlists';
 import { Skeleton } from '../skeleton';
 import { useDrawer } from './Drawer';
 import styles from './Sidebar.module.scss';
@@ -32,7 +33,8 @@ const playlistSkeletonWidths = ['55%', '40%', '70%', '45%'];
 function Playlists() {
     const { t } = useTranslation();
     const pathname = usePathname();
-    const { close } = useDrawer();
+    const router = useRouter();
+    const { closeThen } = useDrawer();
     const { collapse } = usePlayerPanel();
     const { error, isPending, isError, refetch, isRefetching } = usePlaylists();
     const { playlists, selected, select } = usePlaylistSelection();
@@ -70,10 +72,13 @@ function Playlists() {
                             href="/"
                             className={clsx(styles.item, active && styles.active)}
                             aria-current={active ? 'true' : undefined}
-                            onClick={() => {
-                                select(playlist.id);
-                                collapse();
-                                close();
+                            onClick={event => {
+                                event.preventDefault();
+                                closeThen(() => {
+                                    select(playlist.id);
+                                    collapse();
+                                    if (pathname !== '/') router.push('/');
+                                });
                             }}
                         >
                             <Icon>queue_music</Icon>
@@ -88,22 +93,30 @@ function Playlists() {
 
 export function Sidebar() {
     const pathname = usePathname();
-    const { close } = useDrawer();
+    const router = useRouter();
+    const { closeThen } = useDrawer();
     const { expand } = usePlayerPanel();
     const { t } = useTranslation();
+    const { data: queue } = useQueue();
+    const queueBadge = queue?.suspended ? '!' : queue?.items.length || null;
 
     const renderItem = ({ href, label, icon }: NavItem) => {
         const active = pathname === href;
+        const badge = href === '/queue/' ? queueBadge : null;
         return (
             <li key={href}>
                 <Link
                     href={href}
                     className={clsx(styles.item, active && styles.active)}
                     aria-current={active ? 'page' : undefined}
-                    onClick={close}
+                    onClick={event => {
+                        event.preventDefault();
+                        closeThen(() => router.push(href));
+                    }}
                 >
                     <Icon>{icon}</Icon>
                     <span className={styles.label}>{t(label)}</span>
+                    {badge ? <span className={styles.badge}>{badge}</span> : null}
                 </Link>
             </li>
         );
@@ -117,14 +130,7 @@ export function Sidebar() {
             <div className={styles.playerNav}>
                 <ul className={styles.list}>
                     <li>
-                        <button
-                            type="button"
-                            className={styles.item}
-                            onClick={() => {
-                                expand();
-                                close();
-                            }}
-                        >
+                        <button type="button" className={styles.item} onClick={() => closeThen(expand)}>
                             <Icon>home</Icon>
                             <span className={styles.label}>{t('screens.player')}</span>
                         </button>

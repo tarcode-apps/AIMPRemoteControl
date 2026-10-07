@@ -1,16 +1,9 @@
 import type { Metadata, Viewport } from 'next';
-import { ApiProvider } from './_api/ApiProvider';
-import {
-    Drawer,
-    DrawerContainer,
-    DrawerContent,
-    PlayerPanel,
-    PlayerPanelProvider,
-    PlaylistSelectionProvider,
-    Sidebar,
-} from './_components';
+import { ApiProvider } from './_api/helpers/ApiProvider';
+import { Drawer, DrawerContainer, DrawerContent, PlayerPanel, PlayerPanelProvider, Sidebar } from './_components';
 import { DetectLanguage } from './_i18n/DetectLanguage';
 import { fallbackLanguage, resources } from './_i18n/resources';
+import { PlaylistSelectionProvider } from './_state/PlaylistSelection';
 import './_styles/globals.scss';
 
 export const metadata: Metadata = {

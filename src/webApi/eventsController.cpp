@@ -6,7 +6,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include "coverIndex.h"
+#include "helpers/coverIndex.h"
 #include "playerController.h"
 #include "pluginInfo.h"
 #include "stateUpdateEvents.h"
@@ -24,6 +24,12 @@ namespace
 		return {{"playlists", std::move(playlists)}};
 	}
 
+	nlohmann::json QueueData(StateUpdateEvents &events)
+	{
+		const StateUpdateEvents::QueueInfo queue = events.CurrentQueue();
+		return {{"revision", queue.Revision}, {"count", queue.Count}, {"suspended", queue.Suspended}};
+	}
+
 	nlohmann::json EventData(IAIMPCore *core, StateUpdateEvents &events, webapi::CoverIndex &covers, int kind)
 	{
 		switch (kind)
@@ -32,6 +38,8 @@ namespace
 			return webapi::PlayerController::Snapshot(core, events, covers);
 		case StateUpdateEvents::Playlists:
 			return PlaylistsData(events);
+		case StateUpdateEvents::Queue:
+			return QueueData(events);
 		default:
 			return nlohmann::json::object();
 		}
@@ -73,8 +81,9 @@ void webapi::EventsController::Register(IEndpointRouteBuilder &endpoints)
 				continue;
 			}
 			// A track switch raises several player changes in a row, with a stopped
-			// player in between; one snapshot after the burst is what the client wants.
-			while (changed.test(StateUpdateEvents::ControlPanel) && !events.IsStopped())
+			// player in between, and one queue request raises one queue change per
+			// item; one event after the burst is what the client wants.
+			while ((changed.test(StateUpdateEvents::ControlPanel) || changed.test(StateUpdateEvents::Queue)) && !events.IsStopped())
 			{
 				const std::bitset<StateUpdateEvents::KindCount> more = events.WaitAny(seen, BurstInterval);
 				if (more.none())

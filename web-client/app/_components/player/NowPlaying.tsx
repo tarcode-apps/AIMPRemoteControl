@@ -8,6 +8,7 @@ import clsx from 'clsx';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '../buttons';
+import { TrackCover } from '../cover';
 import { Icon } from '../icons';
 import { Slider } from '../inputs';
 import { useDrawer } from '../sidenav';
@@ -38,7 +39,8 @@ export function NowPlaying() {
     const { data: playlists } = usePlaylists();
     const command = usePlayerCommand();
     const setPlayer = useSetPlayer();
-    const position = usePlayerPosition(player, expanded || docked);
+    const shown = expanded || docked;
+    const position = usePlayerPosition(player, shown);
     const volumeRef = useRef<HTMLDivElement>(null);
     const lastVolumeAt = useRef(0);
     const [volumeOpen, setVolumeOpen] = useState(false);
@@ -146,9 +148,7 @@ export function NowPlaying() {
                 </IconButton>
             </header>
             <div className={styles.cover}>
-                <div className={styles.coverBox}>
-                    <Icon>music_note</Icon>
-                </div>
+                <TrackCover hash={shown ? track?.coverHash : undefined} className={styles.coverBox} />
             </div>
             <div className={styles.track}>
                 <h2 className={styles.title}>

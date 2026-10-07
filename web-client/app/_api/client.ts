@@ -7,7 +7,7 @@ export type RequestOptions = {
     signal?: AbortSignal;
 };
 
-const basePath = '/api/v1';
+export const basePath = '/api/v1';
 
 export async function request<T>(method: HttpMethod, path: string, options: RequestOptions = {}): Promise<T> {
     let response: Response;

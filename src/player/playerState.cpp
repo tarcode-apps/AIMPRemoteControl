@@ -16,18 +16,12 @@ namespace
 
 	IAIMPServicePlayer *PlayerService(IAIMPCore *core)
 	{
-		IAIMPServicePlayer *player = nullptr;
-		if (Failed(core->QueryInterface(IID_IAIMPServicePlayer, reinterpret_cast<void **>(&player))))
-			return nullptr;
-		return player;
+		return AcquireService<IAIMPServicePlayer>(core, IID_IAIMPServicePlayer);
 	}
 
 	IAIMPServiceMessageDispatcher *DispatcherService(IAIMPCore *core)
 	{
-		IAIMPServiceMessageDispatcher *dispatcher = nullptr;
-		if (Failed(core->QueryInterface(IID_IAIMPServiceMessageDispatcher, reinterpret_cast<void **>(&dispatcher))))
-			return nullptr;
-		return dispatcher;
+		return AcquireService<IAIMPServiceMessageDispatcher>(core, IID_IAIMPServiceMessageDispatcher);
 	}
 
 	bool GetBoolProperty(IAIMPServiceMessageDispatcher *dispatcher, DWORD property)
@@ -98,6 +92,8 @@ namespace
 			track.Artist = ToStringAndRelease(ItemFileInfoString(ctx, AIMP_FILEINFO_PROPID_ARTIST));
 			track.Album = ToStringAndRelease(ItemFileInfoString(ctx, AIMP_FILEINFO_PROPID_ALBUM));
 			track.IsUrl = fileUriService && ctx.FileUri && fileUriService->IsURL(ctx.FileUri) == S_OK;
+			if (ctx.FileInfo && !track.IsUrl)
+				track.Cover = player::DescribeCoverSource(ctx.FileInfo, false);
 		}
 		if (fileUriService)
 			fileUriService->Release();
@@ -108,6 +104,8 @@ namespace
 		IAIMPFileInfo *info = nullptr;
 		if (Succeeded(player->GetInfo(&info)) && info)
 		{
+			if (track.IsUrl)
+				track.Cover = player::DescribeCoverSource(info, true);
 			const std::string title = GetPropertyAsString(info, AIMP_FILEINFO_PROPID_TITLE);
 			if (!title.empty())
 			{
@@ -182,17 +180,10 @@ bool player::SendPlayerCommand(IAIMPCore *core, PlayerCommand command)
 
 player::MutationResult player::PlayPlaylistItem(IAIMPCore *core, const std::string &playlistId, std::int32_t index)
 {
-	IAIMPPlaylist *playlist = LoadedPlaylistByAIMPId(core, playlistId);
-	if (!playlist)
-		return MutationResult::PlaylistNotFound;
 	IAIMPPlaylistItem *item = nullptr;
-	if (index < 0 || index >= playlist->GetItemCount() ||
-		Failed(playlist->GetItem(index, IID_IAIMPPlaylistItem, reinterpret_cast<void **>(&item))) || !item)
-	{
-		playlist->Release();
-		return MutationResult::ItemNotFound;
-	}
-	playlist->Release();
+	const MutationResult found = FindPlaylistItem(core, playlistId, index, item);
+	if (found != MutationResult::Ok)
+		return found;
 
 	IAIMPServicePlayer *player = PlayerService(core);
 	const bool ok = player && Succeeded(player->Play2(item));

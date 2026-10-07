@@ -7,15 +7,19 @@ class StateUpdateEvents;
 
 namespace webapi
 {
+	class CoverIndex;
+
 	class EventsController : public IApiController
 	{
 	public:
-		EventsController(IAIMPCore *core, StateUpdateEvents &events) : FCore(core), FEvents(events) {}
+		EventsController(IAIMPCore *core, StateUpdateEvents &events, CoverIndex &covers)
+			: FCore(core), FEvents(events), FCovers(covers) {}
 
 		void Register(IEndpointRouteBuilder &endpoints) override;
 
 	private:
 		IAIMPCore *FCore;
 		StateUpdateEvents &FEvents;
+		CoverIndex &FCovers;
 	};
 }

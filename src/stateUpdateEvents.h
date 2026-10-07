@@ -6,6 +6,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -13,6 +14,7 @@
 
 class IAIMPCore;
 class IAIMPPlaylist;
+class PlaylistChangeFilter;
 
 class StateUpdateEvents
 {
@@ -46,6 +48,10 @@ public:
 	PlaylistRevisions CurrentPlaylistRevisions();
 	std::uint64_t PlaylistRevision(const std::string &playlistId);
 
+	// Counts the tag writes reported for the playlist; a reader of file-bound data
+	// such as covers may want to look again after one.
+	std::uint64_t TagWrites(const std::string &playlistId);
+
 	void Notify(Kind kind);
 	bool IsStopped();
 
@@ -55,8 +61,9 @@ private:
 	class PlaylistManagerListener;
 
 	void WatchPlaylist(IAIMPPlaylist *playlist);
-	void PlayerChanged();
-	void PlaylistChanged(const std::string &playlistId);
+	void PlayerChanged(bool trackStarted);
+	void PlaylistChanged(const std::string &playlistId, bool tagsWritten);
+	void FilterChange(const std::string &playlistId, unsigned long flags, std::int32_t itemCount);
 	void PlaylistRemoved(const std::string &playlistId);
 	void AllPlaylistsChanged();
 	void PollPlaylistSettings();
@@ -66,11 +73,13 @@ private:
 	std::vector<PlaylistListener *> FPlaylistListeners;
 	PlaylistManagerListener *FPlaylistManagerListener = nullptr;
 	std::thread FSettingsPoller;
+	std::unique_ptr<PlaylistChangeFilter> FChangeFilter;
 
 	std::mutex FMutex;
 	std::condition_variable FChanged;
 	std::uint64_t FVersions[KindCount] = {};
 	PlaylistRevisions FPlaylistRevisions;
+	PlaylistRevisions FTagWrites;
 	// Its changes move the playing item's index, so they count as player changes too.
 	std::string FPlayingPlaylistId;
 	bool FStopped = false;

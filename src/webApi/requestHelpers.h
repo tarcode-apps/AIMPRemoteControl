@@ -1,7 +1,10 @@
 #pragma once
 
+#include <charconv>
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <string_view>
 
 #include <nlohmann/json.hpp>
 
@@ -11,6 +14,33 @@
 
 namespace webapi
 {
+	inline std::string QueryString(const ApiRequest &request, const char *name)
+	{
+		const auto it = request.Query.find(name);
+		return it == request.Query.end() ? std::string() : it->second;
+	}
+
+	// The whole text as a number, or nothing.
+	inline std::optional<std::int32_t> ParseInt32(std::string_view text)
+	{
+		std::int32_t value = 0;
+		const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+		if (error != std::errc() || end != text.data() + text.size())
+			return std::nullopt;
+		return value;
+	}
+
+	inline std::int32_t QueryInt(const ApiRequest &request, const char *name, std::int32_t fallback, std::int32_t min, std::int32_t max)
+	{
+		const std::string text = QueryString(request, name);
+		if (text.empty())
+			return fallback;
+		const std::optional<std::int32_t> value = ParseInt32(text);
+		if (!value || *value < min || *value > max)
+			throw ApiError(400, "invalidQuery");
+		return *value;
+	}
+
 	inline void ThrowUnlessOk(player::MutationResult result)
 	{
 		switch (result)

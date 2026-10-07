@@ -8,6 +8,7 @@
 #include "apiFileManager.h"
 #include "apiPlaylists.h"
 #include "aimpHelper.h"
+#include "covers.h"
 #include "playlistItemContext.h"
 
 namespace
@@ -76,6 +77,8 @@ namespace
 		ctx.Item->GetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_PLAYINGSWITCH, &enabled);
 		item.Enabled = enabled != 0;
 		item.IsUrl = ctx.FileUriService && ctx.FileUri && ctx.FileUriService->IsURL(ctx.FileUri) == S_OK;
+		if (ctx.FileInfo)
+			item.Cover = player::DescribeCoverSource(ctx.FileInfo, item.IsUrl);
 		return item;
 	}
 }
@@ -214,6 +217,19 @@ std::optional<std::vector<player::PlaylistGroup>> player::GetPlaylistGroups(IAIM
 		fileUriService->Release();
 	playlist->Release();
 	return groups;
+}
+
+player::MutationResult player::FindPlaylistItem(IAIMPCore *core, const std::string &playlistId, std::int32_t index, IAIMPPlaylistItem *&item)
+{
+	IAIMPPlaylist *playlist = LoadedPlaylistByAIMPId(core, playlistId);
+	if (!playlist)
+		return MutationResult::PlaylistNotFound;
+	item = nullptr;
+	if (index < 0 || index >= playlist->GetItemCount() ||
+		Failed(playlist->GetItem(index, IID_IAIMPPlaylistItem, reinterpret_cast<void **>(&item))))
+		item = nullptr;
+	playlist->Release();
+	return item ? MutationResult::Ok : MutationResult::ItemNotFound;
 }
 
 player::MutationResult player::SetGroupExpanded(IAIMPCore *core, const std::string &playlistId, std::optional<std::int32_t> index, bool expanded)

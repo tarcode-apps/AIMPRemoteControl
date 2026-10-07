@@ -111,24 +111,47 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 	void MapGet(const std::string &pathPattern, HttpGetHandler handler) override
 	{
 		AuthenticatedPaths.emplace_back(pathPattern);
-		Routes.push_back([pathPattern, handler = std::move(handler)](httplib::Server &http)
-						 { http.Get(pathPattern, [handler](const httplib::Request &req, httplib::Response &res)
+		Routes.push_back([this, pathPattern, handler = std::move(handler)](httplib::Server &http)
+						 { http.Get(pathPattern, [this, handler](const httplib::Request &req, httplib::Response &res)
 									{
-				std::vector<std::string> matches;
-				for (std::size_t i = 1; i < req.matches.size(); ++i)
-					matches.push_back(req.matches[i].str());
-				const auto content = handler(matches);
+				std::optional<HttpContent> content;
+				try
+				{
+					content = handler(ParseRequest(req));
+				}
+				catch (const ApiError &e)
+				{
+					SetApiError(res, e);
+					return;
+				}
 				if (!content)
 				{
 					res.status = 404;
 					return;
 				}
+				res.status = content->Status;
 				for (const auto &[name, value] : content->Headers)
 					res.set_header(name, value);
 				if (!content->FilePath.empty())
 					res.set_file_content(content->FilePath, content->ContentType);
-				else
+				else if (!content->ContentType.empty())
 					res.set_content(content->Body, content->ContentType); }); });
+	}
+
+	static ApiRequest ParseRequest(const httplib::Request &req)
+	{
+		ApiRequest request;
+		for (std::size_t i = 1; i < req.matches.size(); ++i)
+			request.PathMatches.push_back(req.matches[i].str());
+		request.Query.insert(req.params.begin(), req.params.end());
+		return request;
+	}
+
+	void SetApiError(httplib::Response &res, const ApiError &e) const
+	{
+		res.status = e.Status();
+		res.set_header("Cache-Control", "no-store");
+		res.set_content(nlohmann::json{{"error", {{"code", e.Code()}, {"message", LocalizeMessage(std::string("AIMPRemoteControlErrors\\") + e.Code())}}}}.dump(), "application/json");
 	}
 
 	void MapUpload(const std::string &pathPattern, HttpUploadHandler handler) override
@@ -173,10 +196,7 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 		Routes.push_back([this, route, pathPattern, handler = std::move(handler)](httplib::Server &http)
 						 { (http.*route)(pathPattern, [this, handler](const httplib::Request &req, httplib::Response &res)
 										   {
-				ApiRequest request;
-				for (std::size_t i = 1; i < req.matches.size(); ++i)
-					request.PathMatches.push_back(req.matches[i].str());
-				request.Query.insert(req.params.begin(), req.params.end());
+				ApiRequest request = ParseRequest(req);
 				try
 				{
 					if (!req.body.empty())
@@ -189,8 +209,7 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 				}
 				catch (const ApiError &e)
 				{
-					res.status = e.Status();
-					res.set_content(nlohmann::json{{"error", {{"code", e.Code()}, {"message", LocalizeMessage(std::string("AIMPRemoteControlErrors\\") + e.Code())}}}}.dump(), "application/json");
+					SetApiError(res, e);
 				} }); });
 	}
 

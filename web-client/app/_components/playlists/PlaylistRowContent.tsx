@@ -5,6 +5,7 @@ import { formatDuration } from '@/app/_utils/format';
 import clsx from 'clsx';
 import type { PointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ItemCover } from '../cover';
 import { Icon } from '../icons';
 import { ListCheckbox } from '../inputs';
 import { Skeleton } from '../skeleton';
@@ -13,6 +14,7 @@ import styles from './PlaylistPage.module.scss';
 export type RowProps = {
     playlist: Playlist;
     docked: boolean;
+    thumbnailSize: number;
     // The widest number on screen, which every number cell renders invisibly to
     // size itself by: the rows are positioned absolutely and share no grid.
     widestNumber: string;
@@ -52,6 +54,7 @@ export function ItemRow({
     number,
     playlist,
     docked,
+    thumbnailSize,
     widestNumber,
     selecting,
     sorting,
@@ -79,6 +82,16 @@ export function ItemRow({
                     {label}
                 </div>
             )}
+            {playlist.showThumbnails && (
+                <ItemCover
+                    playlistId={playlist.id}
+                    index={item.index}
+                    coverKey={item.cover}
+                    revision={playlist.revision}
+                    size={thumbnailSize}
+                    className={styles.thumbnail}
+                />
+            )}
             <div className={styles.text}>
                 <div className={styles.title}>
                     {label && !docked && `${label} `}
@@ -91,7 +104,7 @@ export function ItemRow({
     );
 }
 
-export function SkeletonRow({ playlist, docked, widestNumber, selecting, sorting }: RowProps) {
+export function SkeletonRow({ playlist, docked, thumbnailSize, widestNumber, selecting, sorting }: RowProps) {
     return (
         <>
             {selecting && <Skeleton shape="rect" className={styles.checkbox} width={16} height={16} />}
@@ -100,6 +113,9 @@ export function SkeletonRow({ playlist, docked, widestNumber, selecting, sorting
                 <div className={styles.number} data-widest={widestNumber}>
                     <Skeleton width="100%" />
                 </div>
+            )}
+            {playlist.showThumbnails && (
+                <Skeleton shape="rect" className={styles.thumbnail} width={thumbnailSize} height={thumbnailSize} />
             )}
             <div className={styles.text}>
                 <Skeleton className={styles.title} width="60%" />

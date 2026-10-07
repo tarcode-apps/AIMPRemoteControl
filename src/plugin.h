@@ -9,6 +9,7 @@
 #include "serviceDiscoveryServer.h"
 #include "sleepTimer.h"
 #include "stateUpdateEvents.h"
+#include "webApi/coverIndex.h"
 
 #include <memory>
 
@@ -30,6 +31,7 @@ private:
 	SharedSettings FSettings;
 	NetworkWatcher FNetworkWatcher;
 	StateUpdateEvents FStateEvents;
+	std::unique_ptr<webapi::CoverIndex> FCoverIndex;
 	SleepTimer FSleepTimer;
 };
 

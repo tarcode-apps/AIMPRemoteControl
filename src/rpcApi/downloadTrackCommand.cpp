@@ -76,11 +76,11 @@ namespace
 void rpcapi::DownloadTrackCommand::Register(IEndpointRouteBuilder &endpoints)
 {
 	endpoints.MapGet(R"(/downloadTrack/playlist_id/-?\d+/track_id/(-?\d+))",
-			   [core = FCore, &idManager = FIdManager](const std::vector<std::string> &matches) -> std::optional<HttpContent>
+			   [core = FCore, &idManager = FIdManager](const ApiRequest &request) -> std::optional<HttpContent>
 			   {
-				   if (matches.empty())
+				   if (request.PathMatches.empty())
 					   return std::nullopt;
-				   const std::string fileName = LocalFileName(core, idManager, static_cast<std::int32_t>(std::stol(matches[0])));
+				   const std::string fileName = LocalFileName(core, idManager, static_cast<std::int32_t>(std::stol(request.PathMatches[0])));
 				   if (fileName.empty())
 					   return std::nullopt;
 

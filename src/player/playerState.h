@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 
+#include "covers.h"
 #include "playlistItems.h"
 
 class IAIMPCore;
@@ -33,6 +34,7 @@ namespace player
 		std::string Artist;
 		std::string Album;
 		bool IsUrl = false;
+		CoverSource Cover;
 	};
 
 	struct PlayerState

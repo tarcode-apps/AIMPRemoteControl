@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <cctype>
-#include <charconv>
 #include <optional>
 #include <utility>
 #include <string>
@@ -14,6 +13,7 @@
 
 #include "mainThreadRunner.h"
 #include "player/playlistItems.h"
+#include "player/covers.h"
 #include "player/playlists.h"
 #include "requestHelpers.h"
 #include "stateUpdateEvents.h"
@@ -21,16 +21,12 @@
 namespace
 {
 	using webapi::CheckRevision;
+	using webapi::QueryInt;
+	using webapi::QueryString;
 	using webapi::ThrowUnlessOk;
 
 	constexpr std::int32_t DefaultLimit = 200;
 	constexpr std::int32_t MaxLimit = 500;
-
-	std::string QueryString(const ApiRequest &request, const char *name)
-	{
-		const auto it = request.Query.find(name);
-		return it == request.Query.end() ? std::string() : it->second;
-	}
 
 	// Whitespace-only searches mean no search, so that they share the cache key of
 	// the plain list on the client.
@@ -41,18 +37,6 @@ namespace
 		search.erase(search.begin(), std::find_if(search.begin(), search.end(), notSpace));
 		search.erase(std::find_if(search.rbegin(), search.rend(), notSpace).base(), search.end());
 		return search;
-	}
-
-	std::int32_t QueryInt(const ApiRequest &request, const char *name, std::int32_t fallback, std::int32_t min, std::int32_t max)
-	{
-		const std::string text = QueryString(request, name);
-		if (text.empty())
-			return fallback;
-		std::int32_t value = 0;
-		const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
-		if (error != std::errc() || end != text.data() + text.size() || value < min || value > max)
-			throw ApiError(400, "invalidQuery");
-		return value;
 	}
 
 	nlohmann::json ToJson(const player::PlaylistInfo &playlist, std::uint64_t revision)
@@ -69,6 +53,7 @@ namespace
 			{"absoluteNumbers", playlist.AbsoluteNumbers},
 			{"showDuration", playlist.ShowDuration},
 			{"showSecondLine", playlist.ShowSecondLine},
+			{"showThumbnails", playlist.ShowThumbnails},
 			{"grouping", {{"enabled", playlist.Grouped}, {"template", playlist.GroupingTemplate}, {"autoMerge", playlist.GroupAutoMerge}}},
 		};
 	}
@@ -83,6 +68,7 @@ namespace
 			{"rating", item.Rating},
 			{"enabled", item.Enabled},
 			{"isUrl", item.IsUrl},
+			{"cover", player::CoverKey(item.Cover)},
 		};
 	}
 

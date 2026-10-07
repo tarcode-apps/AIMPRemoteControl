@@ -18,9 +18,8 @@ struct HttpContent
 	std::string Body;
 	std::string FilePath;
 	std::map<std::string, std::string> Headers;
+	int Status = 200;
 };
-
-using HttpGetHandler = std::function<std::optional<HttpContent>(const std::vector<std::string> &pathMatches)>;
 
 struct HttpUploadedFile
 {
@@ -40,6 +39,9 @@ struct ApiRequest
 };
 
 using ApiHandler = std::function<nlohmann::json(const ApiRequest &request)>;
+
+// Nullopt is a plain 404; an ApiError is answered like one of an ApiHandler.
+using HttpGetHandler = std::function<std::optional<HttpContent>(const ApiRequest &request)>;
 
 enum class HttpMethod
 {

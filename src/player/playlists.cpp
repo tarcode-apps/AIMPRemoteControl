@@ -58,6 +58,9 @@ namespace
 		info.AbsoluteNumbers = flag(AIMP_PLAYLIST_PROPID_VIEW_NUMBERS_ABSOLUTE);
 		info.ShowDuration = flag(AIMP_PLAYLIST_PROPID_VIEW_DURATION);
 		info.ShowSecondLine = flag(AIMP_PLAYLIST_PROPID_VIEW_SECOND_LINE);
+		// The player shows thumbnails only with the second line; until the SDK exposes the
+		// setting itself, the second line decides.
+		info.ShowThumbnails = info.ShowSecondLine;
 		info.Grouped = flag(AIMP_PLAYLIST_PROPID_GROUPPING);
 		info.GroupingTemplate = GetPropertyAsString(props, AIMP_PLAYLIST_PROPID_GROUPPING_TEMPLATE);
 		info.GroupAutoMerge = flag(AIMP_PLAYLIST_PROPID_GROUPPING_AUTOMERGING);

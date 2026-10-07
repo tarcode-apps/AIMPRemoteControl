@@ -91,7 +91,8 @@
 }
 
 .coverBox {
-    --icon-size: 96px;
+    // A share of the square, which the window may make small.
+    --icon-size: min(96px, 40cqw, 40cqh);
 
     display: flex;
     align-items: center;

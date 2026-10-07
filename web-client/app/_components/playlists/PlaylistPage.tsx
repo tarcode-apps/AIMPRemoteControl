@@ -23,6 +23,8 @@ import { pageSize, usePlaylistLayout } from './usePlaylistLayout';
 const twoLineRowHeight = 56;
 const oneLineRowHeight = 44;
 const groupRowHeight = 40;
+// The thumbnail is square and leaves this much of the row above and below.
+const thumbnailMargin = 6;
 const overscanRows = 6;
 const bufferPages = 1;
 const pendingRows = 12;
@@ -128,7 +130,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
     // Sizes are cached by index: a moved group changes which indexes are headers, and
     // a drag collapses a block.
     const dragged = drag.state?.source;
-    useLayoutEffect(() => virtualizer.measure(), [rows, virtualizer, dragged]);
+    useLayoutEffect(() => virtualizer.measure(), [rows, virtualizer, dragged, itemRowHeight]);
 
     const numberOf = (row: PlaylistRow, item: PlaylistItem | undefined) => {
         if (row.kind !== 'item') return undefined;
@@ -225,7 +227,14 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
     };
 
     const rowId = (row: number) => `${listId}-${row}`;
-    const rowProps = { playlist, docked, widestNumber, selecting, sorting: sortable };
+    const rowProps = {
+        playlist,
+        docked,
+        thumbnailSize: itemRowHeight - 2 * thumbnailMargin,
+        widestNumber,
+        selecting,
+        sorting: sortable,
+    };
 
     let ghost = null;
     if (drag.state) {

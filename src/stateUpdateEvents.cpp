@@ -1,6 +1,7 @@
 #include "stateUpdateEvents.h"
 
 #include <algorithm>
+#include <utility>
 
 #include "apiCore.h"
 #include "apiMessages.h"
@@ -11,6 +12,7 @@
 #include "mainThreadRunner.h"
 #include "player/playerState.h"
 #include "player/playlists.h"
+#include "playlistChangeFilter.h"
 
 class StateUpdateEvents::MessageHook : public IUnknownImpl<IAIMPMessageHook>
 {
@@ -23,12 +25,14 @@ public:
 	{
 		switch (message)
 		{
-		case AIMP_MSG_EVENT_PLAYER_STATE:
 		case AIMP_MSG_EVENT_STREAM_START:
 		case AIMP_MSG_EVENT_STREAM_START_SUBTRACK:
+			FOwner.PlayerChanged(true);
+			break;
+		case AIMP_MSG_EVENT_PLAYER_STATE:
 		case AIMP_MSG_EVENT_STREAM_END:
 		case AIMP_MSG_EVENT_PLAYING_FILE_INFO:
-			FOwner.PlayerChanged();
+			FOwner.PlayerChanged(false);
 			break;
 		case AIMP_MSG_EVENT_PROPERTY_VALUE:
 			switch (param1)
@@ -81,10 +85,11 @@ public:
 	void WINAPI Activated() override {}
 	void WINAPI Changed(DWORD flags) override
 	{
-		if (flags & (AIMP_PLAYLIST_NOTIFY_NAME | AIMP_PLAYLIST_NOTIFY_CONTENT | AIMP_PLAYLIST_NOTIFY_FILEINFO |
-					 AIMP_PLAYLIST_NOTIFY_READONLY | AIMP_PLAYLIST_NOTIFY_PLAYINGSWITCHS | AIMP_PLAYLIST_NOTIFY_STATISTICS |
+		if (flags & (AIMP_PLAYLIST_NOTIFY_NAME | AIMP_PLAYLIST_NOTIFY_READONLY | AIMP_PLAYLIST_NOTIFY_PLAYINGSWITCHS |
 					 AIMP_PLAYLIST_NOTIFY_GROUPNAME))
-			FOwner.PlaylistChanged(FId);
+			FOwner.PlaylistChanged(FId, false);
+		if (flags & (AIMP_PLAYLIST_NOTIFY_CONTENT | AIMP_PLAYLIST_NOTIFY_FILEINFO | AIMP_PLAYLIST_NOTIFY_STATISTICS))
+			FOwner.FilterChange(FId, flags, FPlaylist ? FPlaylist->GetItemCount() : 0);
 	}
 	void WINAPI Removed() override
 	{
@@ -142,6 +147,8 @@ void StateUpdateEvents::Start(IAIMPCore *core)
 {
 	FCore = core;
 	FStopped = false;
+	FChangeFilter = std::make_unique<PlaylistChangeFilter>([this](const std::string &playlistId, bool tagsWritten)
+														   { PlaylistChanged(playlistId, tagsWritten); });
 
 	FMessageHook = new MessageHook(*this);
 	FMessageHook->AddRef();
@@ -184,6 +191,7 @@ void StateUpdateEvents::Stop()
 	}
 	FChanged.notify_all();
 	JoinPumpingMessages(FSettingsPoller);
+	FChangeFilter.reset();
 
 	if (!FCore)
 		return;
@@ -215,6 +223,7 @@ void StateUpdateEvents::Stop()
 	{
 		std::lock_guard lock(FMutex);
 		FPlaylistRevisions.clear();
+		FTagWrites.clear();
 	}
 	FCore = nullptr;
 }
@@ -228,26 +237,31 @@ void StateUpdateEvents::WatchPlaylist(IAIMPPlaylist *playlist)
 	{
 		std::lock_guard lock(FMutex);
 		FPlaylistRevisions[listener->Id()] = 1;
+		FTagWrites[listener->Id()] = 1;
 	}
 	Notify(Playlists);
 }
 
 // Called from the player's own thread, where the playing playlist can be read.
-void StateUpdateEvents::PlayerChanged()
+void StateUpdateEvents::PlayerChanged(bool trackStarted)
 {
 	const std::string playing = player::PlayingPlaylistId(FCore);
 	{
 		std::lock_guard lock(FMutex);
 		FPlayingPlaylistId = playing;
 	}
+	if (trackStarted && FChangeFilter)
+		FChangeFilter->TrackStarted(playing);
 	Notify(ControlPanel);
 }
 
-void StateUpdateEvents::PlaylistChanged(const std::string &playlistId)
+void StateUpdateEvents::PlaylistChanged(const std::string &playlistId, bool tagsWritten)
 {
 	{
 		std::lock_guard lock(FMutex);
 		++FPlaylistRevisions[playlistId];
+		if (tagsWritten)
+			++FTagWrites[playlistId];
 		++FVersions[Playlists];
 		if (playlistId == FPlayingPlaylistId)
 			++FVersions[ControlPanel];
@@ -260,8 +274,17 @@ void StateUpdateEvents::PlaylistRemoved(const std::string &playlistId)
 	{
 		std::lock_guard lock(FMutex);
 		FPlaylistRevisions.erase(playlistId);
+		FTagWrites.erase(playlistId);
 	}
+	if (FChangeFilter)
+		FChangeFilter->Forget(playlistId);
 	Notify(Playlists);
+}
+
+void StateUpdateEvents::FilterChange(const std::string &playlistId, unsigned long flags, std::int32_t itemCount)
+{
+	if (FChangeFilter)
+		FChangeFilter->Changed(playlistId, flags, itemCount);
 }
 
 void StateUpdateEvents::AllPlaylistsChanged()
@@ -285,6 +308,13 @@ std::uint64_t StateUpdateEvents::PlaylistRevision(const std::string &playlistId)
 	std::lock_guard lock(FMutex);
 	const auto it = FPlaylistRevisions.find(playlistId);
 	return it == FPlaylistRevisions.end() ? 0 : it->second;
+}
+
+std::uint64_t StateUpdateEvents::TagWrites(const std::string &playlistId)
+{
+	std::lock_guard lock(FMutex);
+	const auto it = FTagWrites.find(playlistId);
+	return it == FTagWrites.end() ? 0 : it->second;
 }
 
 bool StateUpdateEvents::Wait(Kind kind, std::chrono::milliseconds timeout)
@@ -379,7 +409,7 @@ void StateUpdateEvents::PollPlaylistSettings()
 		{
 			const auto seen = known.find(id);
 			if (seen != known.end() && seen->second != snapshot)
-				PlaylistChanged(id);
+				PlaylistChanged(id, false);
 		}
 		known = current;
 	}

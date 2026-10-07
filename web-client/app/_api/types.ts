@@ -16,6 +16,7 @@ export type Playlist = {
     absoluteNumbers: boolean;
     showDuration: boolean;
     showSecondLine: boolean;
+    showThumbnails: boolean;
     grouping: PlaylistGrouping;
 };
 
@@ -27,6 +28,8 @@ export type PlaylistItem = {
     rating: number;
     enabled: boolean;
     isUrl: boolean;
+    // Names the cover in its URL; changes when the tags are written.
+    cover: string;
 };
 
 export type PlaylistItemsPage = {
@@ -107,6 +110,8 @@ export type PlayingTrack = {
     artist: string;
     album: string;
     isUrl: boolean;
+    // The image by its bytes: the same across the tracks of an album, empty without a cover.
+    coverHash: string;
 };
 
 export type PlayerState = {

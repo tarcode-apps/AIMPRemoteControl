@@ -22,6 +22,7 @@ namespace player
 		bool AbsoluteNumbers = false; // numbering continues across groups instead of restarting
 		bool ShowDuration = true;
 		bool ShowSecondLine = true;
+		bool ShowThumbnails = true;
 		bool Grouped = false;
 		std::string GroupingTemplate;
 		bool GroupAutoMerge = false;

@@ -2,7 +2,7 @@
 
 import { usePlayer, usePlayerPosition, useSetPlayer } from '@/app/_api/player';
 import { useTranslation } from 'react-i18next';
-import { Icon } from '../icons';
+import { TrackCover } from '../cover';
 import { Marquee } from './Marquee';
 import styles from './MiniPlayer.module.scss';
 import { PlayButton } from './PlayButton';
@@ -19,7 +19,8 @@ export function MiniPlayer({ onExpand }: MiniPlayerProps) {
     const { expanded, docked } = usePlayerPanel();
     const { data: player } = usePlayer();
     const setPlayer = useSetPlayer();
-    const position = usePlayerPosition(player, !expanded && !docked);
+    const shown = !expanded && !docked;
+    const position = usePlayerPosition(player, shown);
     const track = player?.track ?? null;
     const duration = track ? (player?.duration ?? 0) : 0;
 
@@ -33,9 +34,7 @@ export function MiniPlayer({ onExpand }: MiniPlayerProps) {
                 title={t('player.expand')}
                 aria-label={t('player.expand')}
             />
-            <div className={styles.cover}>
-                <Icon>music_note</Icon>
-            </div>
+            <TrackCover hash={shown ? track?.coverHash : undefined} size={48} className={styles.cover} />
             <div className={styles.track}>
                 {track && <Marquee className={styles.title}>{track.title}</Marquee>}
                 {track?.artist && <span className={styles.artist}>{track.artist}</span>}

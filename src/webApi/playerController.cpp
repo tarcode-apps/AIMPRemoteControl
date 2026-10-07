@@ -6,6 +6,7 @@
 #include <string>
 
 #include "mainThreadRunner.h"
+#include "coverIndex.h"
 #include "player/playerState.h"
 #include "requestHelpers.h"
 #include "stateUpdateEvents.h"
@@ -94,12 +95,16 @@ namespace
 	}
 }
 
-nlohmann::json webapi::PlayerController::Snapshot(IAIMPCore *core, StateUpdateEvents &events)
+nlohmann::json webapi::PlayerController::Snapshot(IAIMPCore *core, StateUpdateEvents &events, CoverIndex &covers)
 {
 	const player::PlayerState state = RunOnMainThread(core, [&]
 													  { return player::GetPlayerState(core); });
 	nlohmann::json track = nullptr;
 	if (state.Track)
+	{
+		// The cover is looked up here, once per track, so that the client can show it
+		// without asking for it first.
+		const std::string coverHash = covers.HashFor(state.Track->Cover, events.TagWrites(state.Track->PlaylistId));
 		track = {
 			{"playlistId", state.Track->PlaylistId},
 			{"playlistRevision", events.PlaylistRevision(state.Track->PlaylistId)},
@@ -109,7 +114,9 @@ nlohmann::json webapi::PlayerController::Snapshot(IAIMPCore *core, StateUpdateEv
 			{"artist", state.Track->Artist},
 			{"album", state.Track->Album},
 			{"isUrl", state.Track->IsUrl},
+			{"coverHash", coverHash},
 		};
+	}
 	return {
 		{"state", StateName(state.State)},
 		{"position", state.Position},
@@ -125,8 +132,8 @@ nlohmann::json webapi::PlayerController::Snapshot(IAIMPCore *core, StateUpdateEv
 
 void webapi::PlayerController::Register(IEndpointRouteBuilder &endpoints)
 {
-	endpoints.MapApi(HttpMethod::Get, "/api/v1/player", [core = FCore, &events = FEvents](const ApiRequest &) -> nlohmann::json
-			   { return Snapshot(core, events); });
+	endpoints.MapApi(HttpMethod::Get, "/api/v1/player", [core = FCore, &events = FEvents, &covers = FCovers](const ApiRequest &) -> nlohmann::json
+			   { return Snapshot(core, events, covers); });
 
 	endpoints.MapApi(HttpMethod::Post, "/api/v1/player/play", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {

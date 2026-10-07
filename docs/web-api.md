@@ -30,6 +30,7 @@ Error codes so far:
 | `404` | `itemNotFound` | an item index in the request is outside the playlist |
 | `500` | `playlistUpdateFailed` | the player refused the change |
 | `500` | `playerCommandFailed` | the player refused a playback command or setting |
+| `404` | `coverNotFound` | the item has no cover, the `key` is not the item's current one, or the image named by this hash is no longer known |
 
 ## Playlists
 
@@ -51,6 +52,7 @@ All loaded playlists in the player's order.
     "absoluteNumbers": false,
     "showDuration": true,
     "showSecondLine": true,
+    "showThumbnails": true,
     "grouping": { "enabled": true, "template": "%Album", "autoMerge": false }
   }
 ]
@@ -60,10 +62,15 @@ All loaded playlists in the player's order.
 by the plugin: it starts at 1 when the playlist is loaded, grows on every
 change of its name, content, tags, statistics, read-only flag, track switches
 or view and grouping settings, and is
-not stable across player restarts. Compare it with the value in the
+not stable across player restarts. The bookkeeping the player does when it
+starts a track is not counted; a change of content, tags or ratings counts
+within a second of being made. Compare it with the value in the
 [`playlists` event](#get-apiv1events) to learn which playlists to reload.
-`showNumbers`, `absoluteNumbers`, `showDuration` and `showSecondLine` are the
-playlist's view settings in the player; the client lays out item rows by them.
+`showNumbers`, `absoluteNumbers`, `showDuration`, `showSecondLine` and
+`showThumbnails` are the playlist's view settings in the player; the client lays
+out item rows by them. The player does not expose its thumbnail setting yet, so
+`showThumbnails` follows `showSecondLine`, as the player itself shows thumbnails
+only with the second line.
 With `absoluteNumbers` off, numbering restarts in every group. `grouping` is
 the playlist's own grouping: whether it is on, the template that names the
 groups, and whether same-named groups are merged. Items are always returned in
@@ -95,7 +102,8 @@ it is only valid for the `revision` the page was read at.
       "duration": 266.4,
       "rating": 4,
       "enabled": true,
-      "isUrl": false
+      "isUrl": false,
+      "cover": "7068c7442182d15a"
     }
   ]
 }
@@ -104,7 +112,10 @@ it is only valid for the `revision` the page was read at.
 `displayText` and `secondLine` are the two lines the player itself shows for
 the item, formatted by the playlist's own templates; `secondLine` is empty
 when the playlist hides its second line. `duration` is in seconds, `rating` is `0..5`,
-`enabled` is the check box in front of the track, `isUrl` marks streams.
+`enabled` is the check box in front of the track, `isUrl` marks streams. `cover` is the
+key the item's [cover URL](#get-apiv1playlistsiditemsindexcoverkeysize) takes: it
+names the file, so it only changes when the file is replaced. The client shows the covers of
+the playlists whose `showThumbnails` is on.
 Every page is read from the player at request time, nothing is cached in the
 plugin; a search is one pass over the whole playlist per page.
 
@@ -225,7 +236,8 @@ The player's state at request time.
     "title": "Track One",
     "artist": "Artist A",
     "album": "Album X",
-    "isUrl": false
+    "isUrl": false,
+    "coverHash": "b34839fba2927a883f861e5460f8698d"
   }
 }
 ```
@@ -239,7 +251,11 @@ shows nothing, even though it remembers what to restart. `index` is the item's
 index in its playlist and is only valid for `playlistRevision`; when that
 playlist changes, a new `player` event carries the current index. For a
 stream, `title`, `artist` and `album` describe what the station is playing
-now, not the station itself.
+now, not the station itself. `coverHash` names the
+track's cover for [`GET /api/v1/covers/{hash}`](#get-apiv1covershashsize), which
+the client fetches directly; it is empty without a cover, and the same for every
+track that shares the image. The plugin looks the cover up when it builds the
+state, once per track, as the player's own window does.
 
 The API sends nothing while the position merely advances: the client keeps
 time itself from the moment it received the state and reads it again when it
@@ -286,6 +302,50 @@ the player's default action at the end of the playlist (jump to the next one)
 unless it is set to do nothing. The response is an empty object.
 
 Errors: `400 invalidBody`, `500 playerCommandFailed`.
+
+## Covers
+
+A cover is served by the hash of its bytes, so that the tracks of an album,
+which mostly share one image, share one download and one entry in the browser's
+cache. The playing track's hash comes with the [player state](#get-apiv1player);
+an item's own URL only redirects to the hash. Both URLs take the same `size`.
+
+| Query | Default | |
+|---|---|---|
+| `size` | | the longer side in pixels; the server only scales down, so an image that already fits is served as it is. Without it the image is the copy the player holds, which the player itself has scaled down to its own limit. `original` is the image as found in the tags or the folder, read from the file on every request, for saving it. The web client asks for `64`, `128`, `256` or `512`, so that one image serves the screens of one density |
+
+### `GET /api/v1/playlists/{id}/items/{index}/cover?key=…&size=…`
+
+Looks the cover of one item up as the player's own window does: in the tags,
+in the folder and, when the player's settings allow it, on the internet. `key`
+is the item's `cover` value; it names the file in the URL and is checked against
+the item, so that an index that has moved does not serve another item's cover.
+
+The response is a `302` redirect to `GET /api/v1/covers/{hash}` with the same
+`size`, sent with `Cache-Control: no-store`: the redirect is asked for on every
+show, which is cheap, while the image it leads to stays in the browser's cache.
+A missing cover and a `key` the item no longer has are a `404 coverNotFound`,
+not cached either: a cover may be written into the tags at any time, and the
+plugin reads the file again after that.
+
+Errors: `400 invalidQuery`, `404 playlistNotFound`, `404 itemNotFound`,
+`404 coverNotFound`.
+
+### `GET /api/v1/covers/{hash}?size=…`
+
+The image named by the hash of its bytes, scaled to `size`. The hash is that of
+the player's copy whatever the `size`, the original included. JPEG stays JPEG and
+PNG stays PNG; the bytes never change under one hash, so the image is sent with
+`Cache-Control: private, max-age=31536000, immutable`.
+
+The plugin keeps no copy of the images: it remembers which file each hash was
+seen in and looks the cover up again. After a restart it remembers nothing
+until the items are asked again, which the uncached redirect makes certain; the
+playing track's cover is found whether or not it was asked for. A hash the
+plugin does not know, or whose cover changed since, is a `404 coverNotFound`
+with `Cache-Control: no-store`.
+
+Errors: `400 invalidQuery`, `404 coverNotFound`.
 
 ## Events
 

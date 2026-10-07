@@ -42,6 +42,7 @@
 #include "rpcApi/uploadTrackCommand.h"
 #include "rpcApi/versionCommand.h"
 #include "webApi/eventsController.h"
+#include "webApi/coversController.h"
 #include "webApi/playerController.h"
 #include "webApi/playlistsController.h"
 
@@ -103,6 +104,7 @@ HRESULT WINAPI AIMPPlugin::Initialize(IAIMPCore *Core)
 	}
 	
 	FStateEvents.Start(Core);
+	FCoverIndex = std::make_unique<webapi::CoverIndex>(Core);
 	FSleepTimer.Start(Core, FStateEvents);
 	FDiscoveryServer.Start(FNetworkWatcher);
 
@@ -141,8 +143,9 @@ HRESULT WINAPI AIMPPlugin::Initialize(IAIMPCore *Core)
 	commands.push_back(std::make_unique<rpcapi::StatusCommand>(Core));
 	commands.push_back(std::make_unique<rpcapi::SubscribeOnAIMPStateUpdateEventCommand>(Core, FIdManager, FStateEvents, FSleepTimer));
 	commands.push_back(std::make_unique<webapi::PlaylistsController>(Core, FStateEvents));
-	commands.push_back(std::make_unique<webapi::PlayerController>(Core, FStateEvents));
-	commands.push_back(std::make_unique<webapi::EventsController>(Core, FStateEvents));
+	commands.push_back(std::make_unique<webapi::PlayerController>(Core, FStateEvents, *FCoverIndex));
+	commands.push_back(std::make_unique<webapi::CoversController>(Core, FStateEvents, *FCoverIndex));
+	commands.push_back(std::make_unique<webapi::EventsController>(Core, FStateEvents, *FCoverIndex));
 	FRemoteControlServer = std::make_unique<AIMPRemoteControlServer>(std::move(commands), FNetworkWatcher,
 		[core = FCore](const std::string &keyPath)
 		{
@@ -177,6 +180,7 @@ HRESULT WINAPI AIMPPlugin::Finalize()
 	FNetworkWatcher.Stop();
 	FSleepTimer.Stop();
 	FStateEvents.Stop();
+	FCoverIndex.reset();
 	if (FRemoteControlServer)
 	{
 		FRemoteControlServer->Stop();

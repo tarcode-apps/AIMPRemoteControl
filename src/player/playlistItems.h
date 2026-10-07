@@ -6,8 +6,11 @@
 #include <string>
 #include <vector>
 
+#include "coverSource.h"
+
 class IAIMPCore;
 class IAIMPPlaylist;
+class IAIMPPlaylistItem;
 class PlaylistItemContext;
 
 namespace player
@@ -21,6 +24,7 @@ namespace player
 		double Rating = 0;		 // 0..5
 		bool Enabled = true;
 		bool IsUrl = false;
+		CoverSource Cover;
 	};
 
 	struct ItemsQuery
@@ -73,6 +77,9 @@ namespace player
 		ItemNotFound,
 		Failed
 	};
+
+	// The item at `index`, for the caller to release.
+	MutationResult FindPlaylistItem(IAIMPCore *core, const std::string &playlistId, std::int32_t index, IAIMPPlaylistItem *&item);
 
 	// Collapses or expands one group, or every group when `index` is nullopt.
 	MutationResult SetGroupExpanded(IAIMPCore *core, const std::string &playlistId, std::optional<std::int32_t> index, bool expanded);

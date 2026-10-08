@@ -1,15 +1,13 @@
 'use client';
 
-import { playlistItemsQuery } from '@/app/_api/playlists';
+import { playlistKeys } from '@/app/_api/playlists';
+import type { PlaylistGroups, PlaylistItem } from '@/app/_api/types';
 import { useListMode, type ListModeValue } from '@/app/_components/lists';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import { useQueryClient } from '@tanstack/react-query';
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 
-export type PlaylistModeContextValue = ListModeValue & {
-    // For group headers, whose items may not be loaded.
-    setRangeSelected(position: number, count: number, selected: boolean): Promise<void>;
-};
+export type PlaylistModeContextValue = ListModeValue<PlaylistItem>;
 
 const PlaylistModeContext = createContext<PlaylistModeContextValue | null>(null);
 
@@ -19,29 +17,23 @@ export function usePlaylistMode(): PlaylistModeContextValue {
     return value;
 }
 
-const maxRangeLimit = 500;
-
 export function PlaylistModeProvider({ children }: { children: ReactNode }) {
     const client = useQueryClient();
     const { selected: playlist } = usePlaylistSelection();
-    // Switching playlists leaves the mode.
-    const list = useListMode(playlist?.id);
+    const list = useListMode<PlaylistItem>(playlist?.id);
+    // The selection names items by index, which a change of the playlist renumbers.
+    const [revision, setRevision] = useState(playlist?.revision);
+    if (revision !== playlist?.revision) {
+        setRevision(playlist?.revision);
+        list.clearSelection();
+    }
 
-    const setRangeSelected = async (position: number, count: number, selected: boolean) => {
-        if (list.mode === null || !playlist) return;
-        const indexes: number[] = [];
-        for (let offset = position; offset < position + count; offset += maxRangeLimit) {
-            const page = await client.fetchQuery(
-                playlistItemsQuery(playlist.id, {
-                    offset,
-                    limit: Math.min(maxRangeLimit, position + count - offset),
-                    search: list.text,
-                }),
-            );
-            for (const item of page.items) indexes.push(item.index);
-        }
-        list.setSelected(indexes, selected);
+    // The groups the page lays out, for a selection that leaves some of them out.
+    const itemSelection = () => {
+        const groups =
+            playlist && client.getQueryData<PlaylistGroups>(playlistKeys.groupsView(playlist.id, list.text))?.groups;
+        return list.itemSelection(groups?.map(group => group.index));
     };
 
-    return <PlaylistModeContext value={{ ...list, setRangeSelected }}>{children}</PlaylistModeContext>;
+    return <PlaylistModeContext value={{ ...list, itemSelection }}>{children}</PlaylistModeContext>;
 }

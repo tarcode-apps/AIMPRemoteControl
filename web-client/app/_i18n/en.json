@@ -43,13 +43,50 @@
     "position": "Playback position",
     "noTime": "--:--",
     "trackNumbers": "#{{number}} - {{position}}/{{count}}",
-    "trackPosition": "{{position}}/{{count}}"
+    "trackPosition": "{{position}}/{{count}}",
+    "trackMenu": "Track menu",
+    "goToPlaylist": "Go to playlist"
   },
   "playlists": {
     "summary": "{{count}} / {{duration}} / {{size}}"
   },
   "selection": {
     "title": "Multiple selection"
+  },
+  "search": {
+    "title": "Extended search",
+    "placeholder": "Search in playlists",
+    "prompt": "Type what to look for",
+    "playlists": "Playlists to search",
+    "allPlaylists": "All playlists",
+    "fields": "Search fields",
+    "field": {
+      "title": "Titles",
+      "artist": "Artist names",
+      "album": "Album names",
+      "genre": "Genres",
+      "file": "Full file paths"
+    }
+  },
+  "favorites": {
+    "empty": "No favorites yet",
+    "searchPlaceholder": "Search in favorites",
+    "add": "Add to favorites",
+    "remove": "Remove from favorites",
+    "clear": "Clear favorites",
+    "groupBy": "Group by…",
+    "groupings": {
+      "playlist": "Playlist",
+      "artist": "Artist",
+      "album": "Album",
+      "genre": "Genre",
+      "year": "Year",
+      "folder": "Folder"
+    },
+    "noValue": "Unknown",
+    "missing": "The track is not in its playlist",
+    "find": "Find in playlists",
+    "pickTitle": "Choose a track"
   },
   "queue": {
     "title": "Queue manager",
@@ -103,6 +140,7 @@
       "randomGroups": "Shuffle groups",
       "randomGroupItems": "Shuffle tracks within groups",
       "randomAll": "Shuffle groups and tracks"
-    }
+    },
+    "goToTrack": "Go to track"
   }
 }

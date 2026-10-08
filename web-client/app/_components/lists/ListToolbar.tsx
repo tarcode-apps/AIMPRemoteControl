@@ -22,6 +22,9 @@ export type ListToolbarProps = {
     selectedActions: MenuItem[];
     // Replaces everything while sorting.
     sorting?: ReactNode;
+    // A search that is not a mode of the list: the field shows it when docked, and
+    // a phone has it in the app bar, so the toolbar's own search button is left out.
+    externalSearch?: { value: string; onChange(value: string): void };
 };
 
 // The toolbar of a list: fixed slots, so a button that replaces another in a
@@ -33,6 +36,7 @@ export function ListToolbar({
     moreActions,
     selectedActions,
     sorting,
+    externalSearch,
 }: ListToolbarProps) {
     const { t } = useTranslation();
     const docked = useMediaQuery(media.drawerDocked);
@@ -84,15 +88,18 @@ export function ListToolbar({
         buttons = (
             <>
                 {idle}
-                {!docked && (
-                    <ToolbarButton
-                        title={t('playlist.search')}
-                        className={clsx(mode.query !== null && styles.active)}
-                        onClick={() => mode.setQuery(mode.query === null ? '' : null)}
-                    >
-                        <Icon>search</Icon>
-                    </ToolbarButton>
-                )}
+                {!docked &&
+                    (externalSearch ? (
+                        <span />
+                    ) : (
+                        <ToolbarButton
+                            title={t('playlist.search')}
+                            className={clsx(mode.query !== null && styles.active)}
+                            onClick={() => mode.setQuery(mode.query === null ? '' : null)}
+                        >
+                            <Icon>search</Icon>
+                        </ToolbarButton>
+                    ))}
                 <Menu title={t('playlist.more')} icon="more_horiz" Button={ToolbarButton} items={moreActions} />
             </>
         );
@@ -103,8 +110,10 @@ export function ListToolbar({
                 <SearchField
                     className={styles.search}
                     placeholder={searchPlaceholder}
-                    value={mode.query ?? ''}
-                    onChange={value => mode.setQuery(value === '' ? null : value)}
+                    value={externalSearch ? externalSearch.value : (mode.query ?? '')}
+                    onChange={
+                        externalSearch ? externalSearch.onChange : value => mode.setQuery(value === '' ? null : value)
+                    }
                 />
             )}
             {buttons}

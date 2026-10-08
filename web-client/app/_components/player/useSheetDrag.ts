@@ -8,12 +8,29 @@ export type SheetDragOptions = {
     handleRef: RefObject<HTMLElement | null>;
     expanded: boolean;
     enabled: boolean;
+    // The sheet starts following the pointer; a tap does not get here.
+    onPull(): void;
     onExpand(): void;
     onCollapse(): void;
 };
 
-export function useSheetDrag({ panelRef, handleRef, expanded, enabled, onExpand, onCollapse }: SheetDragOptions) {
-    const range = useRef({ base: 0, max: 0 });
+export function useSheetDrag({
+    panelRef,
+    handleRef,
+    expanded,
+    enabled,
+    onPull,
+    onExpand,
+    onCollapse,
+}: SheetDragOptions) {
+    const range = useRef({ base: 0, max: 0, pulled: false });
+    const panelRange = () => {
+        const panel = panelRef.current;
+        const handle = handleRef.current;
+        if (!panel || !handle) return null;
+        const toolbar = parseFloat(getComputedStyle(document.body).getPropertyValue('--toolbar-height')) || 0;
+        return panel.offsetHeight - handle.offsetHeight - toolbar;
+    };
 
     const clamp = (offset: number) => Math.min(Math.max(offset, 0), range.current.max);
 
@@ -21,16 +38,21 @@ export function useSheetDrag({ panelRef, handleRef, expanded, enabled, onExpand,
         axis: 'y',
         enabled,
         onStart: () => {
-            const panel = panelRef.current;
-            const handle = handleRef.current;
-            if (!panel || !handle) return false;
-            const toolbar = parseFloat(getComputedStyle(document.body).getPropertyValue('--toolbar-height')) || 0;
-            const max = panel.offsetHeight - handle.offsetHeight - toolbar;
-            range.current = { base: expanded ? 0 : max, max };
+            const max = panelRange();
+            if (max === null) return false;
+            range.current = { base: expanded ? 0 : max, max, pulled: false };
         },
         onMove: delta => {
             const panel = panelRef.current;
-            if (!panel) return;
+            // The keyboard closing as the drag starts gives the sheet more room; the
+            // start stays where it was taken, under the finger.
+            const max = panelRange();
+            if (!panel || max === null) return;
+            range.current.max = max;
+            if (!range.current.pulled) {
+                range.current.pulled = true;
+                onPull();
+            }
             const offset = clamp(range.current.base + delta);
             panel.style.setProperty('--sheet-offset', `${offset}px`);
             panel.style.setProperty('--sheet-progress', `${1 - offset / range.current.max}`);

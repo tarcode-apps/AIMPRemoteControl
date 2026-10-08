@@ -39,7 +39,7 @@
     border-radius: 24px;
     transition: background-color 0.15s;
 
-    mixins.hover-capable {
+    @include mixins.hover-capable {
         &:hover {
             background: var(--color-hover);
         }

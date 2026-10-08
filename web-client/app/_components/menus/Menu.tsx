@@ -1,6 +1,7 @@
 'use client';
 
 import { anchorName } from '@/app/_utils/anchorName';
+import clsx from 'clsx';
 import {
     useEffect,
     useId,
@@ -19,6 +20,8 @@ export type MenuItem = {
     label: string;
     icon?: string;
     disabled?: boolean;
+    // A line above the item.
+    separated?: boolean;
     onSelect(): void;
 };
 
@@ -114,7 +117,7 @@ export function MenuPopover({ id, anchor, items, onClose }: MenuPopoverProps) {
                 <button
                     key={item.label}
                     role="menuitem"
-                    className={styles.item}
+                    className={clsx(styles.item, item.separated && styles.separated)}
                     disabled={item.disabled}
                     // Hidden by hand before the action: an action that re-renders the
                     // items takes the clicked button out of the DOM before a declarative
@@ -137,10 +140,11 @@ export type MenuProps = {
     icon: string;
     items: MenuItem[];
     className?: string;
+    buttonClassName?: string;
     Button?: ComponentType<IconButtonProps>;
 };
 
-export function Menu({ title, icon, items, className, Button = IconButton }: MenuProps) {
+export function Menu({ title, icon, items, className, buttonClassName, Button = IconButton }: MenuProps) {
     const id = useId();
     const anchor = anchorName('menu', id);
 
@@ -148,6 +152,7 @@ export function Menu({ title, icon, items, className, Button = IconButton }: Men
         <div className={className}>
             <Button
                 title={title}
+                className={buttonClassName}
                 aria-haspopup="menu"
                 popoverTarget={id}
                 style={{ anchorName: anchor } as CSSProperties}

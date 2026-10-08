@@ -7,20 +7,24 @@ import { Icon } from '@/app/_components/icons';
 import { ListToolbar } from '@/app/_components/lists';
 import toolbarStyles from '@/app/_components/lists/ListToolbar.module.scss';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
+import { useNavigation } from '@/app/_state/Navigation';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
+import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
 import { media } from '@/app/_styles/media';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePlaylistMode } from './PlaylistMode';
-import { SortDialog } from './SortDialog';
+import { PlaylistSortDialog } from './SortDialog';
 
 export function PlaylistToolbar() {
     const { t } = useTranslation();
+    const { openSecondScreen } = useNavigation();
     const docked = useMediaQuery(media.drawerDocked);
     const { selected } = usePlaylistSelection();
     const mode = usePlaylistMode();
     const setExpanded = useSetGroupExpanded(selected?.id ?? '');
     const enqueue = useEnqueue();
+    const favoriteActions = useFavoriteActions();
     const [sortDialog, setSortDialog] = useState(false);
     const grouped = selected?.grouping.enabled ?? false;
     const expandAll = (expanded: boolean) => {
@@ -30,6 +34,21 @@ export function PlaylistToolbar() {
         const selection = mode.itemSelection();
         if (selected && selection)
             enqueue.mutate({ playlistId: selected.id, revision: selected.revision, atBeginning, ...selection });
+    };
+    const addSelectedToFavorites = () => {
+        const selection = mode.itemSelection();
+        if (selected && selection)
+            void favoriteActions.addSelections([{ playlistId: selected.id, revision: selected.revision, selection }]);
+    };
+    // The extended search takes the text a search here was typed with; coming back
+    // finds the plain playlist.
+    const extendedSearch = {
+        label: t('search.title'),
+        icon: 'manage_search',
+        onSelect: () => {
+            const url = mode.text ? `/search/?q=${encodeURIComponent(mode.text)}` : '/search/';
+            mode.leaveThen(() => openSecondScreen(url));
+        },
     };
 
     return (
@@ -62,6 +81,7 @@ export function PlaylistToolbar() {
                     disabled: !grouped,
                     onSelect: () => expandAll(true),
                 },
+                extendedSearch,
             ]}
             selectedActions={[
                 {
@@ -76,7 +96,14 @@ export function PlaylistToolbar() {
                     disabled: mode.nothingSelected,
                     onSelect: () => enqueueSelected(true),
                 },
+                {
+                    label: t('favorites.add'),
+                    icon: 'heart_plus',
+                    disabled: mode.nothingSelected,
+                    onSelect: addSelectedToFavorites,
+                },
                 { label: t('playlist.removeSelected'), icon: 'delete', disabled: true, onSelect: () => {} },
+                ...(mode.mode === 'search' ? [extendedSearch] : []),
             ]}
             sorting={
                 <>
@@ -98,7 +125,11 @@ export function PlaylistToolbar() {
                         <Icon>sort_by_alpha</Icon>
                     </ToolbarButton>
                     {selected && (
-                        <SortDialog playlist={selected} open={sortDialog} onClose={() => setSortDialog(false)} />
+                        <PlaylistSortDialog
+                            playlist={selected}
+                            open={sortDialog}
+                            onClose={() => setSortDialog(false)}
+                        />
                     )}
                 </>
             }

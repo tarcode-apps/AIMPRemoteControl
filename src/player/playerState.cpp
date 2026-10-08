@@ -94,6 +94,8 @@ namespace
 			track.IsUrl = fileUriService && ctx.FileUri && fileUriService->IsURL(ctx.FileUri) == S_OK;
 			if (ctx.FileInfo && !track.IsUrl)
 				track.Cover = player::DescribeCoverSource(ctx.FileInfo, false);
+			if (ctx.FileUri)
+				track.FileUri = IAIMPStringToString(ctx.FileUri);
 		}
 		if (fileUriService)
 			fileUriService->Release();

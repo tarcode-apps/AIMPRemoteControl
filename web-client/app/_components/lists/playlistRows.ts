@@ -20,9 +20,13 @@ type GroupSpan = RowSpan & {
 // it is expanded; a flat playlist is a single anonymous span.
 export class PlaylistRows {
     private readonly spans: GroupSpan[] = [];
+    // Rows, headers included and folded items left out.
     readonly count: number;
+    // Items, folded ones included: what the pages are counted in.
+    readonly itemCount: number;
 
     constructor(itemCount: number, groups: PlaylistGroup[] | undefined) {
+        this.itemCount = itemCount;
         let row = 0;
         if (!groups?.length) {
             this.count = itemCount;
@@ -77,6 +81,10 @@ export class PlaylistRows {
             last = entry.position;
         }
         return first === null || last === null ? null : [first, last];
+    }
+
+    get groupCount(): number {
+        return this.spans.length;
     }
 
     private spanOf(row: number): GroupSpan | null {

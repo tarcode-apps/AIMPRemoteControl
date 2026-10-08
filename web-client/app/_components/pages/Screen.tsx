@@ -1,5 +1,6 @@
 'use client';
 
+import { useNavigation } from '@/app/_state/Navigation';
 import clsx from 'clsx';
 import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,13 +21,29 @@ export type ScreenProps = {
     // A strip under the app bar for a state the whole list is in.
     notice?: ReactNode;
     toolbar?: ReactNode;
+    // Keeps the mini player in view on a phone, as the main screen does; a second
+    // screen says so when playback can start from it.
+    player?: boolean;
     children?: ReactNode;
 };
 
-export function Screen({ title, subtitle, tabs, search, onBack, actions, notice, toolbar, children }: ScreenProps) {
-    const { secondary, open, goBack } = useDrawer();
+export function Screen({
+    title,
+    subtitle,
+    tabs,
+    search,
+    onBack,
+    actions,
+    notice,
+    toolbar,
+    player,
+    children,
+}: ScreenProps) {
+    const { secondary, open } = useDrawer();
+    const { goBack } = useNavigation();
     const { t } = useTranslation();
     const hasToolbar = toolbar != null;
+    const withPlayer = player ?? !secondary;
 
     useEffect(() => {
         if (!hasToolbar) return;
@@ -34,8 +51,15 @@ export function Screen({ title, subtitle, tabs, search, onBack, actions, notice,
         return () => document.body.classList.remove('has-toolbar');
     }, [hasToolbar]);
 
+    // The player panel lives outside the screen and reads the class.
+    useEffect(() => {
+        if (!withPlayer) return;
+        document.body.classList.add('has-player');
+        return () => document.body.classList.remove('has-player');
+    }, [withPlayer]);
+
     return (
-        <div className={clsx(styles.screen, secondary && styles.secondary)}>
+        <div className={clsx(styles.screen, withPlayer && styles.withPlayer)}>
             <header className={clsx(styles.appBar, tabs && styles.withTabs, search && styles.withSearch)}>
                 {secondary || onBack ? (
                     <IconButton title={t('nav.back')} className={styles.nav} onClick={onBack ?? goBack}>

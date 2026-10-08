@@ -66,20 +66,25 @@ IAIMPString *ItemTitleOrFileName(const PlaylistItemContext &ctx)
 	return ItemFileName(ctx);
 }
 
-bool PlaylistItemMatches(const PlaylistItemContext &ctx, IAIMPString *searchString)
+bool PlaylistItemMatches(const PlaylistItemContext &ctx, IAIMPString *searchString, const SearchFields &fields)
 {
+	const auto contains = [&](IAIMPString *s)
+	{
+		INT32 index = -1;
+		return s && Succeeded(s->Find(searchString, &index, AIMP_STRING_FIND_IGNORECASE, 0)) && index >= 0;
+	};
+	// For the strings the item helpers hand out, which are the caller's to release.
 	const auto matches = [&](IAIMPString *s)
 	{
-		if (!s)
-			return false;
-		INT32 index = -1;
-		const bool found = Succeeded(s->Find(searchString, &index, AIMP_STRING_FIND_IGNORECASE, 0)) && index >= 0;
-		s->Release();
+		const bool found = contains(s);
+		if (s)
+			s->Release();
 		return found;
 	};
-	return matches(ItemTitleOrFileName(ctx)) ||
-		   matches(ItemFileInfoString(ctx, AIMP_FILEINFO_PROPID_ARTIST)) ||
-		   matches(ItemFileInfoString(ctx, AIMP_FILEINFO_PROPID_ALBUM)) ||
-		   matches(ItemFileInfoString(ctx, AIMP_FILEINFO_PROPID_GENRE)) ||
-		   matches(ItemParentDirName(ctx));
+	return (fields.Title && matches(ItemTitleOrFileName(ctx))) ||
+		   (fields.Artist && matches(ItemFileInfoString(ctx, AIMP_FILEINFO_PROPID_ARTIST))) ||
+		   (fields.Album && matches(ItemFileInfoString(ctx, AIMP_FILEINFO_PROPID_ALBUM))) ||
+		   (fields.Genre && matches(ItemFileInfoString(ctx, AIMP_FILEINFO_PROPID_GENRE))) ||
+		   (fields.Folder && matches(ItemParentDirName(ctx))) ||
+		   (fields.File && contains(ctx.FileUri));
 }

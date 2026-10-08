@@ -3,6 +3,7 @@ import { ApiProvider } from './_api/helpers/ApiProvider';
 import { Drawer, DrawerContainer, DrawerContent, PlayerPanel, PlayerPanelProvider, Sidebar } from './_components';
 import { DetectLanguage } from './_i18n/DetectLanguage';
 import { fallbackLanguage, resources } from './_i18n/resources';
+import { NavigationProvider } from './_state/Navigation';
 import { PlaylistSelectionProvider } from './_state/PlaylistSelection';
 import './_styles/globals.scss';
 
@@ -16,6 +17,9 @@ export const viewport: Viewport = {
         { media: '(prefers-color-scheme: dark)', color: '#202125' },
     ],
     viewportFit: 'cover',
+    // The on-screen keyboard shrinks the layout, so the toolbar rises above it
+    // instead of being covered.
+    interactiveWidget: 'resizes-content',
 };
 
 export default function RootLayout({
@@ -28,17 +32,19 @@ export default function RootLayout({
             <body>
                 <DetectLanguage />
                 <ApiProvider>
-                    <PlaylistSelectionProvider>
-                        <PlayerPanelProvider>
-                            <DrawerContainer>
-                                <Drawer>
-                                    <Sidebar />
-                                </Drawer>
-                                <DrawerContent>{children}</DrawerContent>
-                                <PlayerPanel />
-                            </DrawerContainer>
-                        </PlayerPanelProvider>
-                    </PlaylistSelectionProvider>
+                    <NavigationProvider>
+                        <PlaylistSelectionProvider>
+                            <PlayerPanelProvider>
+                                <DrawerContainer>
+                                    <Drawer>
+                                        <Sidebar />
+                                    </Drawer>
+                                    <DrawerContent>{children}</DrawerContent>
+                                    <PlayerPanel />
+                                </DrawerContainer>
+                            </PlayerPanelProvider>
+                        </PlaylistSelectionProvider>
+                    </NavigationProvider>
                 </ApiProvider>
             </body>
         </html>

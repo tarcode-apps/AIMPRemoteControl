@@ -88,7 +88,7 @@ it is only valid for the `revision` the page was read at.
 |---|---|---|
 | `offset` | `0` | index of the first item to return, in the view |
 | `limit` | `200` | page size, `1..500` |
-| `search` | | case-insensitive substring over title, artist, album, genre and folder name; `total` and `offset` then count matches. Surrounding whitespace is ignored, a blank value means no search |
+| `search` | | case-insensitive substring over title, artist, album, genre and folder name; `total` and `offset` then count matches, and the response adds `duration` and `size` of every match. Surrounding whitespace is ignored, a blank value means no search |
 
 ```json
 {
@@ -104,7 +104,8 @@ it is only valid for the `revision` the page was read at.
       "rating": 4,
       "enabled": true,
       "isUrl": false,
-      "cover": "7068c7442182d15a"
+      "cover": "7068c7442182d15a",
+      "fileUri": "C:\\Music\\Artist A\\Track One.mp3"
     }
   ]
 }
@@ -116,25 +117,90 @@ when the playlist hides its second line. `duration` is in seconds, `size` in byt
 `rating` is `0..5`, `enabled` is the check box in front of the track, `isUrl` marks streams. `cover` is the
 key the item's [cover URL](#get-apiv1playlistsiditemsindexcoverkeysize) takes: it
 names the file, so it only changes when the file is replaced. The client shows the covers of
-the playlists whose `showThumbnails` is on.
+the playlists whose `showThumbnails` is on. `fileUri` is the track's URI as the
+player stores it: a path, an URL, or a part of a container such as a CUE sheet;
+it is the one stable name of a track across playlist changes, and is compared
+byte for byte (the player runs on case-sensitive file systems too).
 Every page is read from the player at request time, nothing is cached in the
 plugin; a search is one pass over the whole playlist per page.
 
 Errors: `404 playlistNotFound`, `400 invalidQuery`.
 
-### `POST /api/v1/playlists/{id}/items/summary`
+### `POST /api/v1/playlists/{id}/items/details`
 
-The count, total `duration` and total `size` of a selection of items, for a
-"multiple selection" heading. The body names the items as
-[`POST /api/v1/queue/items`](#post-apiv1queueitems) does, `playlistId` aside:
-`indexes`, or `search` with `except`, plus an optional `revision`.
+The selected items with the tag fields a client keeps for lists of its own,
+such as favorites. The body names the items as
+[`POST /api/v1/queue/items`](#post-apiv1queueitems) does, `playlistId` aside,
+plus an optional `revision`.
 
 ```json
-{"count": 12, "duration": 2954.6, "size": 118222848}
+{
+  "items": [
+    {
+      "index": 12,
+      "displayText": "Artist A - Track One",
+      "secondLine": "MP3 :: 44 kHz :: 320 kbps :: Stereo :: 10,16 MB",
+      "duration": 266.4,
+      "size": 10655744,
+      "rating": 4,
+      "enabled": true,
+      "isUrl": false,
+      "cover": "7068c7442182d15a",
+      "fileUri": "C:\\Music\\Artist A\\Track One.mp3",
+      "artist": "Artist A",
+      "album": "Album",
+      "genre": "Rock",
+      "year": "2008",
+      "folder": "Artist A"
+    }
+  ]
+}
 ```
+
+The items are [playlist items](#get-apiv1playlistsiditems) with the tags as
+written, empty when missing; `secondLine` follows the playlist's template
+whether or not the playlist shows it, `folder` is the name of the file's
+folder.
 
 Errors: `400 invalidBody`, `404 playlistNotFound`, `404 itemNotFound`,
 `409 playlistChanged`.
+
+### `POST /api/v1/playlists/locate`
+
+Finds remembered files in the playlists they were remembered from:
+
+```json
+{"items": [{"fileUri": "C:\\Music\\Artist A\\Track One.mp3", "playlistId": "{A1B2C3D4-...}"}]}
+```
+
+```json
+{
+  "found": [
+    {
+      "fileUri": "C:\\Music\\Artist A\\Track One.mp3",
+      "playlistId": "{A1B2C3D4-...}",
+      "revision": 7,
+      "index": 12,
+      "displayText": "Artist A - Track One",
+      "secondLine": "MP3 :: 44 kHz :: 320 kbps :: Stereo :: 10,16 MB",
+      "duration": 266.4,
+      "size": 10655744,
+      "rating": 4,
+      "enabled": true,
+      "isUrl": false,
+      "cover": "7068c7442182d15a"
+    }
+  ]
+}
+```
+
+Each file is looked for in its own playlist only, by comparing the URI byte for
+byte, and the first item that matches is returned as a [playlist item](#get-apiv1playlistsiditems)
+with the playlist's `revision` its `index` belongs to. A file that is not in
+its playlist, or whose playlist is not loaded, is simply absent from `found`.
+One pass over each named playlist, reading only the URIs.
+
+Errors: `400 invalidBody`.
 
 ### `GET /api/v1/playlists/{id}/groups`
 
@@ -142,7 +208,7 @@ The playlist's groups as the player shows them, in order. Empty when the
 playlist is not grouped.
 
 With the same `search` parameter as `items`, the groups describe the matches
-only: `count`, `duration` and `firstPosition` count matching items, positions
+only: `count`, `duration`, `size` and `firstPosition` count matching items, positions
 run through the matches like `offset` does, and groups without matches are left
 out. `index` stays the group's real index, so it can still be collapsed.
 
@@ -150,14 +216,15 @@ out. `index` stays the group's real index, so it can still be collapsed.
 {
   "revision": 7,
   "groups": [
-    { "index": 0, "name": "Album X", "count": 12, "duration": 2870.4, "expanded": true, "firstPosition": 0 },
-    { "index": 1, "name": "Album Y", "count": 9, "duration": 2011.0, "expanded": false, "firstPosition": 12 }
+    { "index": 0, "name": "Album X", "count": 12, "duration": 2870.4, "size": 114819072, "expanded": true, "firstPosition": 0 },
+    { "index": 1, "name": "Album Y", "count": 9, "duration": 2011.0, "size": 80445440, "expanded": false, "firstPosition": 12 }
   ]
 }
 ```
 
 Groups are contiguous runs of the playlist: `firstPosition` is the index of the
-group's first item and the group covers the next `count` items. `expanded` is
+group's first item and the group covers the next `count` items, `size` being
+their total in bytes. `expanded` is
 the player's own collapsed state. `name` is what the player shows: with the
 `%FileDir` grouping template that is the folder name alone, not the full path.
 
@@ -227,6 +294,61 @@ the group requests. The response is an empty object.
 Errors: `400 invalidBody`, `403 playlistReadOnly`, `404 playlistNotFound`,
 `404 itemNotFound`, `409 playlistChanged`, `500 playlistUpdateFailed`.
 
+## Search
+
+### `GET /api/v1/search`
+
+The extended search: one text over every loaded playlist, or over the named ones.
+The matches come in playlist order, the playlists in the player's order, and
+are paged as a whole.
+
+| Query | Default | |
+|---|---|---|
+| `search` | | required: the case-insensitive substring to look for, surrounding whitespace ignored |
+| `fields` | all | comma-separated, which texts to look through: `title` (the tag title, or the file name without one), `artist`, `album`, `genre`, `file` (the whole file path or URL) |
+| `playlists` | all | comma-separated playlist ids: only these, in the player's order |
+| `offset` | `0` | index of the first match to return |
+| `limit` | `200` | page size, `1..500` |
+
+```json
+{
+  "total": 37,
+  "duration": 9124.6,
+  "size": 365248512,
+  "items": [
+    {
+      "playlistId": "{A1B2C3D4-...}",
+      "revision": 7,
+      "index": 12,
+      "displayText": "Artist A - Track One",
+      "secondLine": "MP3 :: 44 kHz :: 320 kbps :: Stereo :: 10,16 MB",
+      "duration": 266.4,
+      "size": 10655744,
+      "rating": 4,
+      "enabled": true,
+      "isUrl": false,
+      "cover": "7068c7442182d15a",
+      "fileUri": "C:\\Music\\Artist A\\Track One.mp3"
+    }
+  ],
+  "playlists": [
+    { "id": "{A1B2C3D4-...}", "revision": 7, "count": 25, "duration": 6230.1, "size": 249233408 },
+    { "id": "{B2C3D4E5-...}", "revision": 3, "count": 12, "duration": 2894.5, "size": 116015104 }
+  ]
+}
+```
+
+`total`, `duration` and `size` describe every match in the scope, not the
+page. The items are [playlist items](#get-apiv1playlistsiditems) with the
+`playlistId` and the playlist `revision` the `index` belongs to; `secondLine`
+follows the playlist's template whether or not the playlist shows it.
+`playlists` lists the playlists with matches, in order, with their counts and
+totals, so that a client can lay the whole result out in groups and sum a whole
+group before it has loaded the pages. Every page is one pass over the scope.
+
+Errors: `400 invalidQuery` (no text, an unknown field name), `404 playlistNotFound`
+(one of `playlists` is not loaded).
+
 ## Queue
 
 The playback queue holds playlist items that the player plays next, before it
@@ -251,7 +373,8 @@ track it is, `index` being valid for the playlist's current revision.
       "rating": 0,
       "enabled": true,
       "isUrl": false,
-      "cover": "3f9a1c2e5b7d8e01"
+      "cover": "3f9a1c2e5b7d8e01",
+      "fileUri": "C:\\Music\\Artist\\Title.mp3"
     }
   ]
 }
@@ -279,12 +402,25 @@ chosen by search:
 
 `search` selects every item the search would list (an empty string is the
 whole playlist) but the indexes in `except`; a client that selected everything
-in a long result does not have to send the indexes. `revision` is the
-playlist's and optional, as in the group requests. The response is an empty
+in a long result does not have to send the indexes. With `fields`, a non-empty
+array of the names [`GET /api/v1/search`](#get-apiv1search) takes, the
+selection covers what that search lists in the playlist instead of what the
+playlist's own search does. `groups`, indexes of the playlist's groups as
+[`GET /api/v1/playlists/{id}/groups`](#get-apiv1playlistsidgroups) gives them,
+keeps the search to those groups, so a client can select whole groups without
+loading their items; `indexes` next to `search` adds items besides the matches.
+Either way the items come in playlist order:
+
+```json
+{"playlistId": "{A1B2C3D4-...}", "search": "", "groups": [0, 2], "except": [5], "indexes": [6], "revision": 7}
+```
+
+`except`, `groups` and `fields` without `search` are refused. `revision` is
+the playlist's and optional, as in the group requests. The response is an empty
 object.
 
-Errors: `400 invalidBody`, `404 playlistNotFound`, `404 itemNotFound`,
-`409 playlistChanged`, `500 playlistUpdateFailed`.
+Errors: `400 invalidBody`, `404 playlistNotFound`, `404 itemNotFound` (an index or
+a group outside the playlist), `409 playlistChanged`, `500 playlistUpdateFailed`.
 
 ### `POST /api/v1/queue/remove`
 
@@ -345,7 +481,8 @@ The player's state at request time.
     "artist": "Artist A",
     "album": "Album X",
     "isUrl": false,
-    "coverHash": "b34839fba2927a883f861e5460f8698d"
+    "coverHash": "b34839fba2927a883f861e5460f8698d",
+    "fileUri": "C:\\Music\\Artist A\\Track One.mp3"
   }
 }
 ```
@@ -359,7 +496,8 @@ shows nothing, even though it remembers what to restart. `index` is the item's
 index in its playlist and is only valid for `playlistRevision`; when that
 playlist changes, a new `player` event carries the current index. For a
 stream, `title`, `artist` and `album` describe what the station is playing
-now, not the station itself. `coverHash` names the
+now, not the station itself. `fileUri` is the item's URI as in the
+[playlist items](#get-apiv1playlistsiditems). `coverHash` names the
 track's cover for [`GET /api/v1/covers/{hash}`](#get-apiv1covershashsize), which
 the client fetches directly; it is empty without a cover, and the same for every
 track that shares the image. The plugin looks the cover up when it builds the

@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useOptimisticMutation } from './helpers/optimistic';
 import { request } from './helpers/request';
-import type { EnqueueRequest, Queue, QueueMoveRequest, QueueRemoveRequest } from './types';
+import type { EnqueueRequest, Queue, QueueMoveRequest, QueueRemoveRequest, SelectionInPlaylist } from './types';
 
 export const queueKeys = {
     all: ['queue'] as const,
@@ -42,6 +42,16 @@ export function useEnqueue() {
     return useMutation({
         mutationFn: (body: EnqueueRequest) => request<unknown>('POST', '/queue/items', { body }),
     });
+}
+
+// One request per playlist, in order, so that the queue keeps the order of the
+// parts; the beginning of the queue is filled from the last part back.
+export function useEnqueueSelections() {
+    const enqueue = useEnqueue();
+    return async (parts: SelectionInPlaylist[], atBeginning: boolean) => {
+        for (const { playlistId, revision, selection } of atBeginning ? [...parts].reverse() : parts)
+            await enqueue.mutateAsync({ playlistId, revision, atBeginning, ...selection });
+    };
 }
 
 function renumbered(items: Queue['items']) {

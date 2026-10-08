@@ -78,6 +78,8 @@ player::PlaylistItem player::ReadPlaylistItem(const PlaylistItemContext &ctx, st
 	item.IsUrl = ctx.FileUriService && ctx.FileUri && ctx.FileUriService->IsURL(ctx.FileUri) == S_OK;
 	if (ctx.FileInfo)
 		item.Cover = DescribeCoverSource(ctx.FileInfo, item.IsUrl);
+	if (ctx.FileUri)
+		item.FileUri = IAIMPStringToString(ctx.FileUri);
 	return item;
 }
 
@@ -88,23 +90,77 @@ bool player::NormalizeIndexes(std::vector<std::int32_t> &indexes, std::int32_t c
 	return indexes.empty() || (indexes.front() >= 0 && indexes.back() < count);
 }
 
+namespace
+{
+	// The indexes of the items of `groups` that match `search`, every item when it is
+	// empty; false when a group is outside the playlist.
+	bool GroupMatches(IAIMPCore *core, IAIMPPlaylist *playlist, std::vector<std::int32_t> groups, const std::string &search,
+					  const SearchFields &fields, const std::function<void(std::int32_t)> &match)
+	{
+		std::sort(groups.begin(), groups.end());
+		groups.erase(std::unique(groups.begin(), groups.end()), groups.end());
+		if (!groups.empty() && (groups.front() < 0 || groups.back() >= playlist->GetGroupCount()))
+			return false;
+		IAIMPServiceFileURI *fileUriService = AcquireService<IAIMPServiceFileURI>(core, IID_IAIMPServiceFileURI);
+		IAIMPString *searchString = search.empty() ? nullptr : StringToIAIMPString(core, search);
+		for (const std::int32_t index : groups)
+		{
+			IAIMPPlaylistGroup *group = nullptr;
+			if (Failed(playlist->GetGroup(index, IID_IAIMPPlaylistGroup, reinterpret_cast<void **>(&group))) || !group)
+				continue;
+			const INT32 count = group->GetItemCount();
+			for (INT32 j = 0; j < count; ++j)
+			{
+				IAIMPPlaylistItem *item = nullptr;
+				if (Failed(group->GetItem(j, IID_IAIMPPlaylistItem, reinterpret_cast<void **>(&item))) || !item)
+					continue;
+				const PlaylistItemContext ctx(fileUriService, item);
+				INT32 itemIndex = -1;
+				if ((!searchString || PlaylistItemMatches(ctx, searchString, fields)) &&
+					Succeeded(item->GetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_INDEX, &itemIndex)))
+					match(itemIndex);
+				item->Release();
+			}
+			group->Release();
+		}
+		if (searchString)
+			searchString->Release();
+		if (fileUriService)
+			fileUriService->Release();
+		return true;
+	}
+}
+
 bool player::VisitSelectedItems(IAIMPCore *core, IAIMPPlaylist *playlist, const ItemSelection &selection, const ItemVisitor &visit)
 {
+	// The matches are gathered first, so that they and the extra indexes come in
+	// playlist order together.
+	std::vector<std::int32_t> indexes = selection.Indexes;
 	if (selection.Search)
 	{
 		std::vector<std::int32_t> except = selection.Except;
 		std::sort(except.begin(), except.end());
-		ItemsQuery query;
-		query.Limit = INT32_MAX;
-		query.Search = *selection.Search;
-		VisitPlaylistItems(core, playlist, query, [&](const PlaylistItemContext &ctx, std::int32_t index)
-						   {
+		const auto match = [&](std::int32_t index)
+		{
 			if (!std::binary_search(except.begin(), except.end(), index))
-				visit(ctx, index); });
-		return true;
+				indexes.push_back(index);
+		};
+		if (selection.Groups)
+		{
+			if (!GroupMatches(core, playlist, *selection.Groups, *selection.Search, selection.Fields, match))
+				return false;
+		}
+		else
+		{
+			ItemsQuery query;
+			query.Limit = INT32_MAX;
+			query.Search = *selection.Search;
+			query.Fields = selection.Fields;
+			VisitPlaylistItems(core, playlist, query, [&](const PlaylistItemContext &, std::int32_t index)
+							   { match(index); });
+		}
 	}
 
-	std::vector<std::int32_t> indexes = selection.Indexes;
 	if (!NormalizeIndexes(indexes, playlist->GetItemCount()))
 		return false;
 	IAIMPServiceFileURI *fileUriService = AcquireService<IAIMPServiceFileURI>(core, IID_IAIMPServiceFileURI);
@@ -122,7 +178,8 @@ bool player::VisitSelectedItems(IAIMPCore *core, IAIMPPlaylist *playlist, const 
 	return true;
 }
 
-std::int32_t player::VisitPlaylistItems(IAIMPCore *core, IAIMPPlaylist *playlist, const ItemsQuery &query, const ItemVisitor &visit)
+std::int32_t player::VisitPlaylistItems(IAIMPCore *core, IAIMPPlaylist *playlist, const ItemsQuery &query, const ItemVisitor &visit,
+										ItemsSummary *matches)
 {
 	IAIMPServiceFileURI *fileUriService = nullptr;
 	if (Failed(core->QueryInterface(IID_IAIMPServiceFileURI, reinterpret_cast<void **>(&fileUriService))))
@@ -140,10 +197,12 @@ std::int32_t player::VisitPlaylistItems(IAIMPCore *core, IAIMPPlaylist *playlist
 		const PlaylistItemContext ctx(fileUriService, item);
 		if (!search)
 			visit(ctx, i);
-		else if (PlaylistItemMatches(ctx, search))
+		else if (PlaylistItemMatches(ctx, search, query.Fields))
 		{
 			if (matched >= query.Offset && matched - query.Offset < query.Limit)
 				visit(ctx, i);
+			if (matches)
+				AddToSummary(ctx, *matches);
 			++matched;
 		}
 		item->Release();
@@ -165,8 +224,11 @@ std::optional<player::ItemsPage> player::GetPlaylistItems(IAIMPCore *core, const
 	const SecondLineFormatter secondLine(core, playlist);
 	ItemsPage page;
 	page.Offset = query.Offset;
+	ItemsSummary matches;
 	page.Total = VisitPlaylistItems(core, playlist, query, [&](const PlaylistItemContext &ctx, std::int32_t index)
-									{ page.Items.push_back(ReadPlaylistItem(ctx, index, secondLine)); });
+									{ page.Items.push_back(ReadPlaylistItem(ctx, index, secondLine)); }, &matches);
+	if (!query.Search.empty())
+		page.Matches = matches;
 	playlist->Release();
 	return page;
 }
@@ -215,6 +277,7 @@ std::optional<std::vector<player::PlaylistGroup>> player::GetPlaylistGroups(IAIM
 		info.Expanded = expanded != 0;
 		if (searchString)
 		{
+			ItemsSummary matches;
 			const INT32 itemCount = group->GetItemCount();
 			for (INT32 j = 0; j < itemCount; ++j)
 			{
@@ -223,15 +286,12 @@ std::optional<std::vector<player::PlaylistGroup>> player::GetPlaylistGroups(IAIM
 					continue;
 				const PlaylistItemContext ctx(fileUriService, item);
 				if (PlaylistItemMatches(ctx, searchString))
-				{
-					DOUBLE seconds = 0;
-					if (ctx.FileInfo)
-						ctx.FileInfo->GetValueAsFloat(AIMP_FILEINFO_PROPID_DURATION, &seconds);
-					info.Duration += seconds;
-					++info.Count;
-				}
+					AddToSummary(ctx, matches);
 				item->Release();
 			}
+			info.Count = matches.Count;
+			info.Duration = matches.Duration;
+			info.Size = matches.Size;
 			info.FirstPosition = matchedBefore;
 			matchedBefore += info.Count;
 		}
@@ -239,11 +299,23 @@ std::optional<std::vector<player::PlaylistGroup>> player::GetPlaylistGroups(IAIM
 		{
 			info.Count = group->GetItemCount();
 			group->GetValueAsFloat(AIMP_PLAYLISTGROUP_PROPID_DURATION, &info.Duration);
-			IAIMPPlaylistItem *first = nullptr;
-			if (info.Count > 0 && Succeeded(group->GetItem(0, IID_IAIMPPlaylistItem, reinterpret_cast<void **>(&first))) && first)
+			// The group keeps no size of its own.
+			for (INT32 j = 0; j < info.Count; ++j)
 			{
-				first->GetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_INDEX, &info.FirstPosition);
-				first->Release();
+				IAIMPPlaylistItem *item = nullptr;
+				if (Failed(group->GetItem(j, IID_IAIMPPlaylistItem, reinterpret_cast<void **>(&item))) || !item)
+					continue;
+				if (j == 0)
+					item->GetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_INDEX, &info.FirstPosition);
+				IAIMPFileInfo *fileInfo = nullptr;
+				if (Succeeded(item->GetValueAsObject(AIMP_PLAYLISTITEM_PROPID_FILEINFO, IID_IAIMPFileInfo, reinterpret_cast<void **>(&fileInfo))) && fileInfo)
+				{
+					INT64 size = 0;
+					fileInfo->GetValueAsInt64(AIMP_FILEINFO_PROPID_FILESIZE, &size);
+					info.Size += size;
+					fileInfo->Release();
+				}
+				item->Release();
 			}
 		}
 		if (!searchString || info.Count > 0)
@@ -271,25 +343,38 @@ player::MutationResult player::FindPlaylistItem(IAIMPCore *core, const std::stri
 	return item ? MutationResult::Ok : MutationResult::ItemNotFound;
 }
 
-player::MutationResult player::SummarizePlaylistItems(IAIMPCore *core, const std::string &playlistId, const ItemSelection &selection,
-														ItemsSummary &summary)
+void player::AddToSummary(const PlaylistItemContext &ctx, ItemsSummary &summary)
+{
+	if (ctx.FileInfo)
+	{
+		DOUBLE duration = 0;
+		INT64 size = 0;
+		ctx.FileInfo->GetValueAsFloat(AIMP_FILEINFO_PROPID_DURATION, &duration);
+		ctx.FileInfo->GetValueAsInt64(AIMP_FILEINFO_PROPID_FILESIZE, &size);
+		summary.Duration += duration;
+		summary.Size += size;
+	}
+	++summary.Count;
+}
+
+player::MutationResult player::DescribePlaylistItems(IAIMPCore *core, const std::string &playlistId, const ItemSelection &selection,
+													 std::vector<ItemDetails> &items)
 {
 	IAIMPPlaylist *playlist = LoadedPlaylistByAIMPId(core, playlistId);
 	if (!playlist)
 		return MutationResult::PlaylistNotFound;
-	summary = {};
-	const bool found = VisitSelectedItems(core, playlist, selection, [&](const PlaylistItemContext &ctx, std::int32_t)
+	const SecondLineFormatter secondLine(core, playlist, true);
+	items.clear();
+	const bool found = VisitSelectedItems(core, playlist, selection, [&](const PlaylistItemContext &ctx, std::int32_t index)
 										  {
-		if (ctx.FileInfo)
-		{
-			DOUBLE duration = 0;
-			INT64 size = 0;
-			ctx.FileInfo->GetValueAsFloat(AIMP_FILEINFO_PROPID_DURATION, &duration);
-			ctx.FileInfo->GetValueAsInt64(AIMP_FILEINFO_PROPID_FILESIZE, &size);
-			summary.Duration += duration;
-			summary.Size += size;
-		}
-		++summary.Count; });
+		ItemDetails details;
+		details.Item = ReadPlaylistItem(ctx, index, secondLine);
+		details.Artist = ToStringAndRelease(ItemFileInfoString(ctx, AIMP_FILEINFO_PROPID_ARTIST));
+		details.Album = ToStringAndRelease(ItemFileInfoString(ctx, AIMP_FILEINFO_PROPID_ALBUM));
+		details.Genre = ToStringAndRelease(ItemFileInfoString(ctx, AIMP_FILEINFO_PROPID_GENRE));
+		details.Year = ToStringAndRelease(ItemFileInfoString(ctx, AIMP_FILEINFO_PROPID_DATE));
+		details.Folder = ToStringAndRelease(ItemParentDirName(ctx));
+		items.push_back(std::move(details)); });
 	playlist->Release();
 	return found ? MutationResult::Ok : MutationResult::ItemNotFound;
 }

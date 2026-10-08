@@ -3,7 +3,7 @@
 import { useQueue } from '@/app/_api/queue';
 import type { QueueItem } from '@/app/_api/types';
 import { useListMode, type ListModeValue } from '@/app/_components/lists';
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
 export type QueueModeContextValue = ListModeValue & {
     // The items the list shows: the whole queue, or the search's matches.
@@ -21,6 +21,12 @@ export function useQueueMode(): QueueModeContextValue {
 export function QueueModeProvider({ children }: { children: ReactNode }) {
     const list = useListMode('queue');
     const { data } = useQueue();
+    // The selection names entries by position, which the player moves as it plays.
+    const [revision, setRevision] = useState(data?.revision);
+    if (revision !== data?.revision) {
+        setRevision(data?.revision);
+        list.clearSelection();
+    }
     const all = data?.items;
     const { text } = list;
     // The queue is small and loaded whole, so the search runs on the client.

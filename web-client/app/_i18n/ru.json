@@ -43,13 +43,50 @@
     "position": "Позиция воспроизведения",
     "noTime": "--:--",
     "trackNumbers": "#{{number}} - {{position}}/{{count}}",
-    "trackPosition": "{{position}}/{{count}}"
+    "trackPosition": "{{position}}/{{count}}",
+    "trackMenu": "Меню трека",
+    "goToPlaylist": "Перейти к плейлисту"
   },
   "playlists": {
     "summary": "{{count}} / {{duration}} / {{size}}"
   },
   "selection": {
     "title": "Множественный выбор"
+  },
+  "search": {
+    "title": "Расширенный поиск",
+    "placeholder": "Поиск в плейлистах",
+    "prompt": "Введите текст для поиска",
+    "playlists": "Плейлисты для поиска",
+    "allPlaylists": "Все плейлисты",
+    "fields": "Поля поиска",
+    "field": {
+      "title": "Заголовках",
+      "artist": "Имени исполнителя",
+      "album": "Имени альбома",
+      "genre": "Жанре",
+      "file": "Полном пути к файлу"
+    }
+  },
+  "favorites": {
+    "empty": "В избранном пока ничего нет",
+    "searchPlaceholder": "Поиск в избранном",
+    "add": "Добавить в избранное",
+    "remove": "Удалить из избранного",
+    "clear": "Очистить избранное",
+    "groupBy": "Группировать по…",
+    "groupings": {
+      "playlist": "Плейлисту",
+      "artist": "Исполнителю",
+      "album": "Альбому",
+      "genre": "Жанру",
+      "year": "Году",
+      "folder": "Папке"
+    },
+    "noValue": "Не указано",
+    "missing": "Трека нет в его плейлисте",
+    "find": "Найти в плейлистах",
+    "pickTitle": "Выбор трека"
   },
   "queue": {
     "title": "Менеджер очереди",
@@ -103,6 +140,7 @@
       "randomGroups": "Перемешать группы",
       "randomGroupItems": "Перемешать треки внутри групп",
       "randomAll": "Перемешать группы и треки"
-    }
+    },
+    "goToTrack": "Перейти к треку"
   }
 }

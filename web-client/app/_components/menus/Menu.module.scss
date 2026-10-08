@@ -1,3 +1,5 @@
+@use "../../_styles/mixins" as mixins;
+
 .menu {
     inset: auto;
     margin: 0;
@@ -21,7 +23,13 @@
     text-align: left;
     white-space: nowrap;
 
-    mixins.hover-capable {
+    &.separated {
+        margin-top: 8px;
+        border-top: 1px solid var(--color-divider);
+        padding-top: 18px;
+    }
+
+    @include mixins.hover-capable {
         &:hover:not(:disabled) {
             background: var(--color-hover);
         }

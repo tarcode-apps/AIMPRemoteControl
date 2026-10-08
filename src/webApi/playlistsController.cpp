@@ -14,6 +14,7 @@
 #include "helpers/itemJson.h"
 #include "helpers/requestHelpers.h"
 #include "mainThreadRunner.h"
+#include "player/locate.h"
 #include "player/playlistItems.h"
 #include "player/playlists.h"
 #include "stateUpdateEvents.h"
@@ -21,26 +22,15 @@
 namespace
 {
 	using webapi::CheckRevision;
+	using webapi::DefaultPageLimit;
+	using webapi::MaxPageLimit;
 	using webapi::MoveBody;
 	using webapi::OptionalField;
 	using webapi::QueryInt;
-	using webapi::QueryString;
+	using webapi::RevisionOf;
+	using webapi::SearchText;
 	using webapi::SelectionBody;
 	using webapi::ThrowUnlessOk;
-
-	constexpr std::int32_t DefaultLimit = 200;
-	constexpr std::int32_t MaxLimit = 500;
-
-	// Whitespace-only searches mean no search, so that they share the cache key of
-	// the plain list on the client.
-	std::string SearchQuery(const ApiRequest &request)
-	{
-		std::string search = QueryString(request, "search");
-		const auto notSpace = [](unsigned char c) { return !std::isspace(c); };
-		search.erase(search.begin(), std::find_if(search.begin(), search.end(), notSpace));
-		search.erase(std::find_if(search.rbegin(), search.rend(), notSpace).base(), search.end());
-		return search;
-	}
 
 	nlohmann::json ToJson(const player::PlaylistInfo &playlist, std::uint64_t revision)
 	{
@@ -68,6 +58,7 @@ namespace
 			{"name", group.Name},
 			{"count", group.Count},
 			{"duration", group.Duration},
+			{"size", group.Size},
 			{"expanded", group.Expanded},
 			{"firstPosition", group.FirstPosition},
 		};
@@ -131,10 +122,7 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 		const StateUpdateEvents::PlaylistRevisions revisions = events.CurrentPlaylistRevisions();
 		nlohmann::json result = nlohmann::json::array();
 		for (const player::PlaylistInfo &playlist : playlists)
-		{
-			const auto revision = revisions.find(playlist.Id);
-			result.push_back(ToJson(playlist, revision == revisions.end() ? 0 : revision->second));
-		}
+			result.push_back(ToJson(playlist, RevisionOf(revisions, playlist.Id)));
 		return result; });
 
 	endpoints.MapApi(HttpMethod::Get, R"(/api/v1/playlists/([^/]+)/items)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
@@ -142,8 +130,8 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 		const std::string playlistId = request.PathMatches.at(0);
 		player::ItemsQuery query;
 		query.Offset = QueryInt(request, "offset", 0, 0, INT32_MAX);
-		query.Limit = QueryInt(request, "limit", DefaultLimit, 1, MaxLimit);
-		query.Search = SearchQuery(request);
+		query.Limit = QueryInt(request, "limit", DefaultPageLimit, 1, MaxPageLimit);
+		query.Search = SearchText(request);
 
 		// The revision is read before the items so that a change racing with the read
 		// makes the page look older, never newer, than it is.
@@ -156,28 +144,62 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 		nlohmann::json items = nlohmann::json::array();
 		for (const player::PlaylistItem &item : page->Items)
 			items.push_back(ItemJson(item));
-		return {
+		nlohmann::json result = {
 			{"total", page->Total},
 			{"revision", revision},
 			{"offset", page->Offset},
 			{"items", std::move(items)},
-		}; });
+		};
+		if (page->Matches)
+		{
+			result["duration"] = page->Matches->Duration;
+			result["size"] = page->Matches->Size;
+		}
+		return result; });
 
-	endpoints.MapApi(HttpMethod::Post, R"(/api/v1/playlists/([^/]+)/items/summary)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
+	endpoints.MapApi(HttpMethod::Post, R"(/api/v1/playlists/([^/]+)/items/details)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {
 		const std::string playlistId = request.PathMatches.at(0);
 		const player::ItemSelection selection = SelectionBody(request.Body);
 		CheckRevision(request.Body, events, playlistId);
-		player::ItemsSummary summary;
+		std::vector<player::ItemDetails> details;
 		ThrowUnlessOk(RunOnMainThread(core, [&]
-									  { return player::SummarizePlaylistItems(core, playlistId, selection, summary); }));
-		return {{"count", summary.Count}, {"duration", summary.Duration}, {"size", summary.Size}}; });
+									  { return player::DescribePlaylistItems(core, playlistId, selection, details); }));
+		nlohmann::json items = nlohmann::json::array();
+		for (const player::ItemDetails &item : details)
+			items.push_back(DetailsJson(item));
+		return {{"items", std::move(items)}}; });
+
+	endpoints.MapApi(HttpMethod::Post, "/api/v1/playlists/locate", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
+			   {
+		const nlohmann::json &body = request.Body;
+		if (!body.is_object() || !body.contains("items") || !body["items"].is_array())
+			throw ApiError(400, "invalidBody");
+		std::vector<player::LocateRequest> requests;
+		for (const nlohmann::json &entry : body["items"])
+		{
+			if (!entry.is_object())
+				throw ApiError(400, "invalidBody");
+			const auto fileUri = OptionalField<std::string>(entry, "fileUri", &nlohmann::json::is_string);
+			const auto playlistId = OptionalField<std::string>(entry, "playlistId", &nlohmann::json::is_string);
+			if (!fileUri || !playlistId)
+				throw ApiError(400, "invalidBody");
+			requests.push_back({*fileUri, *playlistId});
+		}
+
+		const StateUpdateEvents::PlaylistRevisions revisions = events.CurrentPlaylistRevisions();
+		const std::vector<player::LocatedItem> located = RunOnMainThread(core, [&]
+																		  { return player::LocatePlaylistItems(core, requests); });
+		nlohmann::json found = nlohmann::json::array();
+		for (const player::LocatedItem &entry : located)
+			found.push_back(ItemJson(entry.Item, entry.PlaylistId, RevisionOf(revisions, entry.PlaylistId)));
+		return {{"found", std::move(found)}}; });
 
 	endpoints.MapApi(HttpMethod::Get, R"(/api/v1/playlists/([^/]+)/groups)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {
 		const std::string playlistId = request.PathMatches.at(0);
 		const std::uint64_t revision = events.PlaylistRevision(playlistId);
-		const std::string search = SearchQuery(request);
+		const std::string search = SearchText(request);
 		const std::optional<std::vector<player::PlaylistGroup>> groups = RunOnMainThread(core, [&]
 																				   { return player::GetPlaylistGroups(core, playlistId, search); });
 		if (!groups)

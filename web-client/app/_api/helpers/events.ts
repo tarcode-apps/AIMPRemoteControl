@@ -1,7 +1,10 @@
+import { favoriteKeys } from '@/app/_api/favorites';
 import { playerKeys, snapshot } from '@/app/_api/player';
 import { playlistKeys } from '@/app/_api/playlists';
 import { queueKeys } from '@/app/_api/queue';
+import { searchKeys } from '@/app/_api/search';
 import type { PlayerState, Playlist, Queue } from '@/app/_api/types';
+import { favoriteRecords } from '@/app/_state/Favorites';
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
@@ -35,6 +38,11 @@ function invalidateChangedPlaylists(client: QueryClient, { playlists }: Playlist
     // Queued items point at playlist indexes.
     const queue = client.getQueryData<Queue>(queueKeys.all);
     if (queue?.items.some(item => changed.has(item.playlistId))) client.invalidateQueries({ queryKey: queueKeys.all });
+    // A search spans every playlist, a new one included.
+    if (changed.size) client.invalidateQueries({ queryKey: searchKeys.all });
+    // A favorite is looked for in its own playlist only.
+    if (favoriteRecords().some(record => changed.has(record.playlistId)))
+        client.invalidateQueries({ queryKey: favoriteKeys.all });
 }
 
 export function useEventStream(client: QueryClient) {

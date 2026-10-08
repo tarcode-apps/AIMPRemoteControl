@@ -3,10 +3,12 @@
 import { errorMessage } from '@/app/_api/helpers/errors';
 import { usePlaylists } from '@/app/_api/playlists';
 import { useQueue } from '@/app/_api/queue';
+import { useFavorites } from '@/app/_state/Favorites';
+import { useNavigation } from '@/app/_state/Navigation';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import clsx from 'clsx';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '../buttons';
 import { Icon } from '../icons';
@@ -19,13 +21,15 @@ type NavItem = {
     href: string;
     label: 'screens.timer' | 'screens.effects' | 'screens.favorites' | 'screens.queue';
     icon: string;
+    // Shows a back arrow and sits over the main screen.
+    second: boolean;
 };
 
 const toolItems: NavItem[] = [
-    { href: '/timer/', label: 'screens.timer', icon: 'schedule' },
-    { href: '/effects/', label: 'screens.effects', icon: 'equalizer' },
-    { href: '/favorites/', label: 'screens.favorites', icon: 'favorite' },
-    { href: '/queue/', label: 'screens.queue', icon: 'list' },
+    { href: '/timer/', label: 'screens.timer', icon: 'schedule', second: true },
+    { href: '/effects/', label: 'screens.effects', icon: 'equalizer', second: true },
+    { href: '/favorites/', label: 'screens.favorites', icon: 'favorite', second: false },
+    { href: '/queue/', label: 'screens.queue', icon: 'list', second: true },
 ];
 
 const playlistSkeletonWidths = ['55%', '40%', '70%', '45%'];
@@ -33,9 +37,8 @@ const playlistSkeletonWidths = ['55%', '40%', '70%', '45%'];
 function Playlists() {
     const { t } = useTranslation();
     const pathname = usePathname();
-    const router = useRouter();
+    const { openScreen } = useNavigation();
     const { closeThen } = useDrawer();
-    const { collapse } = usePlayerPanel();
     const { error, isPending, isError, refetch, isRefetching } = usePlaylists();
     const { playlists, selected, select } = usePlaylistSelection();
 
@@ -76,8 +79,7 @@ function Playlists() {
                                 event.preventDefault();
                                 closeThen(() => {
                                     select(playlist.id);
-                                    collapse();
-                                    if (pathname !== '/') router.push('/');
+                                    openScreen('/');
                                 });
                             }}
                         >
@@ -93,16 +95,20 @@ function Playlists() {
 
 export function Sidebar() {
     const pathname = usePathname();
-    const router = useRouter();
+    const { openScreen, openSecondScreen } = useNavigation();
     const { closeThen } = useDrawer();
     const { expand } = usePlayerPanel();
     const { t } = useTranslation();
     const { data: queue } = useQueue();
-    const queueBadge = queue?.suspended ? '!' : queue?.items.length || null;
+    const { records: favorites } = useFavorites();
+    const badges: Partial<Record<string, string | number | null>> = {
+        '/queue/': queue?.suspended ? '!' : queue?.items.length || null,
+        '/favorites/': favorites.length || null,
+    };
 
-    const renderItem = ({ href, label, icon }: NavItem) => {
+    const renderItem = ({ href, label, icon, second }: NavItem) => {
         const active = pathname === href;
-        const badge = href === '/queue/' ? queueBadge : null;
+        const badge = badges[href];
         return (
             <li key={href}>
                 <Link
@@ -111,7 +117,7 @@ export function Sidebar() {
                     aria-current={active ? 'page' : undefined}
                     onClick={event => {
                         event.preventDefault();
-                        closeThen(() => router.push(href));
+                        closeThen(() => (second ? openSecondScreen(href) : openScreen(href)));
                     }}
                 >
                     <Icon>{icon}</Icon>

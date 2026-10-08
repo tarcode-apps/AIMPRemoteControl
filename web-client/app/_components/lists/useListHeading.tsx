@@ -17,6 +17,9 @@ export type ListHeadingOptions = {
     totals: ItemsSummary | undefined;
     // Of the selected items; asked for only while something is selected.
     selectedTotals: ItemsSummary | undefined;
+    // A search that is not a mode of the list: on a phone its field stands in for
+    // the heading except while selecting, and the back arrow keeps its usual job.
+    externalSearch?: { value: string; onChange(value: string): void };
 };
 
 export type ListHeading = {
@@ -37,10 +40,11 @@ export function useListHeading({
     searchPlaceholder,
     totals,
     selectedTotals,
+    externalSearch,
 }: ListHeadingOptions): ListHeading {
     const { t, i18n } = useTranslation();
     const docked = useMediaQuery(media.drawerDocked);
-    const mobileSearch = !docked && mode.query !== null;
+    const mobileSearch = !docked && (externalSearch ? mode.mode !== 'select' : mode.query !== null);
     const shown = mode.selecting && !mode.nothingSelected ? selectedTotals : mode.mode === 'select' ? nothing : totals;
 
     return {
@@ -52,15 +56,15 @@ export function useListHeading({
                 duration: formatDuration(shown.duration),
                 size: formatSize(shown.size, i18n.language),
             }),
-        onBack: mobileSearch ? () => mode.setQuery(null) : undefined,
+        onBack: mobileSearch && !externalSearch ? () => mode.setQuery(null) : undefined,
         search: mobileSearch && (
             <SearchField
                 className={styles.search}
                 placeholder={searchPlaceholder}
-                value={mode.query ?? ''}
+                value={externalSearch ? externalSearch.value : (mode.query ?? '')}
                 autoFocus
-                onChange={mode.setQuery}
-                onClose={() => mode.setQuery(null)}
+                onChange={externalSearch ? externalSearch.onChange : mode.setQuery}
+                onClose={externalSearch ? undefined : () => mode.setQuery(null)}
             />
         ),
     };

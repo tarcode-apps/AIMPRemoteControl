@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <cstdint>
 #include <optional>
@@ -16,10 +18,65 @@
 
 namespace webapi
 {
+	constexpr std::int32_t DefaultPageLimit = 200;
+	constexpr std::int32_t MaxPageLimit = 500;
+
 	inline std::string QueryString(const ApiRequest &request, const char *name)
 	{
 		const auto it = request.Query.find(name);
 		return it == request.Query.end() ? std::string() : it->second;
+	}
+
+	// Whitespace-only searches mean no search, so that they share the cache key of
+	// the plain list on the client.
+	inline std::string SearchText(const ApiRequest &request)
+	{
+		std::string search = QueryString(request, "search");
+		const auto notSpace = [](unsigned char c) { return !std::isspace(c); };
+		search.erase(search.begin(), std::find_if(search.begin(), search.end(), notSpace));
+		search.erase(std::find_if(search.rbegin(), search.rend(), notSpace).base(), search.end());
+		return search;
+	}
+
+	// The texts a search looks through, by the names of the web API; every named one
+	// when `names` is empty. The folder name belongs to the playlist's own search
+	// and has no name, so a request that names fields searches as GET /search does.
+	inline SearchFields ParseSearchFields(const std::vector<std::string> &names, const char *errorCode)
+	{
+		if (names.empty())
+			return SearchFields{true, true, true, true, false, true};
+		SearchFields fields{false, false, false, false, false, false};
+		for (const std::string &name : names)
+		{
+			if (name == "title")
+				fields.Title = true;
+			else if (name == "artist")
+				fields.Artist = true;
+			else if (name == "album")
+				fields.Album = true;
+			else if (name == "genre")
+				fields.Genre = true;
+			else if (name == "file")
+				fields.File = true;
+			else
+				throw ApiError(400, errorCode);
+		}
+		return fields;
+	}
+
+	// A comma-separated list, without empty entries.
+	inline std::vector<std::string> SplitCommaList(std::string_view text)
+	{
+		std::vector<std::string> values;
+		while (!text.empty())
+		{
+			const std::size_t comma = text.find(',');
+			const std::string_view value = text.substr(0, comma);
+			if (!value.empty())
+				values.emplace_back(value);
+			text = comma == std::string_view::npos ? std::string_view() : text.substr(comma + 1);
+		}
+		return values;
 	}
 
 	// The whole text as a number, or nothing.
@@ -77,21 +134,50 @@ namespace webapi
 		return values;
 	}
 
-	// `search` with `except` for everything the search finds, or `indexes`.
+	// With `nonEmpty` the array must be there with at least one value; otherwise a
+	// missing array is an empty one.
+	inline std::vector<std::string> StringArray(const nlohmann::json &body, const char *name, bool nonEmpty)
+	{
+		if (!body.contains(name))
+		{
+			if (nonEmpty)
+				throw ApiError(400, "invalidBody");
+			return {};
+		}
+		const nlohmann::json &array = body[name];
+		if (!array.is_array() || (nonEmpty && array.empty()))
+			throw ApiError(400, "invalidBody");
+		std::vector<std::string> values;
+		for (const nlohmann::json &value : array)
+		{
+			if (!value.is_string())
+				throw ApiError(400, "invalidBody");
+			values.push_back(value.get<std::string>());
+		}
+		return values;
+	}
+
+	// `indexes`, or `search` with `except`, `groups` and extra `indexes`; see
+	// player::ItemSelection.
 	inline player::ItemSelection SelectionBody(const nlohmann::json &body)
 	{
 		if (!body.is_object())
 			throw ApiError(400, "invalidBody");
 		player::ItemSelection selection;
-		if (body.contains("indexes"))
+		selection.Search = OptionalField<std::string>(body, "search", &nlohmann::json::is_string);
+		if (!selection.Search)
 		{
+			if (body.contains("except") || body.contains("groups") || body.contains("fields"))
+				throw ApiError(400, "invalidBody");
 			selection.Indexes = IntArray(body, "indexes", true);
 			return selection;
 		}
-		selection.Search = OptionalField<std::string>(body, "search", &nlohmann::json::is_string);
-		if (!selection.Search)
-			throw ApiError(400, "invalidBody");
+		selection.Indexes = IntArray(body, "indexes", false);
 		selection.Except = IntArray(body, "except", false);
+		if (body.contains("groups"))
+			selection.Groups = IntArray(body, "groups", false);
+		if (body.contains("fields"))
+			selection.Fields = ParseSearchFields(StringArray(body, "fields", true), "invalidBody");
 		return selection;
 	}
 
@@ -132,6 +218,13 @@ namespace webapi
 			throw ApiError(400, "invalidBody");
 		if (body["revision"].get<std::uint64_t>() != current)
 			throw ApiError(409, changedCode);
+	}
+
+	// Zero for a playlist the events have not seen.
+	inline std::uint64_t RevisionOf(const StateUpdateEvents::PlaylistRevisions &revisions, const std::string &playlistId)
+	{
+		const auto revision = revisions.find(playlistId);
+		return revision == revisions.end() ? 0 : revision->second;
 	}
 
 	inline void CheckRevision(const nlohmann::json &body, StateUpdateEvents &events, const std::string &playlistId)

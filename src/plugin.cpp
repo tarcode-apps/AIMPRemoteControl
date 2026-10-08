@@ -46,6 +46,7 @@
 #include "webApi/playerController.h"
 #include "webApi/playlistsController.h"
 #include "webApi/queueController.h"
+#include "webApi/searchController.h"
 
 namespace
 {
@@ -145,6 +146,7 @@ HRESULT WINAPI AIMPPlugin::Initialize(IAIMPCore *Core)
 	commands.push_back(std::make_unique<rpcapi::SubscribeOnAIMPStateUpdateEventCommand>(Core, FIdManager, FStateEvents, FSleepTimer));
 	commands.push_back(std::make_unique<webapi::PlaylistsController>(Core, FStateEvents));
 	commands.push_back(std::make_unique<webapi::QueueController>(Core, FStateEvents));
+	commands.push_back(std::make_unique<webapi::SearchController>(Core, FStateEvents));
 	commands.push_back(std::make_unique<webapi::PlayerController>(Core, FStateEvents, *FCoverIndex));
 	commands.push_back(std::make_unique<webapi::CoversController>(Core, FStateEvents, *FCoverIndex));
 	commands.push_back(std::make_unique<webapi::EventsController>(Core, FStateEvents, *FCoverIndex));

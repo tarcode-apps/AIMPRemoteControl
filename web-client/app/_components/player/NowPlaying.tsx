@@ -3,6 +3,9 @@
 import { usePlayer, usePlayerCommand, usePlayerPosition, useSetPlayer } from '@/app/_api/player';
 import { usePlaylists } from '@/app/_api/playlists';
 import type { RepeatMode } from '@/app/_api/types';
+import { useFavorites } from '@/app/_state/Favorites';
+import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
+import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
 import { formatDuration } from '@/app/_utils/format';
 import clsx from 'clsx';
 import { useEffect, useRef, useState } from 'react';
@@ -11,6 +14,7 @@ import { IconButton } from '../buttons';
 import { TrackCover } from '../cover';
 import { Icon } from '../icons';
 import { Slider } from '../inputs';
+import { Menu, type MenuItem } from '../menus';
 import { useDrawer } from '../sidenav';
 import { Marquee } from './Marquee';
 import styles from './NowPlaying.module.scss';
@@ -41,6 +45,28 @@ export function NowPlaying() {
     const setPlayer = useSetPlayer();
     const shown = expanded || docked;
     const position = usePlayerPosition(player, shown);
+
+    const favorites = useFavorites();
+    const favoriteActions = useFavoriteActions();
+    const { showTrack } = usePlaylistSelection();
+    // The favorite button and the track menu, only while a track is loaded.
+    const playing = player?.track;
+    const playingRef = playing && { ...playing, revision: playing.playlistRevision };
+    const isFavorite = !!playing && favorites.has(playing.fileUri);
+    const favoriteItem = playingRef && favoriteActions.favoriteMenuItem(playingRef);
+    const trackMenu: MenuItem[] =
+        playingRef && favoriteItem
+            ? [
+                  favoriteItem,
+                  {
+                      label: t('player.goToPlaylist'),
+                      icon: 'queue_music',
+                      separated: true,
+                      onSelect: () => showTrack(playingRef),
+                  },
+              ]
+            : [];
+
     const volumeRef = useRef<HTMLDivElement>(null);
     const lastVolumeAt = useRef(0);
     const [volumeOpen, setVolumeOpen] = useState(false);
@@ -148,19 +174,43 @@ export function NowPlaying() {
                 </IconButton>
             </header>
             <div className={styles.cover}>
-                <TrackCover hash={shown ? track?.coverHash : undefined} className={styles.coverBox} />
+                {/* Loaded while the sheet is closed too, so that it opens on the image rather than the placeholder. */}
+                <TrackCover hash={track?.coverHash} className={styles.coverBox} />
             </div>
             <div className={styles.track}>
-                <h2 className={styles.title}>
-                    <Marquee>{adjusting ? volumeLabel : (track?.title ?? blank)}</Marquee>
-                </h2>
-                <p className={styles.details}>{track?.artist || blank}</p>
-                <p className={styles.details}>{track?.album || blank}</p>
+                {favoriteItem ? (
+                    <IconButton
+                        title={favoriteItem.label}
+                        className={clsx(styles.sideButton, styles.sideStart, isFavorite && styles.on)}
+                        onClick={favoriteItem.onSelect}
+                    >
+                        <Icon className={clsx(!isFavorite && styles.unfilled)}>favorite</Icon>
+                    </IconButton>
+                ) : (
+                    <span />
+                )}
+                <div className={styles.lines}>
+                    <h2 className={styles.title}>
+                        <Marquee>{adjusting ? volumeLabel : (track?.title ?? blank)}</Marquee>
+                    </h2>
+                    <p className={styles.details}>{track?.artist || blank}</p>
+                    <p className={styles.details}>{track?.album || blank}</p>
+                </div>
+                {playing ? (
+                    <Menu
+                        title={t('player.trackMenu')}
+                        icon="more_horiz"
+                        items={trackMenu}
+                        buttonClassName={clsx(styles.sideButton, styles.sideEnd)}
+                    />
+                ) : (
+                    <span />
+                )}
             </div>
             <div className={styles.controls}>
                 <IconButton
                     title={t('player.shuffle')}
-                    className={clsx(styles.toggle, player?.shuffle && styles.on)}
+                    className={clsx(styles.toggle, styles.sideButton, styles.sideStart, player?.shuffle && styles.on)}
                     onClick={() => player && setPlayer.mutate({ shuffle: !player.shuffle })}
                 >
                     <Icon>shuffle</Icon>
@@ -196,7 +246,13 @@ export function NowPlaying() {
                 <SkipButton direction="next" className={styles.wide} />
                 <IconButton
                     title={t('player.repeat')}
-                    className={clsx(styles.toggle, styles.repeat, repeat !== 'off' && styles.on)}
+                    className={clsx(
+                        styles.toggle,
+                        styles.repeat,
+                        styles.sideButton,
+                        styles.sideEnd,
+                        repeat !== 'off' && styles.on,
+                    )}
                     onClick={() => setPlayer.mutate({ repeat: repeatCycle[repeat] })}
                 >
                     {/* The font has no crossed-out repeat, so the stroke is drawn over it. */}

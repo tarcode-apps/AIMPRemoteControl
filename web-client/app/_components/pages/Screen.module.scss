@@ -134,7 +134,7 @@
     min-height: 0;
     overflow-y: auto;
 
-    .screen:not(.secondary) & {
+    .screen.withPlayer & {
         @include mixins.player-sheet {
             padding-bottom: var(--mini-player-height);
         }
@@ -151,10 +151,10 @@
     padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
     background: var(--color-bg);
     // The list scrolls under the toolbar, which the shadow shows; the mini player
-    // sits on the toolbar of the main screen, so that one stays flat.
+    // sits on the toolbar of a screen that keeps it, so that one stays flat.
     box-shadow: 0 -2px 8px var(--color-shadow);
 
-    .screen:not(.secondary) & {
+    .screen.withPlayer & {
         @include mixins.player-sheet {
             box-shadow: none;
         }

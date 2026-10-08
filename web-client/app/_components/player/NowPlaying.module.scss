@@ -1,11 +1,14 @@
 @use "../../_styles/mixins" as mixins;
 
+// The side padding puts the cover's edge on the visible lines of the menu glyph,
+// which sit 3px inside its icon box; the header pulls its buttons back out so
+// that their icon boxes keep the usual 16px.
 .nowPlaying {
     display: flex;
     flex-direction: column;
     height: 100%;
-    padding: var(--safe-top) calc(16px + var(--safe-right)) calc(16px + var(--safe-bottom))
-        calc(16px + var(--safe-left));
+    padding: var(--safe-top) calc(19px + var(--safe-right)) calc(16px + var(--safe-bottom))
+        calc(19px + var(--safe-left));
 }
 
 .header {
@@ -13,7 +16,7 @@
     display: flex;
     align-items: center;
     height: var(--app-bar-height);
-    margin: 0 -12px;
+    margin: 0 -15px;
 }
 
 .header .nav {
@@ -104,10 +107,39 @@
     color: var(--color-text-secondary);
 }
 
+// The title lines flanked by the favorite button and the track menu, as the
+// player draws them.
 .track {
     flex: none;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
     padding-bottom: 32px;
     text-align: center;
+}
+
+// The buttons at the sides of the track block and the controls: smaller than
+// the icon buttons elsewhere, and placed so that the icon's outer edge lines up
+// with the cover's while the circle reaches a little past it.
+.sideButton {
+    width: 40px;
+    height: 40px;
+}
+
+.sideStart {
+    margin-left: calc((var(--icon-size) - 40px) / 2);
+}
+
+.sideEnd {
+    margin-right: calc((var(--icon-size) - 40px) / 2);
+}
+
+.lines {
+    min-width: 0;
+}
+
+.unfilled {
+    font-variation-settings: "FILL" 0;
 }
 
 .title {
@@ -134,7 +166,7 @@
     margin: 8px 0 16px;
 
     @include mixins.hover-capable {
-        button:hover {
+        button:hover:not(:disabled) {
             color: var(--color-accent);
         }
     }

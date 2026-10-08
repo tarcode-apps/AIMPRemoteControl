@@ -35,6 +35,7 @@ namespace player
 		std::string Album;
 		bool IsUrl = false;
 		CoverSource Cover;
+		std::string FileUri;
 	};
 
 	struct PlayerState

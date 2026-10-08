@@ -17,7 +17,8 @@ export function useActiveRow(rows: PlaylistRows, scrollTo: (row: number) => void
         scrollTo(next);
     };
 
-    const select = (next: PlaylistRowKey) => {
+    // Null takes the cursor away.
+    const select = (next: PlaylistRowKey | null) => {
         setKey(next);
         setByKeyboard(false);
     };

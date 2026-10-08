@@ -31,6 +31,37 @@ export type PlaylistItem = {
     isUrl: boolean;
     // Names the cover in its URL; changes when the tags are written.
     cover: string;
+    // The URI as the player stores it: the one stable name of a track, compared
+    // byte for byte.
+    fileUri: string;
+};
+
+// An item with the tags a client keeps for lists of its own.
+export type ItemDetails = PlaylistItem & {
+    artist: string;
+    album: string;
+    genre: string;
+    year: string;
+    folder: string;
+};
+
+export type ItemDetailsResponse = {
+    items: ItemDetails[];
+};
+
+export type LocateRequest = {
+    fileUri: string;
+    playlistId: string;
+};
+
+// A remembered file found in its playlist, at the playlist's `revision`.
+export type LocatedItem = PlaylistItem & {
+    playlistId: string;
+    revision: number;
+};
+
+export type LocateResponse = {
+    found: LocatedItem[];
 };
 
 export type PlaylistItemsPage = {
@@ -38,6 +69,9 @@ export type PlaylistItemsPage = {
     revision: number;
     offset: number;
     items: PlaylistItem[];
+    // Of every match, with a search only.
+    duration?: number;
+    size?: number;
 };
 
 export type PlaylistGroup = {
@@ -45,6 +79,7 @@ export type PlaylistGroup = {
     name: string;
     count: number;
     duration: number;
+    size: number;
     expanded: boolean;
     firstPosition: number;
 };
@@ -96,9 +131,47 @@ export type MoveRequest = {
     revision?: number;
 };
 
+// The texts a search looks through, as the extended search names them.
+export type SearchField = 'title' | 'artist' | 'album' | 'genre' | 'file';
+
+export const searchFields: readonly SearchField[] = ['title', 'artist', 'album', 'genre', 'file'];
+
 // Which items of a playlist a request means: these indexes, or everything the
-// search finds but the indexes in `except`.
-export type ItemSelection = { indexes: number[] } | { search: string; except: number[] };
+// search finds but the indexes in `except`. With `fields` the search is the
+// extended one, without it the playlist's own.
+export type ItemSelection =
+    | { indexes: number[] }
+    | {
+          // Everything when empty.
+          search: string;
+          fields?: SearchField[];
+          // Only the matches in these groups of the playlist.
+          groups?: number[];
+          except: number[];
+          // Items besides the matches.
+          indexes?: number[];
+      };
+
+export type SearchHit = PlaylistItem & {
+    playlistId: string;
+    // The playlist's, which `index` belongs to.
+    revision: number;
+};
+
+export type SearchPlaylist = ItemsSummary & {
+    id: string;
+    revision: number;
+};
+
+// One page of the extended search; `total`, `duration` and `size` cover every
+// match, `playlists` lists those with matches in the order the hits come.
+export type SearchPage = {
+    total: number;
+    duration: number;
+    size: number;
+    items: SearchHit[];
+    playlists: SearchPlaylist[];
+};
 
 export type ItemsSummary = {
     count: number;
@@ -118,6 +191,14 @@ export type Queue = {
     // Kept but not played from.
     suspended: boolean;
     items: QueueItem[];
+};
+
+// The part of a selection that lies in one playlist, as that playlist's requests
+// take it.
+export type SelectionInPlaylist = {
+    playlistId: string;
+    revision?: number;
+    selection: ItemSelection;
 };
 
 export type EnqueueRequest = ItemSelection & {
@@ -155,6 +236,7 @@ export type PlayingTrack = {
     isUrl: boolean;
     // The image by its bytes: the same across the tracks of an album, empty without a cover.
     coverHash: string;
+    fileUri: string;
 };
 
 export type PlayerState = {

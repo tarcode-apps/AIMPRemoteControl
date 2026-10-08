@@ -13,14 +13,19 @@
     transition: background-color 0.15s;
 
     @include mixins.hover-capable {
-        &:hover {
+        &:hover:not(:disabled) {
             background: var(--color-hover);
         }
     }
 
-    &:active,
+    &:active:not(:disabled),
     &[data-pressed] {
         background: var(--color-pressed);
+    }
+
+    &:disabled {
+        color: var(--color-text-dim);
+        cursor: default;
     }
 
     &:focus-visible {

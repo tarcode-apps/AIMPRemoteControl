@@ -23,6 +23,14 @@
     padding: 0 16px;
 }
 
+// A row whose track the player no longer has, such as a favorite that left its
+// playlist: shown from its snapshot, but nothing can be done with it.
+.row.missing .text,
+.row.missing .duration,
+.row.missing .thumbnail {
+    opacity: 0.45;
+}
+
 .number {
     font-variant-numeric: tabular-nums;
 
@@ -110,7 +118,7 @@
     color: var(--color-accent);
     font-weight: var(--font-weight-medium);
 
-    mixins.hover-capable {
+    @include mixins.hover-capable {
         &:hover {
             background: var(--color-hover);
         }

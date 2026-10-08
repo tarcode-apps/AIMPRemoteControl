@@ -18,6 +18,7 @@ import {
 import styles from '@/app/_components/lists/ListPage.module.scss';
 import { useRowMenu } from '@/app/_components/menus';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
+import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
 import { media } from '@/app/_styles/media';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import clsx from 'clsx';
@@ -59,7 +60,9 @@ export function QueuePage() {
 
     const move = useMoveQueueItems();
     const remove = useRemoveFromQueue();
+    const favoriteActions = useFavoriteActions();
     const rowMenu = useRowMenu((item: QueueItem) => [
+        favoriteActions.favoriteMenuItem({ ...item, revision: revisions.get(item.playlistId) }),
         {
             label: t('queue.remove'),
             icon: 'delete',
@@ -79,6 +82,7 @@ export function QueuePage() {
                 drag.reset();
                 return;
             }
+            active.select({ kind: 'item', position: target });
             move.mutate(
                 { positions: [items[row].position], target, revision: queue?.revision },
                 { onError: () => drag.reset() },
@@ -93,7 +97,8 @@ export function QueuePage() {
     const playing = player?.track;
     const isPlaying = (item: QueueItem) => playing?.playlistId === item.playlistId && playing.index === item.index;
 
-    const toggleSelected = (item: QueueItem) => mode.setSelected([item.position], !mode.isSelected(item.position));
+    const toggleSelected = (item: QueueItem) =>
+        mode.setSelected([item.position], !mode.isSelected(item.position), rows);
 
     const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
         if (rows.count === 0) return;
@@ -213,7 +218,7 @@ export function QueuePage() {
                                 <ItemRow
                                     {...itemProps(item)}
                                     selected={selecting && mode.isSelected(item.position)}
-                                    onSelect={selected => mode.setSelected([item.position], selected)}
+                                    onSelect={selected => mode.setSelected([item.position], selected, rows)}
                                     onDragStart={event => drag.start(index, event)}
                                     menu={selecting ? undefined : rowMenu.button(index, item)}
                                 />

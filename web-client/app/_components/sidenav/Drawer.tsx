@@ -2,14 +2,13 @@
 
 import { useBackGesture } from '@/app/_hooks/useBackGesture';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
+import { secondScreenSegment } from '@/app/_state/Navigation';
 import { media } from '@/app/_styles/media';
 import clsx from 'clsx';
-import { usePathname, useRouter, useSelectedLayoutSegment } from 'next/navigation';
+import { usePathname, useSelectedLayoutSegment } from 'next/navigation';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import styles from './Drawer.module.scss';
 import { useDrawerGestures } from './useDrawerGestures';
-
-const SECOND_SCREEN_SEGMENT = '(second-screen)';
 
 export type DrawerContextValue = {
     opened: boolean;
@@ -19,7 +18,6 @@ export type DrawerContextValue = {
     // Closes the drawer, then does `after`: a navigation from the drawer must not
     // land on the drawer's own history entry.
     closeThen(after: () => void): void;
-    goBack(): void;
 };
 
 const DrawerContext = createContext<DrawerContextValue | null>(null);
@@ -38,20 +36,17 @@ export function useDrawer(): DrawerContextValue {
 }
 
 export function DrawerContainer({ children }: { children: ReactNode }) {
-    const router = useRouter();
     const pathname = usePathname();
-    const secondary = useSelectedLayoutSegment() === SECOND_SCREEN_SEGMENT;
+    const secondary = useSelectedLayoutSegment() === secondScreenSegment;
     const modal = useMediaQuery(media.drawerModal);
     const containerRef = useRef<HTMLDivElement>(null);
     const drawerRef = useRef<HTMLElement>(null);
 
     const [opened, setOpened] = useState(false);
     const back = useBackGesture(opened, () => setOpened(false));
-    // Number of in-app navigations since the page was loaded: tells whether
-    // history.back() stays inside the app or would leave it.
-    const [visited, setVisited] = useState({ pathname, depth: 0 });
-    if (visited.pathname !== pathname) {
-        setVisited({ pathname, depth: visited.depth + 1 });
+    const [shownAt, setShownAt] = useState(pathname);
+    if (shownAt !== pathname) {
+        setShownAt(pathname);
         setOpened(false);
     }
 
@@ -85,10 +80,6 @@ export function DrawerContainer({ children }: { children: ReactNode }) {
         },
         close: () => setOpened(false),
         closeThen: after => back.dismiss(after),
-        goBack: () => {
-            if (visited.depth > 0) router.back();
-            else router.replace('/');
-        },
     };
 
     const element: DrawerElementProps = { drawerRef, dragging: gestures.dragging };

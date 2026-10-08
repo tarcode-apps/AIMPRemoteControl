@@ -61,3 +61,23 @@
     gap: 8px;
     padding: 16px;
 }
+
+// A row of the choices a dialog lists: a label and its radio or checkbox.
+.option {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 48px;
+    cursor: pointer;
+}
+
+.label {
+    @include mixins.ellipsis;
+
+    flex: 1;
+}
+
+.disabled {
+    color: var(--color-text-secondary);
+    cursor: default;
+}

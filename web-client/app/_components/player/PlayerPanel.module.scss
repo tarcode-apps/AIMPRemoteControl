@@ -13,7 +13,6 @@
         inset: 0;
         z-index: 8;
         transform: translateY(calc(100% - var(--mini-player-height) - var(--toolbar-height)));
-        transition: transform var(--sheet-transition);
         touch-action: none;
         box-shadow: 0 0 12px var(--color-shadow);
 
@@ -21,7 +20,9 @@
             left: var(--drawer-width);
         }
 
-        &.hidden {
+        // The screen says whether it keeps the mini player, see Screen's `player`;
+        // the full player shows over any screen.
+        body:not(:global(.has-player)) &:not(.expanded, .moving, .dragging) {
             display: none;
         }
 
@@ -33,6 +34,12 @@
             --sheet-progress: 1;
 
             transform: none;
+        }
+
+        // Only while it opens or closes: the bottom inset changes with the
+        // on-screen keyboard, and the toolbar under the sheet does not wait.
+        &.moving {
+            transition: transform var(--sheet-transition);
         }
 
         &.dragging {

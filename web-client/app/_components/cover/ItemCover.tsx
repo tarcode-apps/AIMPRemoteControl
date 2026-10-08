@@ -16,10 +16,11 @@ export type ItemCoverProps = {
     className?: string;
 };
 
+// An empty key is a track with no cover to ask for: the placeholder shows at once.
 export function ItemCover({ playlistId, index, coverKey, revision, size, className }: ItemCoverProps) {
     return (
         <Cover
-            id={`${playlistId}/${index}/${coverKey}@${revision}`}
+            id={coverKey && `${playlistId}/${index}/${coverKey}@${revision}`}
             urlFor={step => itemCoverUrl(playlistId, index, coverKey, step)}
             size={size}
             className={className}

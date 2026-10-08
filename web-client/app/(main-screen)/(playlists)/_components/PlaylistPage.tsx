@@ -3,7 +3,7 @@
 import { errorMessage } from '@/app/_api/helpers/errors';
 import { usePlayer, usePlayTrack } from '@/app/_api/player';
 import { useMovePlaylistItems, usePlaylistItems, useSetGroupExpanded } from '@/app/_api/playlists';
-import { queueMark, trackKey, useEnqueue, useQueuePositions } from '@/app/_api/queue';
+import { queueMark, trackKey, useQueuePositions } from '@/app/_api/queue';
 import type { Playlist, PlaylistGroup, PlaylistItem } from '@/app/_api/types';
 import { ListCheckbox } from '@/app/_components/inputs';
 import type { PlaylistRow } from '@/app/_components/lists';
@@ -12,6 +12,8 @@ import {
     GroupRow,
     ItemRow,
     oneLineRowHeight,
+    pagesAround,
+    pageSize,
     SkeletonRow,
     thumbnailMargin,
     twoLineRowHeight,
@@ -22,37 +24,31 @@ import styles from '@/app/_components/lists/ListPage.module.scss';
 import { useRowMenu } from '@/app/_components/menus';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
+import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
+import { useTrackActions } from '@/app/_state/useTrackActions';
 import { media } from '@/app/_styles/media';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import clsx from 'clsx';
-import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePlaylistMode } from './PlaylistMode';
-import { pageSize, usePlaylistLayout } from './usePlaylistLayout';
+import { usePlaylistLayout } from './usePlaylistLayout';
 
 const groupRowHeight = 40;
 const overscanRows = 6;
-const bufferPages = 1;
 const pendingRows = 12;
+const noFolding: ReadonlyMap<number, boolean> = new Map();
 
 export type PlaylistPageProps = {
     playlist: Playlist;
 };
-
-function pagesAround(positions: [number, number] | null, total: number) {
-    if (!total || !positions) return [];
-    const lastPage = Math.max(0, Math.ceil(total / pageSize) - 1);
-    const first = Math.max(0, Math.floor(positions[0] / pageSize) - bufferPages);
-    const last = Math.min(lastPage, Math.floor(positions[1] / pageSize) + bufferPages);
-    return Array.from({ length: last - first + 1 }, (_, i) => first + i);
-}
 
 export function PlaylistPage({ playlist }: PlaylistPageProps) {
     const { t } = useTranslation();
     const docked = useMediaQuery(media.drawerDocked);
     const scrollRef = useRef<HTMLDivElement>(null);
     const listId = useId();
-    const { selected } = usePlaylistSelection();
+    const { selected, focus, clearFocus } = usePlaylistSelection();
     const mode = usePlaylistMode();
     // The pager keeps the neighbouring playlists mounted with their plain lists.
     const mine = selected?.id === playlist.id;
@@ -63,7 +59,14 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
     const sortable = sorting && !playlist.readOnly;
     const itemRowHeight = playlist.showSecondLine ? twoLineRowHeight : oneLineRowHeight;
 
-    const layout = usePlaylistLayout(playlist, text, searching || sorting);
+    // While selecting, groups fold on the page alone, by index at the playlist's
+    // revision: folding them in the player changes the revision, which clears the
+    // selection.
+    const foldingHere = mine && mode.mode === 'select';
+    const [folded, setFolded] = useState({ revision: playlist.revision, groups: noFolding });
+    const folding = foldingHere && folded.revision === playlist.revision ? folded.groups : noFolding;
+    if (folding !== folded.groups) setFolded({ revision: playlist.revision, groups: noFolding });
+    const layout = usePlaylistLayout(playlist, text, searching || sorting, folding);
     const { rows } = layout;
     const setExpanded = useSetGroupExpanded(playlist.id);
     const moveItems = useMovePlaylistItems(playlist.id);
@@ -80,11 +83,31 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
     });
     const active = useActiveRow(rows, row => virtualizer.scrollToIndex(row, { align: 'auto' }));
     const virtualRows = virtualizer.getVirtualItems();
+
+    // Another screen asked for a track: the cursor goes to it once the rows are the
+    // playlist's own, any list mode being left first. The request stays until
+    // the row is on screen, since a scroll asked for before the list has its size
+    // goes nowhere.
+    useEffect(() => {
+        if (!focus || focus.playlistId !== playlist.id || !mine) return;
+        if (mode.mode !== null) {
+            mode.setMode(null);
+            return;
+        }
+        if (layout.pending) return;
+        const row = rows.rowOf({ kind: 'item', position: focus.index });
+        if (row !== null && !virtualRows.some(virtualRow => virtualRow.index === row)) {
+            virtualizer.scrollToIndex(row, { align: 'center' });
+            return;
+        }
+        if (row !== null) active.select({ kind: 'item', position: focus.index });
+        clearFocus();
+    }, [focus, playlist.id, mine, mode, layout.pending, rows, virtualRows, virtualizer, active, clearFocus]);
     const first = virtualRows.at(0)?.index;
     const last = virtualRows.at(-1)?.index;
     const pages = pagesAround(
         first === undefined || last === undefined ? null : rows.positions(first, last),
-        rows.count,
+        rows.itemCount,
     );
     const queries = usePlaylistItems(
         playlist.id,
@@ -129,6 +152,8 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                 return;
             }
             const indexes = Array.from({ length: count }, (_, i) => firstIndex + i);
+            // The cursor follows what was dragged to where it lands.
+            active.select({ kind: 'item', position: target });
             moveItems.mutate({ indexes, target, revision: playlist.revision }, { onError: () => drag.reset() });
         },
     });
@@ -156,19 +181,6 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
         ),
     )}.`;
 
-    const groupSelection = (group: PlaylistGroup) => {
-        let loadedCount = 0;
-        let selectedCount = 0;
-        for (let position = group.firstPosition; position < group.firstPosition + group.count; position++) {
-            const item = itemAt(position);
-            if (!item) continue;
-            loadedCount++;
-            if (mode.isSelected(item.index)) selectedCount++;
-        }
-        const checked = loadedCount === group.count && selectedCount === loadedCount && loadedCount > 0;
-        return { checked, indeterminate: !checked && selectedCount > 0 };
-    };
-
     const playTrack = usePlayTrack();
     const play = (item: PlaylistItem) =>
         playTrack.mutate({ playlistId: playlist.id, index: item.index, revision: playlist.revision });
@@ -178,7 +190,9 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
     // the list catch up with a change one after the other: while their revisions
     // differ the last index stays in use, or the highlight would blink. The active
     // row follows the track, as in the player, except in a search, which lists
-    // other positions.
+    // other positions. On a phone the cursor is the track's alone: it goes away
+    // when the track plays elsewhere, and sorting keeps the user from moving it.
+    // Docked, the user moves it freely and a track elsewhere leaves it be.
     const [lastIndex, setLastIndex] = useState<number | null>(null);
     const matchedIndex =
         playingTrack?.playlistId === playlist.id
@@ -187,37 +201,38 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                 : undefined
             : null;
     const playingIndex = matchedIndex === undefined ? lastIndex : matchedIndex;
-    if (playingIndex !== null && playingIndex !== lastIndex) {
+    if (playingIndex !== lastIndex) {
         setLastIndex(playingIndex);
-        if (!searching) active.select({ kind: 'item', position: playingIndex });
+        if (!searching && (playingIndex !== null || !docked))
+            active.select(playingIndex === null ? null : { kind: 'item', position: playingIndex });
     }
 
     const toggleGroup = (group: PlaylistGroup) => {
-        if (!searching && !sorting)
-            setExpanded.mutate({ index: group.index, expanded: !group.expanded, revision: playlist.revision });
+        if (searching || sorting) return;
+        if (foldingHere)
+            setFolded({ revision: playlist.revision, groups: new Map(folding).set(group.index, !group.expanded) });
+        else setExpanded.mutate({ index: group.index, expanded: !group.expanded, revision: playlist.revision });
     };
 
     const queuePositions = useQueuePositions();
-    const enqueue = useEnqueue();
     const hasMenu = mode.mode === null || searching;
+    const trackActions = useTrackActions();
+    const favoriteActions = useFavoriteActions();
     const rowMenu = useRowMenu((item: PlaylistItem) => {
-        const enqueueItem = (atBeginning: boolean) =>
-            enqueue.mutate({
-                playlistId: playlist.id,
-                indexes: [item.index],
-                atBeginning,
-                revision: playlist.revision,
-            });
-        return [
-            { label: t('playlist.enqueue'), icon: 'playlist_add', onSelect: () => enqueueItem(false) },
-            { label: t('playlist.enqueueFirst'), icon: 'playlist_play', onSelect: () => enqueueItem(true) },
-        ];
+        const track = { ...item, playlistId: playlist.id, revision: playlist.revision };
+        return [...trackActions.enqueueItems(track), favoriteActions.favoriteMenuItem(track)];
     });
 
+    // A row's item goes with its group in the selection: the server picks out a
+    // whole group's items, so the client never has to load them.
+    const setItemSelected = (item: PlaylistItem, selected: boolean, group: PlaylistGroup | undefined) =>
+        mode.setSelected([item.index], selected, rows, group, () => item);
+    const toggleItem = (item: PlaylistItem, group: PlaylistGroup | undefined) =>
+        setItemSelected(item, !mode.isSelected(item.index, group?.index), group);
     const toggleSelected = (row: PlaylistRow, item: PlaylistItem | undefined) => {
         if (row.kind === 'group')
-            void mode.setRangeSelected(row.group.firstPosition, row.group.count, !groupSelection(row.group).checked);
-        else if (item) mode.setSelected([item.index], !mode.isSelected(item.index));
+            mode.setGroupSelected(row.group.index, !mode.groupCheckState(row.group.index).checked, rows);
+        else if (item) toggleItem(item, row.group);
     };
 
     const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -225,7 +240,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
         const pageRows = Math.max(1, Math.floor(event.currentTarget.clientHeight / itemRowHeight) - 1);
         const current = active.row === null ? null : rows.at(active.row);
         const item = current?.kind === 'item' ? itemAt(current.position) : undefined;
-        if (active.move(event.key, rows.count, pageRows)) event.preventDefault();
+        if ((docked || !sorting) && active.move(event.key, rows.count, pageRows)) event.preventDefault();
         else if (event.key === 'Enter' && current) {
             if (current.kind === 'group') toggleGroup(current.group);
             else if (item && !sorting) play(item);
@@ -238,9 +253,11 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
 
     const onItemClick = (event: MouseEvent, row: number, item: PlaylistItem) => {
         if (mode.mode === 'select') {
-            mode.setSelected([item.index], !mode.isSelected(item.index));
+            toggleItem(item, rows.at(row).group);
             return;
         }
+        // While sorting on a phone the cursor stays where the last drag put it.
+        if (sorting && !docked) return;
         active.select(rows.keyAt(row));
         if (sorting) return;
         // Decided per gesture rather than per device: a tap plays at once, a mouse
@@ -353,13 +370,9 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                                             title={t('playlist.selectGroup')}
                                             tabIndex={-1}
                                             className={styles.groupCheckbox}
-                                            {...groupSelection(row.group)}
+                                            {...mode.groupCheckState(row.group.index)}
                                             onChange={event =>
-                                                mode.setRangeSelected(
-                                                    row.group.firstPosition,
-                                                    row.group.count,
-                                                    event.target.checked,
-                                                )
+                                                mode.setGroupSelected(row.group.index, event.target.checked, rows)
                                             }
                                         />
                                     )}
@@ -399,8 +412,8 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                                         item={item}
                                         number={numberOf(row, item) ?? 0}
                                         queueMark={queueMark(queuePositions.get(trackKey(playlist.id, item.index)))}
-                                        selected={selecting && mode.isSelected(item.index)}
-                                        onSelect={selected => mode.setSelected([item.index], selected)}
+                                        selected={selecting && mode.isSelected(item.index, row.group?.index)}
+                                        onSelect={selected => setItemSelected(item, selected, row.group)}
                                         onDragStart={event => {
                                             draggedItem.current = item;
                                             drag.start(index, event);

@@ -2,7 +2,8 @@
   "actions": {
     "retry": "Повторить",
     "ok": "ОК",
-    "cancel": "Отмена"
+    "cancel": "Отмена",
+    "delete": "Удалить"
   },
   "errors": {
     "network": "Плеер недоступен",
@@ -48,7 +49,16 @@
     "goToPlaylist": "Перейти к плейлисту"
   },
   "playlists": {
-    "summary": "{{count}} / {{duration}} / {{size}}"
+    "summary": "{{count}} / {{duration}} / {{size}}",
+    "searchPlaceholder": "Поиск плейлистов",
+    "notFound": "Плейлисты не найдены",
+    "create": "Новый плейлист",
+    "autoName": "Автоимя",
+    "name": "Имя плейлиста:",
+    "rename": "Переименовать плейлист",
+    "remove": "Удалить плейлист",
+    "actions": "Действия с плейлистом",
+    "removeConfirm": "Удалить плейлист «{{name}}»?"
   },
   "selection": {
     "title": "Множественный выбор"
@@ -141,6 +151,7 @@
       "randomGroupItems": "Перемешать треки внутри групп",
       "randomAll": "Перемешать группы и треки"
     },
-    "goToTrack": "Перейти к треку"
+    "goToTrack": "Перейти к треку",
+    "goToPlaying": "Перейти к текущему треку"
   }
 }

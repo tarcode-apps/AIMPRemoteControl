@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { ToolbarButton } from '../buttons';
 import { Icon } from '../icons';
 import { SearchField } from '../inputs';
-import { Menu, type MenuItem } from '../menus';
+import { Menu, type MenuEntry } from '../menus';
 import type { ListModeValue } from './ListMode';
 import styles from './ListToolbar.module.scss';
 
@@ -18,8 +18,8 @@ export type ListToolbarProps = {
     // The first three slots while nothing is going on; the search and the menu
     // follow them.
     idle: ReactNode;
-    moreActions: MenuItem[];
-    selectedActions: MenuItem[];
+    moreActions: MenuEntry[];
+    selectedActions: MenuEntry[];
     // Replaces everything while sorting.
     sorting?: ReactNode;
     // A search that is not a mode of the list: the field shows it when docked, and

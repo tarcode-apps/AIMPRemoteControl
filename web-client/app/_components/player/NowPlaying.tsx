@@ -14,7 +14,7 @@ import { IconButton } from '../buttons';
 import { TrackCover } from '../cover';
 import { Icon } from '../icons';
 import { Slider } from '../inputs';
-import { Menu, type MenuItem } from '../menus';
+import { Menu, menuSeparator, type MenuEntry } from '../menus';
 import { useDrawer } from '../sidenav';
 import { Marquee } from './Marquee';
 import styles from './NowPlaying.module.scss';
@@ -54,14 +54,14 @@ export function NowPlaying() {
     const playingRef = playing && { ...playing, revision: playing.playlistRevision };
     const isFavorite = !!playing && favorites.has(playing.fileUri);
     const favoriteItem = playingRef && favoriteActions.favoriteMenuItem(playingRef);
-    const trackMenu: MenuItem[] =
+    const trackMenu: MenuEntry[] =
         playingRef && favoriteItem
             ? [
                   favoriteItem,
+                  menuSeparator,
                   {
                       label: t('player.goToPlaylist'),
                       icon: 'queue_music',
-                      separated: true,
                       onSelect: () => showTrack(playingRef),
                   },
               ]

@@ -3,6 +3,7 @@
 #include "apiErrors.h"
 
 #include <cmath>
+#include <optional>
 #include <string>
 
 #include "helpers/coverIndex.h"
@@ -128,6 +129,17 @@ void webapi::PlayerController::Register(IEndpointRouteBuilder &endpoints)
 {
 	endpoints.MapApi(HttpMethod::Get, "/api/v1/player", [core = FCore, &events = FEvents, &covers = FCovers](const ApiRequest &) -> nlohmann::json
 			   { return Snapshot(core, events, covers); });
+
+	endpoints.MapApi(HttpMethod::Get, "/api/v1/player/cursor", [core = FCore](const ApiRequest &) -> nlohmann::json
+			   {
+		const std::optional<player::Cursor> cursor = RunOnMainThread(core, [&]
+																	  { return player::GetCursor(core); });
+		if (!cursor)
+			return nullptr;
+		return {
+			{"playlistId", cursor->PlaylistId},
+			{"index", cursor->Index ? nlohmann::json(*cursor->Index) : nlohmann::json(nullptr)},
+		}; });
 
 	endpoints.MapApi(HttpMethod::Post, "/api/v1/player/play", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {

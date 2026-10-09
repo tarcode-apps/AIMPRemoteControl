@@ -1,7 +1,6 @@
 'use client';
 
 import { anchorName } from '@/app/_utils/anchorName';
-import clsx from 'clsx';
 import {
     useEffect,
     useId,
@@ -20,16 +19,19 @@ export type MenuItem = {
     label: string;
     icon?: string;
     disabled?: boolean;
-    // A line above the item.
-    separated?: boolean;
     onSelect(): void;
 };
+
+// A line between the items around it.
+export const menuSeparator = 'separator';
+
+export type MenuEntry = MenuItem | typeof menuSeparator;
 
 export type MenuPopoverProps = {
     id: string;
     // The CSS anchor name of the element the menu opens at.
     anchor?: string;
-    items: MenuItem[];
+    items: MenuEntry[];
     onClose?(): void;
 };
 
@@ -113,24 +115,28 @@ export function MenuPopover({ id, anchor, items, onClose }: MenuPopoverProps) {
             onKeyDown={onKeyDown}
             onToggle={onToggle}
         >
-            {items.map(item => (
-                <button
-                    key={item.label}
-                    role="menuitem"
-                    className={clsx(styles.item, item.separated && styles.separated)}
-                    disabled={item.disabled}
-                    // Hidden by hand before the action: an action that re-renders the
-                    // items takes the clicked button out of the DOM before a declarative
-                    // hide could run.
-                    onClick={event => {
-                        event.currentTarget.closest<HTMLElement>('[popover]')?.hidePopover();
-                        item.onSelect();
-                    }}
-                >
-                    {item.icon && <Icon>{item.icon}</Icon>}
-                    <span>{item.label}</span>
-                </button>
-            ))}
+            {items.map((item, index) =>
+                item === menuSeparator ? (
+                    <hr key={index} role="separator" className={styles.separator} />
+                ) : (
+                    <button
+                        key={item.label}
+                        role="menuitem"
+                        className={styles.item}
+                        disabled={item.disabled}
+                        // Hidden by hand before the action: an action that re-renders the
+                        // items takes the clicked button out of the DOM before a declarative
+                        // hide could run.
+                        onClick={event => {
+                            event.currentTarget.closest<HTMLElement>('[popover]')?.hidePopover();
+                            item.onSelect();
+                        }}
+                    >
+                        {item.icon && <Icon>{item.icon}</Icon>}
+                        <span>{item.label}</span>
+                    </button>
+                ),
+            )}
         </div>
     );
 }
@@ -138,7 +144,7 @@ export function MenuPopover({ id, anchor, items, onClose }: MenuPopoverProps) {
 export type MenuProps = {
     title: string;
     icon: string;
-    items: MenuItem[];
+    items: MenuEntry[];
     className?: string;
     buttonClassName?: string;
     Button?: ComponentType<IconButtonProps>;

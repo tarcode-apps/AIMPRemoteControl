@@ -78,6 +78,44 @@ groups, and whether same-named groups are merged. Items are always returned in
 the player's order; sorting and grouping happen in the player itself, not in
 the API.
 
+### `POST /api/v1/playlists`
+
+Creates an empty playlist, without activating it:
+
+```json
+{ "name": "Trip" }
+```
+
+With `name` left out or empty, the player names the playlist itself: it starts
+as the player's default name and is renamed by the player's own rules once
+files are added. The response is the new playlist's `id`:
+
+```json
+{ "id": "{A1B2C3D4-...}" }
+```
+
+Errors: `400 invalidBody`, `500 playlistUpdateFailed`.
+
+### `PATCH /api/v1/playlists/{id}`
+
+Renames the playlist:
+
+```json
+{ "name": "Trip" }
+```
+
+An empty `name` hands the naming back to the player, as for a new playlist.
+The response is an empty object.
+
+Errors: `400 invalidBody`, `404 playlistNotFound`, `500 playlistUpdateFailed`.
+
+### `DELETE /api/v1/playlists/{id}`
+
+Closes the playlist and removes it from the player. The response is an empty
+object.
+
+Errors: `404 playlistNotFound`, `500 playlistUpdateFailed`.
+
 ### `GET /api/v1/playlists/{id}/items`
 
 A page of the playlist's items. Items are addressed by their index in the
@@ -507,6 +545,21 @@ The API sends nothing while the position merely advances: the client keeps
 time itself from the moment it received the state and reads it again when it
 comes back to the foreground. A seek, a track switch and every other change
 come through the [`player` event](#get-apiv1events).
+
+### `GET /api/v1/player/cursor`
+
+Where the player's own window stands: the playing or paused track, or, while
+stopped, the active playlist and its focused item (the playback cursor when
+the focus is not on an item).
+
+```json
+{ "playlistId": "{A1B2C3D4-...}", "index": 12 }
+```
+
+`index` is `null` when the playlist has no item to point at, and the whole
+response is `null` without a loaded playlist. The client reads it once, when it
+starts, to open on that track; nothing pushes it afterwards, and the player's
+own selection and the client's stay independent.
 
 ### `POST /api/v1/player/play`
 

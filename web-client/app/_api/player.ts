@@ -2,13 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useOptimisticMutation } from './helpers/optimistic';
 import { request } from './helpers/request';
-import type { PlayerCommand, PlayerPatch, PlayerState, PlayTrackRequest } from './types';
+import type { PlayerCommand, PlayerCursor, PlayerPatch, PlayerState, PlayTrackRequest } from './types';
 
 // The state with the moment it was read: the position counts on from there.
 export type PlayerSnapshot = PlayerState & { receivedAt: number };
 
 export const playerKeys = {
     state: ['player'] as const,
+    cursor: ['playerCursor'] as const,
 };
 
 export function snapshot(state: PlayerState): PlayerSnapshot {
@@ -29,6 +30,18 @@ export function usePlayer() {
         staleTime: 0,
         refetchOnMount: false,
         refetchOnWindowFocus: true,
+    });
+}
+
+// Read once, when the app starts, to open where the player's window stands; the
+// player's selection and the client's are not kept together after that.
+export function usePlayerCursor() {
+    return useQuery({
+        queryKey: playerKeys.cursor,
+        queryFn: ({ signal }) => request<PlayerCursor | null>('GET', '/player/cursor', { signal }),
+        staleTime: Infinity,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
     });
 }
 

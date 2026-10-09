@@ -154,6 +154,57 @@ player::PlayerState player::GetPlayerState(IAIMPCore *core)
 	return state;
 }
 
+std::optional<player::Cursor> player::GetCursor(IAIMPCore *core)
+{
+	IAIMPPlaylistItem *item = nullptr;
+	IAIMPPlaylist *playlist = nullptr;
+	if (IAIMPServicePlayer *player = PlayerService(core))
+	{
+		if (ToPlaybackState(player->GetState()) == PlaybackState::Stopped || Failed(player->GetPlaylistItem(&item)))
+			item = nullptr;
+		player->Release();
+	}
+	if (item)
+	{
+		if (Failed(item->GetValueAsObject(AIMP_PLAYLISTITEM_PROPID_PLAYLIST, IID_IAIMPPlaylist, reinterpret_cast<void **>(&playlist))))
+			playlist = nullptr;
+	}
+	else if (IAIMPServicePlaylistManager *mgr = AcquireService<IAIMPServicePlaylistManager>(core, IID_IAIMPServicePlaylistManager))
+	{
+		if (Failed(mgr->GetActivePlaylist(&playlist)))
+			playlist = nullptr;
+		mgr->Release();
+		IAIMPPlaylistProperties *props = nullptr;
+		if (playlist && Succeeded(playlist->QueryInterface(IID_IAIMPPlaylistProperties, reinterpret_cast<void **>(&props))) && props)
+		{
+			// The focus may be on a group; the playback cursor then stands in.
+			if (Failed(props->GetValueAsObject(AIMP_PLAYLIST_PROPID_FOCUSED_OBJECT, IID_IAIMPPlaylistItem, reinterpret_cast<void **>(&item))))
+				item = nullptr;
+			if (!item && Failed(props->GetValueAsObject(AIMP_PLAYLIST_PROPID_PLAYBACKCURSOR, IID_IAIMPPlaylistItem, reinterpret_cast<void **>(&item))))
+				item = nullptr;
+			props->Release();
+		}
+	}
+	if (!playlist)
+	{
+		if (item)
+			item->Release();
+		return std::nullopt;
+	}
+
+	Cursor cursor;
+	cursor.PlaylistId = GetPlaylistAIMPId(playlist);
+	if (item)
+	{
+		INT32 index = 0;
+		if (Succeeded(item->GetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_INDEX, &index)))
+			cursor.Index = index;
+		item->Release();
+	}
+	playlist->Release();
+	return cursor;
+}
+
 std::string player::PlayingPlaylistId(IAIMPCore *core)
 {
 	IAIMPServicePlaylistManager *mgr = nullptr;

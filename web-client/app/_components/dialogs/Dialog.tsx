@@ -15,10 +15,12 @@ export type DialogProps = {
     actions?: ReactNode;
     children: ReactNode;
     className?: string;
+    // Floats on a phone too, instead of filling its screen.
+    compact?: boolean;
 };
 
 // A modal on the native dialog, which traps the focus and closes on Escape itself.
-export function Dialog({ open, title, onClose, onSubmit, footer, actions, children, className }: DialogProps) {
+export function Dialog({ open, title, onClose, onSubmit, footer, actions, children, className, compact }: DialogProps) {
     const ref = useRef<HTMLDialogElement>(null);
     const titleId = useId();
 
@@ -30,7 +32,12 @@ export function Dialog({ open, title, onClose, onSubmit, footer, actions, childr
     }, [open]);
 
     return (
-        <dialog ref={ref} className={clsx(styles.dialog, className)} aria-labelledby={titleId} onClose={onClose}>
+        <dialog
+            ref={ref}
+            className={clsx(styles.dialog, compact && styles.compact, className)}
+            aria-labelledby={titleId}
+            onClose={onClose}
+        >
             <form
                 className={styles.form}
                 onSubmit={event => {

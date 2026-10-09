@@ -2,7 +2,8 @@
   "actions": {
     "retry": "Retry",
     "ok": "OK",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "delete": "Delete"
   },
   "errors": {
     "network": "The player is unreachable",
@@ -48,7 +49,16 @@
     "goToPlaylist": "Go to playlist"
   },
   "playlists": {
-    "summary": "{{count}} / {{duration}} / {{size}}"
+    "summary": "{{count}} / {{duration}} / {{size}}",
+    "searchPlaceholder": "Search playlists",
+    "notFound": "No playlists found",
+    "create": "New playlist",
+    "autoName": "Auto name",
+    "name": "Playlist name:",
+    "rename": "Rename playlist",
+    "remove": "Delete playlist",
+    "actions": "Playlist actions",
+    "removeConfirm": "Delete the playlist “{{name}}”?"
   },
   "selection": {
     "title": "Multiple selection"
@@ -141,6 +151,7 @@
       "randomGroupItems": "Shuffle tracks within groups",
       "randomAll": "Shuffle groups and tracks"
     },
-    "goToTrack": "Go to track"
+    "goToTrack": "Go to track",
+    "goToPlaying": "Go to the playing track"
   }
 }

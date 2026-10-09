@@ -20,12 +20,16 @@
         background: var(--color-backdrop);
     }
 
+    // A dialog of a list fills a phone's screen; a compact one, such as a question
+    // or a single field, floats as on the desktop.
     @include mixins.drawer-modal {
-        width: 100%;
-        height: 100%;
-        max-width: none;
-        max-height: none;
-        border-radius: 0;
+        &:not(.compact) {
+            width: 100%;
+            height: 100%;
+            max-width: none;
+            max-height: none;
+            border-radius: 0;
+        }
     }
 }
 

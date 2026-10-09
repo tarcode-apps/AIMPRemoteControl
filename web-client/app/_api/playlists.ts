@@ -1,12 +1,15 @@
 import { queryOptions, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useOptimisticMutation } from './helpers/optimistic';
 import { request } from './helpers/request';
 import type {
+    CreatedPlaylist,
     ItemDetailsResponse,
     ItemSelection,
     MoveRequest,
     Playlist,
     PlaylistGroups,
     PlaylistItemsPage,
+    PlaylistRename,
     SortRequest,
 } from './types';
 
@@ -37,6 +40,33 @@ export function usePlaylists() {
         queryKey: playlistKeys.all,
         queryFn: ({ signal }) => request<Playlist[]>('GET', '/playlists', { signal }),
     });
+}
+
+// Resolves once the list knows the new playlist, so that it can be selected.
+export function useCreatePlaylist() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: (name: string) => request<CreatedPlaylist>('POST', '/playlists', { body: { name } }),
+        onSuccess: () => client.invalidateQueries({ queryKey: playlistKeys.all, exact: true }),
+    });
+}
+
+// Not predicted for an empty name, which the player replaces with one of its own.
+export function useRenamePlaylist() {
+    return useOptimisticMutation<Playlist[], PlaylistRename>(
+        playlistKeys.all,
+        ({ id, name }) => request<unknown>('PATCH', `/playlists/${encodeURIComponent(id)}`, { body: { name } }),
+        (playlists, { id, name }) =>
+            name ? playlists.map(playlist => (playlist.id === id ? { ...playlist, name } : playlist)) : undefined,
+    );
+}
+
+export function useRemovePlaylist() {
+    return useOptimisticMutation<Playlist[], string>(
+        playlistKeys.all,
+        id => request<unknown>('DELETE', `/playlists/${encodeURIComponent(id)}`),
+        (playlists, id) => playlists.filter(playlist => playlist.id !== id),
+    );
 }
 
 export function playlistItemsQuery(id: string, unnormalized: ItemsRange) {

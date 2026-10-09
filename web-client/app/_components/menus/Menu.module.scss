@@ -14,6 +14,12 @@
     box-shadow: 0 4px 16px var(--color-shadow);
 }
 
+.separator {
+    margin: 8px 0;
+    border: 0;
+    border-top: 1px solid var(--color-divider);
+}
+
 .item {
     display: flex;
     align-items: center;
@@ -22,12 +28,6 @@
     padding: 10px 16px;
     text-align: left;
     white-space: nowrap;
-
-    &.separated {
-        margin-top: 8px;
-        border-top: 1px solid var(--color-divider);
-        padding-top: 18px;
-    }
 
     @include mixins.hover-capable {
         &:hover:not(:disabled) {

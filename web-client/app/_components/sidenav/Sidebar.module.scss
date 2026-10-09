@@ -86,6 +86,59 @@
     border-top: 1px solid var(--color-divider);
 }
 
+// The playlist search and the add button, in the gutter of the list under them.
+.playlistsBar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px 0;
+}
+
+.search {
+    flex: 1;
+    min-width: 0;
+}
+
+.notFound {
+    margin: 0;
+    padding: 20px 28px;
+    color: var(--color-text-secondary);
+}
+
+.row {
+    position: relative;
+}
+
+// Room for the menu button, which sits over the pill's right end.
+.playlist {
+    padding-right: 44px;
+}
+
+.menuButton {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    transition:
+        opacity 0.15s,
+        background-color 0.15s;
+
+    @include mixins.hover-capable {
+        opacity: 0;
+
+        .row:hover &,
+        .row:focus-within &,
+        &.menuButtonOpen {
+            opacity: 1;
+        }
+    }
+}
+
+.menuButtonOpen {
+    background: var(--color-hover);
+}
+
 .error {
     display: flex;
     align-items: center;

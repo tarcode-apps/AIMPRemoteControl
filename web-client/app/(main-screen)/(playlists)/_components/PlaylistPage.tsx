@@ -86,8 +86,10 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
 
     // Another screen asked for a track: the cursor goes to it once the rows are the
     // playlist's own, any list mode being left first. The request stays until
-    // the row is on screen, since a scroll asked for before the list has its size
-    // goes nowhere.
+    // the row is in view: the rendered rows reach past the edges, and a scroll
+    // asked for before the list has its size goes nowhere.
+    const scrollOffset = virtualizer.scrollOffset ?? 0;
+    const viewHeight = virtualizer.scrollRect?.height ?? 0;
     useEffect(() => {
         if (!focus || focus.playlistId !== playlist.id || !mine) return;
         if (mode.mode !== null) {
@@ -96,13 +98,29 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
         }
         if (layout.pending) return;
         const row = rows.rowOf({ kind: 'item', position: focus.index });
-        if (row !== null && !virtualRows.some(virtualRow => virtualRow.index === row)) {
-            virtualizer.scrollToIndex(row, { align: 'center' });
-            return;
+        if (row !== null) {
+            const shown = virtualRows.find(virtualRow => virtualRow.index === row);
+            if (!shown || shown.start < scrollOffset - 1 || shown.end > scrollOffset + viewHeight + 1) {
+                virtualizer.scrollToIndex(row, { align: 'center' });
+                return;
+            }
+            active.select({ kind: 'item', position: focus.index });
         }
-        if (row !== null) active.select({ kind: 'item', position: focus.index });
         clearFocus();
-    }, [focus, playlist.id, mine, mode, layout.pending, rows, virtualRows, virtualizer, active, clearFocus]);
+    }, [
+        focus,
+        playlist.id,
+        mine,
+        mode,
+        layout.pending,
+        rows,
+        virtualRows,
+        virtualizer,
+        active,
+        clearFocus,
+        scrollOffset,
+        viewHeight,
+    ]);
     const first = virtualRows.at(0)?.index;
     const last = virtualRows.at(-1)?.index;
     const pages = pagesAround(

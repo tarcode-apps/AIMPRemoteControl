@@ -20,6 +20,15 @@ export type Playlist = {
     grouping: PlaylistGrouping;
 };
 
+export type CreatedPlaylist = {
+    id: string;
+};
+
+export type PlaylistRename = {
+    id: string;
+    name: string;
+};
+
 export type PlaylistItem = {
     index: number;
     displayText: string;
@@ -250,6 +259,13 @@ export type PlayerState = {
     radioCapture: boolean;
     // Empty while stopped, as the player's own window is.
     track: PlayingTrack | null;
+};
+
+// Where the player's own window stands; `index` is null when the playlist has no
+// item to point at.
+export type PlayerCursor = {
+    playlistId: string;
+    index: number | null;
 };
 
 export type PlayerCommand = 'play' | 'pause' | 'stop' | 'next' | 'previous';

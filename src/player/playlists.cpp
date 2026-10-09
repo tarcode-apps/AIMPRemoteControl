@@ -96,6 +96,58 @@ std::vector<player::PlaylistInfo> player::GetPlaylists(IAIMPCore *core, bool wit
 	return result;
 }
 
+std::string player::CreatePlaylist(IAIMPCore *core, const std::string &name)
+{
+	IAIMPServicePlaylistManager *mgr = AcquireService<IAIMPServicePlaylistManager>(core, IID_IAIMPServicePlaylistManager);
+	if (!mgr)
+		return {};
+
+	std::string id;
+	IAIMPString *aimpName = name.empty() ? nullptr : StringToIAIMPString(core, name);
+	IAIMPPlaylist *playlist = nullptr;
+	if (Succeeded(mgr->CreatePlaylist(aimpName, false, &playlist)) && playlist)
+	{
+		id = GetPlaylistAIMPId(playlist);
+		playlist->Release();
+	}
+	if (aimpName)
+		aimpName->Release();
+	mgr->Release();
+	return id;
+}
+
+player::MutationResult player::RenamePlaylist(IAIMPCore *core, const std::string &playlistId, const std::string &name)
+{
+	IAIMPPlaylist *playlist = LoadedPlaylistByAIMPId(core, playlistId);
+	if (!playlist)
+		return MutationResult::PlaylistNotFound;
+
+	HRESULT hr = E_FAIL;
+	IAIMPPlaylistProperties *props = nullptr;
+	if (Succeeded(playlist->QueryInterface(IID_IAIMPPlaylistProperties, reinterpret_cast<void **>(&props))) && props)
+	{
+		if (IAIMPString *aimpName = StringToIAIMPString(core, name))
+		{
+			hr = props->SetValueAsObject(AIMP_PLAYLIST_PROPID_NAME, aimpName);
+			aimpName->Release();
+		}
+		props->Release();
+	}
+	playlist->Release();
+	return Succeeded(hr) ? MutationResult::Ok : MutationResult::Failed;
+}
+
+player::MutationResult player::RemovePlaylist(IAIMPCore *core, const std::string &playlistId)
+{
+	IAIMPPlaylist *playlist = LoadedPlaylistByAIMPId(core, playlistId);
+	if (!playlist)
+		return MutationResult::PlaylistNotFound;
+
+	const HRESULT hr = playlist->Close(AIMP_PLAYLIST_CLOSE_FLAGS_FORCE_REMOVE);
+	playlist->Release();
+	return Succeeded(hr) ? MutationResult::Ok : MutationResult::Failed;
+}
+
 std::string player::SettingsSnapshot(IAIMPPlaylist *playlist)
 {
 	IAIMPPlaylistProperties *props = nullptr;

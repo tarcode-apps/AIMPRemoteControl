@@ -125,6 +125,36 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 			result.push_back(ToJson(playlist, RevisionOf(revisions, playlist.Id)));
 		return result; });
 
+	endpoints.MapApi(HttpMethod::Post, "/api/v1/playlists", [core = FCore](const ApiRequest &request) -> nlohmann::json
+			   {
+		const nlohmann::json &body = request.Body;
+		if (!body.is_null() && !body.is_object())
+			throw ApiError(400, "invalidBody");
+		const std::string name = body.is_null() ? std::string() : OptionalField<std::string>(body, "name", &nlohmann::json::is_string).value_or(std::string());
+		const std::string id = RunOnMainThread(core, [&]
+												{ return player::CreatePlaylist(core, name); });
+		if (id.empty())
+			throw ApiError(500, "playlistUpdateFailed");
+		return {{"id", id}}; });
+
+	endpoints.MapApi(HttpMethod::Patch, R"(/api/v1/playlists/([^/]+))", [core = FCore](const ApiRequest &request) -> nlohmann::json
+			   {
+		const std::string playlistId = request.PathMatches.at(0);
+		const nlohmann::json &body = request.Body;
+		if (!body.is_object() || !body.contains("name") || !body["name"].is_string())
+			throw ApiError(400, "invalidBody");
+		const std::string name = body["name"].get<std::string>();
+		ThrowUnlessOk(RunOnMainThread(core, [&]
+									  { return player::RenamePlaylist(core, playlistId, name); }));
+		return nlohmann::json::object(); });
+
+	endpoints.MapApi(HttpMethod::Delete, R"(/api/v1/playlists/([^/]+))", [core = FCore](const ApiRequest &request) -> nlohmann::json
+			   {
+		const std::string playlistId = request.PathMatches.at(0);
+		ThrowUnlessOk(RunOnMainThread(core, [&]
+									  { return player::RemovePlaylist(core, playlistId); }));
+		return nlohmann::json::object(); });
+
 	endpoints.MapApi(HttpMethod::Get, R"(/api/v1/playlists/([^/]+)/items)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {
 		const std::string playlistId = request.PathMatches.at(0);

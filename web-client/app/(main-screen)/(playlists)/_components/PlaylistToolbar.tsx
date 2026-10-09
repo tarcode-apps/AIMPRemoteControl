@@ -1,11 +1,14 @@
 'use client';
 
+import { usePlayer } from '@/app/_api/player';
 import { useSetGroupExpanded } from '@/app/_api/playlists';
 import { useEnqueue } from '@/app/_api/queue';
 import { ToolbarButton } from '@/app/_components/buttons';
 import { Icon } from '@/app/_components/icons';
 import { ListToolbar } from '@/app/_components/lists';
 import toolbarStyles from '@/app/_components/lists/ListToolbar.module.scss';
+import { menuSeparator, type MenuEntry } from '@/app/_components/menus';
+import { usePlaylistActions } from '@/app/_components/playlists';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { useNavigation } from '@/app/_state/Navigation';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
@@ -20,11 +23,13 @@ export function PlaylistToolbar() {
     const { t } = useTranslation();
     const { openSecondScreen } = useNavigation();
     const docked = useMediaQuery(media.drawerDocked);
-    const { selected } = usePlaylistSelection();
+    const { selected, showTrack } = usePlaylistSelection();
+    const playing = usePlayer().data?.track;
     const mode = usePlaylistMode();
     const setExpanded = useSetGroupExpanded(selected?.id ?? '');
     const enqueue = useEnqueue();
     const favoriteActions = useFavoriteActions();
+    const playlistActions = usePlaylistActions();
     const [sortDialog, setSortDialog] = useState(false);
     const grouped = selected?.grouping.enabled ?? false;
     const expandAll = (expanded: boolean) => {
@@ -51,88 +56,108 @@ export function PlaylistToolbar() {
         },
     };
 
+    const playlistEntries: MenuEntry[] = selected
+        ? [menuSeparator, playlistActions.renameItem(selected), playlistActions.removeItem(selected)]
+        : [];
+
     return (
-        <ListToolbar
-            mode={mode}
-            searchPlaceholder={t('playlist.searchPlaceholder')}
-            idle={
-                <>
-                    <ToolbarButton title={t('playlist.add')} disabled>
-                        <Icon>add</Icon>
-                    </ToolbarButton>
-                    <ToolbarButton title={t('playlist.select')} onClick={() => mode.setMode('select')}>
-                        <Icon>checklist</Icon>
-                    </ToolbarButton>
-                    <ToolbarButton title={t('playlist.sort')} disabled={!selected} onClick={() => mode.setMode('sort')}>
-                        <Icon>sort</Icon>
-                    </ToolbarButton>
-                </>
-            }
-            moreActions={[
-                {
-                    label: t('playlist.collapseAll'),
-                    icon: 'unfold_less',
-                    disabled: !grouped,
-                    onSelect: () => expandAll(false),
-                },
-                {
-                    label: t('playlist.expandAll'),
-                    icon: 'unfold_more',
-                    disabled: !grouped,
-                    onSelect: () => expandAll(true),
-                },
-                extendedSearch,
-            ]}
-            selectedActions={[
-                {
-                    label: t('playlist.enqueue'),
-                    icon: 'playlist_add',
-                    disabled: mode.nothingSelected,
-                    onSelect: () => enqueueSelected(false),
-                },
-                {
-                    label: t('playlist.enqueueFirst'),
-                    icon: 'playlist_play',
-                    disabled: mode.nothingSelected,
-                    onSelect: () => enqueueSelected(true),
-                },
-                {
-                    label: t('favorites.add'),
-                    icon: 'heart_plus',
-                    disabled: mode.nothingSelected,
-                    onSelect: addSelectedToFavorites,
-                },
-                { label: t('playlist.removeSelected'), icon: 'delete', disabled: true, onSelect: () => {} },
-                ...(mode.mode === 'search' ? [extendedSearch] : []),
-            ]}
-            sorting={
-                <>
-                    <span />
-                    <span />
-                    <ToolbarButton
-                        title={t('playlist.closeSort')}
-                        className={toolbarStyles.active}
-                        onClick={() => mode.setMode(null)}
-                    >
-                        <Icon>sort</Icon>
-                    </ToolbarButton>
-                    {!docked && <span />}
-                    <ToolbarButton
-                        title={t('playlist.sortBy')}
-                        disabled={!selected || selected.readOnly}
-                        onClick={() => setSortDialog(true)}
-                    >
-                        <Icon>sort_by_alpha</Icon>
-                    </ToolbarButton>
-                    {selected && (
-                        <PlaylistSortDialog
-                            playlist={selected}
-                            open={sortDialog}
-                            onClose={() => setSortDialog(false)}
-                        />
-                    )}
-                </>
-            }
-        />
+        <>
+            <ListToolbar
+                mode={mode}
+                searchPlaceholder={t('playlist.searchPlaceholder')}
+                idle={
+                    <>
+                        <ToolbarButton title={t('playlist.add')} disabled>
+                            <Icon>add</Icon>
+                        </ToolbarButton>
+                        <ToolbarButton title={t('playlist.select')} onClick={() => mode.setMode('select')}>
+                            <Icon>checklist</Icon>
+                        </ToolbarButton>
+                        <ToolbarButton
+                            title={t('playlist.sort')}
+                            disabled={!selected}
+                            onClick={() => mode.setMode('sort')}
+                        >
+                            <Icon>sort</Icon>
+                        </ToolbarButton>
+                    </>
+                }
+                moreActions={[
+                    {
+                        label: t('playlist.collapseAll'),
+                        icon: 'unfold_less',
+                        disabled: !grouped,
+                        onSelect: () => expandAll(false),
+                    },
+                    {
+                        label: t('playlist.expandAll'),
+                        icon: 'unfold_more',
+                        disabled: !grouped,
+                        onSelect: () => expandAll(true),
+                    },
+                    {
+                        label: t('playlist.goToPlaying'),
+                        icon: 'my_location',
+                        disabled: !playing,
+                        onSelect: () => {
+                            if (playing) showTrack({ playlistId: playing.playlistId, index: playing.index });
+                        },
+                    },
+                    extendedSearch,
+                    ...playlistEntries,
+                ]}
+                selectedActions={[
+                    {
+                        label: t('playlist.enqueue'),
+                        icon: 'playlist_add',
+                        disabled: mode.nothingSelected,
+                        onSelect: () => enqueueSelected(false),
+                    },
+                    {
+                        label: t('playlist.enqueueFirst'),
+                        icon: 'playlist_play',
+                        disabled: mode.nothingSelected,
+                        onSelect: () => enqueueSelected(true),
+                    },
+                    {
+                        label: t('favorites.add'),
+                        icon: 'heart_plus',
+                        disabled: mode.nothingSelected,
+                        onSelect: addSelectedToFavorites,
+                    },
+                    { label: t('playlist.removeSelected'), icon: 'delete', disabled: true, onSelect: () => {} },
+                    ...(mode.mode === 'search' ? [extendedSearch] : []),
+                ]}
+                sorting={
+                    <>
+                        <span />
+                        <span />
+                        <ToolbarButton
+                            title={t('playlist.closeSort')}
+                            className={toolbarStyles.active}
+                            onClick={() => mode.setMode(null)}
+                        >
+                            <Icon>sort</Icon>
+                        </ToolbarButton>
+                        {!docked && <span />}
+                        <ToolbarButton
+                            title={t('playlist.sortBy')}
+                            disabled={!selected || selected.readOnly}
+                            onClick={() => setSortDialog(true)}
+                        >
+                            <Icon>sort_by_alpha</Icon>
+                        </ToolbarButton>
+                        {selected && (
+                            <PlaylistSortDialog
+                                playlist={selected}
+                                open={sortDialog}
+                                onClose={() => setSortDialog(false)}
+                            />
+                        )}
+                    </>
+                }
+            />
+            {playlistActions.dialogs}
+        </>
     );
 }

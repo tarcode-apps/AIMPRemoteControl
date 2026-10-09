@@ -52,6 +52,16 @@ namespace player
 	};
 
 	PlayerState GetPlayerState(IAIMPCore *core);
+
+	// Where the player's own window stands: the playing track, or while stopped
+	// the active playlist and its focused item, if any.
+	struct Cursor
+	{
+		std::string PlaylistId;
+		std::optional<std::int32_t> Index;
+	};
+
+	std::optional<Cursor> GetCursor(IAIMPCore *core);
 	std::string PlayingPlaylistId(IAIMPCore *core);
 
 	enum class PlayerCommand

@@ -34,6 +34,7 @@ namespace player
 		std::string Artist;
 		std::string Album;
 		bool IsUrl = false;
+		TrackMarks Marks;
 		CoverSource Cover;
 		std::string FileUri;
 	};

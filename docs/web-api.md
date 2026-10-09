@@ -54,6 +54,7 @@ All loaded playlists in the player's order.
     "showDuration": true,
     "showSecondLine": true,
     "showThumbnails": true,
+    "showMarks": true,
     "grouping": { "enabled": true, "template": "%Album", "autoMerge": false }
   }
 ]
@@ -64,7 +65,7 @@ by the plugin: it starts at 1 when the playlist is loaded, grows on every
 change of its name, content, tags, statistics, read-only flag, track switches
 or view and grouping settings, and is
 not stable across player restarts. The bookkeeping the player does when it
-starts a track is not counted; a change of content, tags or ratings counts
+starts a track is not counted; a change of content, tags or marks counts
 within a second of being made. Compare it with the value in the
 [`playlists` event](#get-apiv1events) to learn which playlists to reload.
 `showNumbers`, `absoluteNumbers`, `showDuration`, `showSecondLine` and
@@ -72,8 +73,9 @@ within a second of being made. Compare it with the value in the
 out item rows by them. The player does not expose its thumbnail setting yet, so
 `showThumbnails` follows `showSecondLine`, as the player itself shows thumbnails
 only with the second line.
-With `absoluteNumbers` off, numbering restarts in every group. `grouping` is
-the playlist's own grouping: whether it is on, the template that names the
+With `absoluteNumbers` off, numbering restarts in every group. `showMarks` is
+the player's own name for showing the marks in the rows. `grouping` is the
+playlist's own grouping: whether it is on, the template that names the
 groups, and whether same-named groups are merged. Items are always returned in
 the player's order; sorting and grouping happen in the player itself, not in
 the API.
@@ -139,7 +141,9 @@ it is only valid for the `revision` the page was read at.
       "displayText": "Artist A - Track One",
       "secondLine": "MP3 :: 44 kHz :: 320 kbps :: Stereo :: 10,16 MB",
       "duration": 266.4,
-      "rating": 4,
+      "mark": 4,
+      "rating": 0.8,
+      "displayingMark": 4,
       "enabled": true,
       "isUrl": false,
       "cover": "7068c7442182d15a",
@@ -152,7 +156,10 @@ it is only valid for the `revision` the page was read at.
 `displayText` and `secondLine` are the two lines the player itself shows for
 the item, formatted by the playlist's own templates; `secondLine` is empty
 when the playlist hides its second line. `duration` is in seconds, `size` in bytes,
-`rating` is `0..5`, `enabled` is the check box in front of the track, `isUrl` marks streams. `cover` is the
+`mark` is the stars the user gave, `0..5`; `rating` is the player's own rating
+of the track from its statistics, `0..1`; `displayingMark` is what the player
+shows, in halves of a star: the mark, or, when there is none, the rating as
+stars, which the player draws hollow. `enabled` is the check box in front of the track, `isUrl` marks streams. `cover` is the
 key the item's [cover URL](#get-apiv1playlistsiditemsindexcoverkeysize) takes: it
 names the file, so it only changes when the file is replaced. The client shows the covers of
 the playlists whose `showThumbnails` is on. `fileUri` is the track's URI as the
@@ -163,6 +170,23 @@ Every page is read from the player at request time, nothing is cached in the
 plugin; a search is one pass over the whole playlist per page.
 
 Errors: `404 playlistNotFound`, `400 invalidQuery`.
+
+### `PATCH /api/v1/playlists/{id}/items/{index}`
+
+Marks one item:
+
+```json
+{ "mark": 4 }
+```
+
+`mark` is the user's stars, `0..5`, `0` for none. There is no `revision`
+to send: every mark changes the playlist, and marks given in quick succession
+must all count. The response is an empty object. The change reaches the lists
+through the `playlists` event and, for the playing track, the `player`
+event.
+
+Errors: `400 invalidBody`, `404 playlistNotFound`, `404 itemNotFound`,
+`500 playlistUpdateFailed`.
 
 ### `POST /api/v1/playlists/{id}/items/details`
 
@@ -180,7 +204,9 @@ plus an optional `revision`.
       "secondLine": "MP3 :: 44 kHz :: 320 kbps :: Stereo :: 10,16 MB",
       "duration": 266.4,
       "size": 10655744,
-      "rating": 4,
+      "mark": 4,
+      "rating": 0.8,
+      "displayingMark": 4,
       "enabled": true,
       "isUrl": false,
       "cover": "7068c7442182d15a",
@@ -223,7 +249,9 @@ Finds remembered files in the playlists they were remembered from:
       "secondLine": "MP3 :: 44 kHz :: 320 kbps :: Stereo :: 10,16 MB",
       "duration": 266.4,
       "size": 10655744,
-      "rating": 4,
+      "mark": 4,
+      "rating": 0.8,
+      "displayingMark": 4,
       "enabled": true,
       "isUrl": false,
       "cover": "7068c7442182d15a"
@@ -362,7 +390,9 @@ are paged as a whole.
       "secondLine": "MP3 :: 44 kHz :: 320 kbps :: Stereo :: 10,16 MB",
       "duration": 266.4,
       "size": 10655744,
-      "rating": 4,
+      "mark": 4,
+      "rating": 0.8,
+      "displayingMark": 4,
       "enabled": true,
       "isUrl": false,
       "cover": "7068c7442182d15a",
@@ -408,7 +438,9 @@ track it is, `index` being valid for the playlist's current revision.
       "displayText": "Artist - Title",
       "secondLine": "MP3 :: 44 kHz :: 320 kbps :: Stereo",
       "duration": 237.4,
+      "mark": 0,
       "rating": 0,
+      "displayingMark": 0,
       "enabled": true,
       "isUrl": false,
       "cover": "3f9a1c2e5b7d8e01",
@@ -519,6 +551,9 @@ The player's state at request time.
     "artist": "Artist A",
     "album": "Album X",
     "isUrl": false,
+    "mark": 4,
+    "rating": 0.8,
+    "displayingMark": 4,
     "coverHash": "b34839fba2927a883f861e5460f8698d",
     "fileUri": "C:\\Music\\Artist A\\Track One.mp3"
   }
@@ -534,7 +569,8 @@ shows nothing, even though it remembers what to restart. `index` is the item's
 index in its playlist and is only valid for `playlistRevision`; when that
 playlist changes, a new `player` event carries the current index. For a
 stream, `title`, `artist` and `album` describe what the station is playing
-now, not the station itself. `fileUri` is the item's URI as in the
+now, not the station itself. `mark`, `rating` and `displayingMark` are the
+track's stars, as in the [playlist items](#get-apiv1playlistsiditems). `fileUri` is the item's URI as in the
 [playlist items](#get-apiv1playlistsiditems). `coverHash` names the
 track's cover for [`GET /api/v1/covers/{hash}`](#get-apiv1covershashsize), which
 the client fetches directly; it is empty without a cover, and the same for every

@@ -1,0 +1,70 @@
+.rating {
+    --rating-slot: 12px;
+    --rating-dot: 3px;
+    --rating-star: 11px;
+
+    display: inline-flex;
+    align-items: center;
+    color: var(--color-text-secondary);
+}
+
+.bar {
+    --rating-slot: 32px;
+    --rating-dot: 6px;
+    --rating-star: 24px;
+
+    border-radius: 16px;
+    color: var(--color-accent);
+
+    &:focus-visible {
+        outline: 2px solid var(--color-accent);
+    }
+}
+
+// The finger slides along the stars, so the page must not scroll with it.
+.editable {
+    cursor: pointer;
+    touch-action: none;
+}
+
+.slot {
+    position: relative;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--rating-slot);
+    height: var(--rating-slot);
+
+    &::before {
+        content: "";
+        width: var(--rating-dot);
+        height: var(--rating-dot);
+        border-radius: 50%;
+        background: var(--color-text-dim);
+    }
+
+    &.filled::before,
+    &.hollow::before {
+        display: none;
+    }
+}
+
+.star {
+    position: relative;
+    font-size: var(--rating-star);
+
+    // The player's own rating of the track, which the user has not confirmed.
+    .hollow & {
+        font-variation-settings: "FILL" 0;
+        color: var(--color-text-secondary);
+    }
+}
+
+// Under a star filled in part: the outline of the whole of it.
+.outline {
+    position: absolute;
+    font-size: var(--rating-star);
+    font-variation-settings: "FILL" 0;
+    color: var(--color-text-dim);
+}

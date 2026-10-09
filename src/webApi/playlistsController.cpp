@@ -47,6 +47,7 @@ namespace
 			{"showDuration", playlist.ShowDuration},
 			{"showSecondLine", playlist.ShowSecondLine},
 			{"showThumbnails", playlist.ShowThumbnails},
+			{"showMarks", playlist.ShowMarks},
 			{"grouping", {{"enabled", playlist.Grouped}, {"template", playlist.GroupingTemplate}, {"autoMerge", playlist.GroupAutoMerge}}},
 		};
 	}
@@ -186,6 +187,20 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 			result["size"] = page->Matches->Size;
 		}
 		return result; });
+
+	// No revision check: marks given in quick succession must all count, and each
+	// of them changes the playlist.
+	endpoints.MapApi(HttpMethod::Patch, R"(/api/v1/playlists/([^/]+)/items/(\d+))", [core = FCore](const ApiRequest &request) -> nlohmann::json
+			   {
+		const std::string playlistId = request.PathMatches.at(0);
+		const std::int32_t index = std::stoi(request.PathMatches.at(1));
+		const nlohmann::json &body = request.Body;
+		if (!body.is_object() || !body.contains("mark") || !body["mark"].is_number_unsigned() || body["mark"].get<std::int32_t>() > 5)
+			throw ApiError(400, "invalidBody");
+		const std::int32_t mark = body["mark"].get<std::int32_t>();
+		ThrowUnlessOk(RunOnMainThread(core, [&]
+									  { return player::SetItemMark(core, playlistId, index, mark); }));
+		return nlohmann::json::object(); });
 
 	endpoints.MapApi(HttpMethod::Post, R"(/api/v1/playlists/([^/]+)/items/details)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {

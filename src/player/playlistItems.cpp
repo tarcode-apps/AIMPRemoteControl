@@ -71,7 +71,7 @@ player::PlaylistItem player::ReadPlaylistItem(const PlaylistItemContext &ctx, st
 		ctx.FileInfo->GetValueAsInt64(AIMP_FILEINFO_PROPID_FILESIZE, &size);
 		item.Size = size;
 	}
-	ctx.Item->GetValueAsFloat(AIMP_PLAYLISTITEM_PROPID_MARK, &item.Rating);
+	item.Marks = ReadMarks(ctx.FileInfo);
 	INT32 enabled = 1;
 	ctx.Item->GetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_PLAYINGSWITCH, &enabled);
 	item.Enabled = enabled != 0;
@@ -341,6 +341,28 @@ player::MutationResult player::FindPlaylistItem(IAIMPCore *core, const std::stri
 		item = nullptr;
 	playlist->Release();
 	return item ? MutationResult::Ok : MutationResult::ItemNotFound;
+}
+
+player::TrackMarks player::ReadMarks(IAIMPFileInfo *info)
+{
+	TrackMarks marks;
+	if (!info)
+		return marks;
+	info->GetValueAsInt32(AIMP_FILEINFO_PROPID_ML_MARK, &marks.Mark);
+	info->GetValueAsFloat(AIMP_FILEINFO_PROPID_ML_RATING, &marks.Rating);
+	info->GetValueAsFloat(AIMP_FILEINFO_PROPID_ML_DISPLAYING_MARK, &marks.DisplayingMark);
+	return marks;
+}
+
+player::MutationResult player::SetItemMark(IAIMPCore *core, const std::string &playlistId, std::int32_t index, std::int32_t mark)
+{
+	IAIMPPlaylistItem *item = nullptr;
+	const MutationResult found = FindPlaylistItem(core, playlistId, index, item);
+	if (found != MutationResult::Ok)
+		return found;
+	const HRESULT hr = item->SetValueAsFloat(AIMP_PLAYLISTITEM_PROPID_MARK, mark);
+	item->Release();
+	return Succeeded(hr) ? MutationResult::Ok : MutationResult::Failed;
 }
 
 void player::AddToSummary(const PlaylistItemContext &ctx, ItemsSummary &summary)

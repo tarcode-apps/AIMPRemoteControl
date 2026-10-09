@@ -2,7 +2,7 @@
 
 import { errorMessage } from '@/app/_api/helpers/errors';
 import { usePlayer, usePlayTrack } from '@/app/_api/player';
-import { useMovePlaylistItems, usePlaylistItems, useSetGroupExpanded } from '@/app/_api/playlists';
+import { useMovePlaylistItems, usePlaylistItems, useSetGroupExpanded, useSetItemMark } from '@/app/_api/playlists';
 import { queueMark, trackKey, useQueuePositions } from '@/app/_api/queue';
 import type { Playlist, PlaylistGroup, PlaylistItem } from '@/app/_api/types';
 import { ListCheckbox } from '@/app/_components/inputs';
@@ -202,6 +202,11 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
     const playTrack = usePlayTrack();
     const play = (item: PlaylistItem) =>
         playTrack.mutate({ playlistId: playlist.id, index: item.index, revision: playlist.revision });
+    // The stars are too small for a finger; a phone rates in the player.
+    const setMark = useSetItemMark();
+    const onRate = docked
+        ? (item: PlaylistItem, mark: number) => setMark.mutate({ playlistId: playlist.id, index: item.index, mark })
+        : undefined;
     const { data: player } = usePlayer();
     const playingTrack = player?.track;
     // The index is only valid for the revision it was read at, and the snapshot and
@@ -437,6 +442,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                                             drag.start(index, event);
                                         }}
                                         menu={hasMenu ? rowMenu.button(index, item) : undefined}
+                                        onRate={onRate}
                                     />
                                 ) : (
                                     <SkeletonRow {...rowProps} />

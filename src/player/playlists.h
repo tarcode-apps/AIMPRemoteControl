@@ -25,6 +25,7 @@ namespace player
 		bool ShowDuration = true;
 		bool ShowSecondLine = true;
 		bool ShowThumbnails = true;
+		bool ShowMarks = false;
 		bool Grouped = false;
 		std::string GroupingTemplate;
 		bool GroupAutoMerge = false;

@@ -61,6 +61,7 @@ namespace
 		// The player shows thumbnails only with the second line; until the SDK exposes the
 		// setting itself, the second line decides.
 		info.ShowThumbnails = info.ShowSecondLine;
+		info.ShowMarks = flag(AIMP_PLAYLIST_PROPID_VIEW_MARKS);
 		info.Grouped = flag(AIMP_PLAYLIST_PROPID_GROUPPING);
 		info.GroupingTemplate = GetPropertyAsString(props, AIMP_PLAYLIST_PROPID_GROUPPING_TEMPLATE);
 		info.GroupAutoMerge = flag(AIMP_PLAYLIST_PROPID_GROUPPING_AUTOMERGING);
@@ -157,7 +158,8 @@ std::string player::SettingsSnapshot(IAIMPPlaylist *playlist)
 	std::string settings;
 	for (const int propId : {AIMP_PLAYLIST_PROPID_VIEW_NUMBERS, AIMP_PLAYLIST_PROPID_VIEW_NUMBERS_ABSOLUTE,
 							 AIMP_PLAYLIST_PROPID_VIEW_DURATION, AIMP_PLAYLIST_PROPID_VIEW_SECOND_LINE,
-							 AIMP_PLAYLIST_PROPID_GROUPPING, AIMP_PLAYLIST_PROPID_GROUPPING_AUTOMERGING})
+							 AIMP_PLAYLIST_PROPID_VIEW_MARKS, AIMP_PLAYLIST_PROPID_GROUPPING,
+							 AIMP_PLAYLIST_PROPID_GROUPPING_AUTOMERGING})
 	{
 		INT32 value = 0;
 		props->GetValueAsInt32(propId, &value);

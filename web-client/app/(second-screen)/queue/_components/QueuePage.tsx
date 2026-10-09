@@ -28,7 +28,13 @@ import { useQueueMode } from './QueueMode';
 
 const overscanRows = 6;
 const pendingRows = 6;
-const view: RowView = { showNumbers: true, showThumbnails: true, showSecondLine: true, showDuration: true };
+const view: RowView = {
+    showNumbers: true,
+    showThumbnails: true,
+    showSecondLine: true,
+    showDuration: true,
+    showMarks: false,
+};
 
 export function QueuePage() {
     const { t } = useTranslation();

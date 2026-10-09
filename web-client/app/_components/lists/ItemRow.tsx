@@ -10,6 +10,7 @@ import { ItemCover } from '../cover';
 import { Icon } from '../icons';
 import { ListCheckbox } from '../inputs';
 import type { RowMenuButton } from '../menus';
+import { Rating } from '../rating';
 import { Skeleton } from '../skeleton';
 import styles from './ListPage.module.scss';
 
@@ -19,7 +20,10 @@ export const oneLineRowHeight = 44;
 export const thumbnailMargin = 6;
 
 // What a list shows of its items: a playlist's own view settings, or fixed ones.
-export type RowView = Pick<Playlist, 'showNumbers' | 'showThumbnails' | 'showSecondLine' | 'showDuration'>;
+export type RowView = Pick<
+    Playlist,
+    'showNumbers' | 'showThumbnails' | 'showSecondLine' | 'showDuration' | 'showMarks'
+>;
 
 export type RowProps = {
     view: RowView;
@@ -44,6 +48,8 @@ export type ItemRowProps = RowProps & {
     onSelect(selected: boolean): void;
     onDragStart?(event: PointerEvent): void;
     menu?: RowMenuButton;
+    // Lets the stars be set in the row; without it they are only shown.
+    onRate?(item: PlaylistItem, mark: number): void;
 };
 
 export function DragHandle({
@@ -81,9 +87,19 @@ export function ItemRow({
     onSelect,
     onDragStart,
     menu,
+    onRate,
 }: ItemRowProps) {
     const { t } = useTranslation();
     const label = view.showNumbers && `${number}.`;
+    const rating = (
+        <Rating
+            className={styles.rating}
+            mark={item.mark}
+            rating={item.rating}
+            displayingMark={item.displayingMark}
+            onChange={onRate && (mark => onRate(item, mark))}
+        />
+    );
     return (
         <>
             {selecting && (
@@ -114,18 +130,26 @@ export function ItemRow({
                 />
             )}
             <div className={styles.text}>
-                <div className={styles.title}>
-                    {label && !docked && `${label} `}
-                    {item.displayText}
+                <div className={styles.line}>
+                    <div className={styles.title}>
+                        {label && !docked && `${label} `}
+                        {item.displayText}
+                    </div>
+                    {queueMark && (
+                        <div className={styles.queueMark} title={t('playlist.inQueue')}>
+                            {queueMark}
+                        </div>
+                    )}
+                    {view.showMarks && !view.showSecondLine && rating}
+                    {view.showDuration && <div className={styles.duration}>{formatDuration(item.duration)}</div>}
                 </div>
-                {view.showSecondLine && <div className={styles.details}>{item.secondLine}</div>}
+                {view.showSecondLine && (
+                    <div className={styles.line}>
+                        <div className={styles.details}>{item.secondLine}</div>
+                        {view.showMarks && rating}
+                    </div>
+                )}
             </div>
-            {queueMark && (
-                <div className={styles.queueMark} title={t('playlist.inQueue')}>
-                    {queueMark}
-                </div>
-            )}
-            {view.showDuration && <div className={styles.duration}>{formatDuration(item.duration)}</div>}
             {menu && (
                 <IconButton
                     title={t('playlist.itemActions')}
@@ -168,10 +192,16 @@ export function SkeletonRow({ view, docked, thumbnailSize, widestNumber, selecti
                 <Skeleton shape="rect" className={styles.thumbnail} width={thumbnailSize} height={thumbnailSize} />
             )}
             <div className={styles.text}>
-                <Skeleton className={styles.title} width="60%" />
-                {view.showSecondLine && <Skeleton className={styles.details} width="40%" />}
+                <div className={styles.line}>
+                    <Skeleton className={styles.title} width="60%" />
+                    {view.showDuration && <Skeleton className={styles.duration} width="2.5em" />}
+                </div>
+                {view.showSecondLine && (
+                    <div className={styles.line}>
+                        <Skeleton className={styles.details} width="40%" />
+                    </div>
+                )}
             </div>
-            {view.showDuration && <Skeleton className={styles.duration} width="2.5em" />}
         </>
     );
 }

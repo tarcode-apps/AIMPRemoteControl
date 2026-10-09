@@ -63,6 +63,10 @@
   "selection": {
     "title": "Multiple selection"
   },
+  "rating": {
+    "title": "Rating",
+    "value": "Rating {{value}} of 5"
+  },
   "search": {
     "title": "Extended search",
     "placeholder": "Search in playlists",

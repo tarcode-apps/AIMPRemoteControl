@@ -18,6 +18,18 @@ class IAIMPString;
 
 namespace player
 {
+	// The stars of a track: the ones the user gave, the player's own rating of the
+	// track from its statistics, and what the player shows, which is the rating as
+	// stars when the user gave none.
+	struct TrackMarks
+	{
+		std::int32_t Mark = 0;	   // 0..5
+		double Rating = 0;		   // 0..1
+		double DisplayingMark = 0; // 0..5, in halves
+	};
+
+	TrackMarks ReadMarks(IAIMPFileInfo *info);
+
 	struct PlaylistItem
 	{
 		std::int32_t Index = 0;
@@ -25,7 +37,7 @@ namespace player
 		std::string SecondLine;	 // formatted by the playlist's second-line template, empty when hidden
 		double Duration = 0;	 // seconds
 		std::int64_t Size = 0;	 // bytes
-		double Rating = 0;		 // 0..5
+		TrackMarks Marks;
 		bool Enabled = true;
 		bool IsUrl = false;
 		CoverSource Cover;
@@ -153,6 +165,9 @@ namespace player
 	// formatted whether or not the playlist shows it.
 	MutationResult DescribePlaylistItems(IAIMPCore *core, const std::string &playlistId, const ItemSelection &selection,
 										 std::vector<ItemDetails> &items);
+
+	// The user's stars, 0 for none.
+	MutationResult SetItemMark(IAIMPCore *core, const std::string &playlistId, std::int32_t index, std::int32_t mark);
 
 	// Collapses or expands one group, or every group when `index` is nullopt.
 	MutationResult SetGroupExpanded(IAIMPCore *core, const std::string &playlistId, std::optional<std::int32_t> index, bool expanded);

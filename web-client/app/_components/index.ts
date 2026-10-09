@@ -4,5 +4,6 @@ export * from './icons';
 export * from './pages';
 export * from './player';
 export * from './playlists';
+export * from './rating';
 export * from './sidenav';
 export * from './skeleton';

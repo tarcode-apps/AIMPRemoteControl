@@ -1,7 +1,7 @@
 'use client';
 
 import { usePlayer, usePlayerCommand, usePlayerPosition, useSetPlayer } from '@/app/_api/player';
-import { usePlaylists } from '@/app/_api/playlists';
+import { usePlaylists, useSetItemMark } from '@/app/_api/playlists';
 import type { RepeatMode } from '@/app/_api/types';
 import { useFavorites } from '@/app/_state/Favorites';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
@@ -15,6 +15,7 @@ import { TrackCover } from '../cover';
 import { Icon } from '../icons';
 import { Slider } from '../inputs';
 import { Menu, menuSeparator, type MenuEntry } from '../menus';
+import { Rating } from '../rating';
 import { useDrawer } from '../sidenav';
 import { Marquee } from './Marquee';
 import styles from './NowPlaying.module.scss';
@@ -43,6 +44,7 @@ export function NowPlaying() {
     const { data: playlists } = usePlaylists();
     const command = usePlayerCommand();
     const setPlayer = useSetPlayer();
+    const setMark = useSetItemMark();
     const shown = expanded || docked;
     const position = usePlayerPosition(player, shown);
 
@@ -137,7 +139,17 @@ export function NowPlaying() {
                 <IconButton title={t('nav.menu')} className={styles.nav} onClick={open}>
                     <Icon>menu</Icon>
                 </IconButton>
-                <div ref={volumeRef} className={styles.volumeArea}>
+                {track && !track.isUrl && !volumeOpen && (
+                    <Rating
+                        size="bar"
+                        className={styles.rating}
+                        mark={track.mark}
+                        rating={track.rating}
+                        displayingMark={track.displayingMark}
+                        onChange={mark => setMark.mutate({ playlistId: track.playlistId, index: track.index, mark })}
+                    />
+                )}
+                <div ref={volumeRef} className={clsx(styles.volumeArea, volumeOpen && styles.volumeOpen)}>
                     {volumeOpen && (
                         <div className={styles.volumePanel}>
                             <IconButton

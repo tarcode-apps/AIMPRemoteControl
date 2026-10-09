@@ -32,7 +32,13 @@ import { useFavoritesMode, type FavoriteEntry } from './FavoritesMode';
 
 const groupRowHeight = 40;
 const overscanRows = 6;
-const view: RowView = { showNumbers: true, showThumbnails: true, showSecondLine: true, showDuration: true };
+const view: RowView = {
+    showNumbers: true,
+    showThumbnails: true,
+    showSecondLine: true,
+    showDuration: true,
+    showMarks: false,
+};
 
 // What a row shows of a favorite that is not in its playlist: its snapshot.
 function snapshotItem(record: FavoriteRecord): PlaylistItem {
@@ -42,7 +48,9 @@ function snapshotItem(record: FavoriteRecord): PlaylistItem {
         secondLine: record.secondLine,
         duration: record.duration,
         size: record.size,
+        mark: 0,
         rating: 0,
+        displayingMark: 0,
         enabled: true,
         isUrl: record.isUrl,
         cover: '',

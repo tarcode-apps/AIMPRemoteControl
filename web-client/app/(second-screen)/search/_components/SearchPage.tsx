@@ -36,7 +36,13 @@ import { useSearchMode } from './SearchMode';
 const groupRowHeight = 40;
 const overscanRows = 6;
 const pendingRows = 12;
-const view: RowView = { showNumbers: true, showThumbnails: true, showSecondLine: true, showDuration: true };
+const view: RowView = {
+    showNumbers: true,
+    showThumbnails: true,
+    showSecondLine: true,
+    showDuration: true,
+    showMarks: false,
+};
 
 export function SearchPage() {
     const { t } = useTranslation();

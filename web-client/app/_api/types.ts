@@ -17,7 +17,16 @@ export type Playlist = {
     showDuration: boolean;
     showSecondLine: boolean;
     showThumbnails: boolean;
+    // The player's name for showing the marks in the rows.
+    showMarks: boolean;
     grouping: PlaylistGrouping;
+};
+
+export type ItemMarkRequest = {
+    playlistId: string;
+    index: number;
+    // The user's stars, 0..5; 0 takes them away.
+    mark: number;
 };
 
 export type CreatedPlaylist = {
@@ -35,7 +44,12 @@ export type PlaylistItem = {
     secondLine: string;
     duration: number;
     size: number;
+    // The stars the user gave, the player's own rating of the track (0..1), and
+    // what the player shows, in halves of a star: the mark, or the rating as stars
+    // when there is none, drawn hollow.
+    mark: number;
     rating: number;
+    displayingMark: number;
     enabled: boolean;
     isUrl: boolean;
     // Names the cover in its URL; changes when the tags are written.
@@ -243,6 +257,9 @@ export type PlayingTrack = {
     artist: string;
     album: string;
     isUrl: boolean;
+    mark: number;
+    rating: number;
+    displayingMark: number;
     // The image by its bytes: the same across the tracks of an album, empty without a cover.
     coverHash: string;
     fileUri: string;

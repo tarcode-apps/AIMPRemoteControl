@@ -21,7 +21,7 @@
 
 .header .nav {
     @include mixins.drawer-docked {
-        visibility: hidden;
+        display: none;
     }
 }
 
@@ -31,12 +31,28 @@
     }
 }
 
+// 20px from the menu glyph, as a heading; the first star's glyph sits 4px into
+// its slot. Beside a docked drawer, where the menu button is gone, the stars start
+// where a full-width cover does, 15px into the header.
+.rating {
+    margin-left: 4px;
+
+    @include mixins.drawer-docked {
+        margin-left: calc(15px - (var(--rating-slot) - var(--rating-star)) / 2);
+    }
+}
+
 .volumeArea {
-    flex: 1;
+    flex: 0 1 auto;
     min-width: 0;
     display: flex;
     align-items: center;
     justify-content: flex-end;
+    margin-left: auto;
+
+    &.volumeOpen {
+        flex: 1;
+    }
 }
 
 .volumePanel {

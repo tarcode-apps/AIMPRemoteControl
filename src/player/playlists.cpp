@@ -6,6 +6,7 @@
 #include "apiPlaylists.h"
 #include "aimpHelper.h"
 #include "crc32.h"
+#include "playerFeatures.h"
 
 namespace
 {
@@ -32,7 +33,8 @@ namespace
 		return crc;
 	}
 
-	std::optional<player::PlaylistInfo> Describe(IAIMPPlaylist *playlist, bool withContentCrc32)
+	std::optional<player::PlaylistInfo> Describe(IAIMPPlaylist *playlist, const player::PlayerFeatures &features,
+												 bool withContentCrc32)
 	{
 		IAIMPPlaylistProperties *props = nullptr;
 		if (Failed(playlist->QueryInterface(IID_IAIMPPlaylistProperties, reinterpret_cast<void **>(&props))) || !props)
@@ -58,9 +60,8 @@ namespace
 		info.AbsoluteNumbers = flag(AIMP_PLAYLIST_PROPID_VIEW_NUMBERS_ABSOLUTE);
 		info.ShowDuration = flag(AIMP_PLAYLIST_PROPID_VIEW_DURATION);
 		info.ShowSecondLine = flag(AIMP_PLAYLIST_PROPID_VIEW_SECOND_LINE);
-		// The player shows thumbnails only with the second line; until the SDK exposes the
-		// setting itself, the second line decides.
-		info.ShowThumbnails = info.ShowSecondLine;
+		// An older player has no thumbnail setting; it shows them with the second line.
+		info.ShowThumbnails = features.ThumbnailsSetting ? flag(AIMP_PLAYLIST_PROPID_VIEW_THUMBNAILS) : info.ShowSecondLine;
 		info.ShowMarks = flag(AIMP_PLAYLIST_PROPID_VIEW_MARKS);
 		info.Grouped = flag(AIMP_PLAYLIST_PROPID_GROUPPING);
 		info.GroupingTemplate = GetPropertyAsString(props, AIMP_PLAYLIST_PROPID_GROUPPING_TEMPLATE);
@@ -82,13 +83,14 @@ std::vector<player::PlaylistInfo> player::GetPlaylists(IAIMPCore *core, bool wit
 	if (Failed(core->QueryInterface(IID_IAIMPServicePlaylistManager, reinterpret_cast<void **>(&mgr))) || !mgr)
 		return result;
 
+	const PlayerFeatures features = GetPlayerFeatures(core);
 	const INT32 count = mgr->GetLoadedPlaylistCount();
 	for (INT32 i = 0; i < count; ++i)
 	{
 		IAIMPPlaylist *playlist = nullptr;
 		if (Succeeded(mgr->GetLoadedPlaylist(i, &playlist)) && playlist)
 		{
-			if (std::optional<PlaylistInfo> info = Describe(playlist, withContentCrc32))
+			if (std::optional<PlaylistInfo> info = Describe(playlist, features, withContentCrc32))
 				result.push_back(std::move(*info));
 			playlist->Release();
 		}

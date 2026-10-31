@@ -66,13 +66,16 @@ change of its name, content, tags, statistics, read-only flag, track switches
 or view and grouping settings, and is
 not stable across player restarts. The bookkeeping the player does when it
 starts a track is not counted; a change of content, tags or marks counts
-within a second of being made. Compare it with the value in the
-[`playlists` event](#get-apiv1events) to learn which playlists to reload.
+within a second of being made. A player older than v6.00 build 3090 does not
+report changes of its view, formatting and grouping settings, so there they
+are noticed within two seconds instead of at once. Compare it with the value
+in the [`playlists` event](#get-apiv1events) to learn which playlists to
+reload.
 `showNumbers`, `absoluteNumbers`, `showDuration`, `showSecondLine` and
 `showThumbnails` are the playlist's view settings in the player; the client lays
-out item rows by them. The player does not expose its thumbnail setting yet, so
-`showThumbnails` follows `showSecondLine`, as the player itself shows thumbnails
-only with the second line.
+out item rows by them. A player older than v6.00 build 3090 has no thumbnail
+setting of its own, so there `showThumbnails` follows `showSecondLine`.
+Whether and how the thumbnails are drawn is up to the client.
 With `absoluteNumbers` off, numbering restarts in every group. `showMarks` is
 the player's own name for showing the marks in the rows. `grouping` is the
 playlist's own grouping: whether it is on, the template that names the

@@ -48,7 +48,10 @@ export function PlaylistPager() {
         onDragEnd: () => trackRef.current?.style.removeProperty('--drag-x'),
     });
 
-    if (!paged) return <div className={styles.single}>{selected && <PlaylistPage playlist={selected} />}</div>;
+    if (!paged)
+        return (
+            <div className={styles.single}>{selected && <PlaylistPage key={selected.id} playlist={selected} />}</div>
+        );
 
     return (
         <div className={styles.pager} {...drag.handlers}>

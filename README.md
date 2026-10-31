@@ -40,7 +40,9 @@ targets the app's last released version (2.0.31).
    The package contains the builds for all platforms; AIMP picks the right one.
 3. Enable the plugin in *Options → Plugins*.
 
-Tested with AIMP 5 and AIMP 6.0 on Windows and Linux.
+Tested with AIMP 5 and AIMP 6.0 on Windows and Linux. AIMP 6.0 build 3090 or
+later reports its playlist view settings and their changes itself; the plugin
+works around their absence in older versions.
 
 ## Setup
 

@@ -10,6 +10,7 @@
 #include "IUnknownImpl.h"
 #include "joinPumpingMessages.h"
 #include "mainThreadRunner.h"
+#include "player/playerFeatures.h"
 #include "player/playerState.h"
 #include "player/playlists.h"
 #include "player/queue.h"
@@ -87,7 +88,7 @@ public:
 	void WINAPI Changed(DWORD flags) override
 	{
 		if (flags & (AIMP_PLAYLIST_NOTIFY_NAME | AIMP_PLAYLIST_NOTIFY_READONLY | AIMP_PLAYLIST_NOTIFY_PLAYINGSWITCHS |
-					 AIMP_PLAYLIST_NOTIFY_GROUPNAME))
+					 AIMP_PLAYLIST_NOTIFY_GROUPNAME | AIMP_PLAYLIST_NOTIFY_SETTINGS))
 			FOwner.PlaylistChanged(FId, false);
 		if (flags & (AIMP_PLAYLIST_NOTIFY_CONTENT | AIMP_PLAYLIST_NOTIFY_FILEINFO | AIMP_PLAYLIST_NOTIFY_STATISTICS))
 			FOwner.FilterChange(FId, flags, FPlaylist ? FPlaylist->GetItemCount() : 0);
@@ -210,8 +211,9 @@ void StateUpdateEvents::Start(IAIMPCore *core)
 		mgr->Release();
 	}
 
-	FSettingsPoller = std::thread([this]
-								  { PollPlaylistSettings(); });
+	if (!player::GetPlayerFeatures(core).SettingsNotifications)
+		FSettingsPoller = std::thread([this]
+									  { PollPlaylistSettings(); });
 }
 
 void StateUpdateEvents::Stop()
@@ -438,8 +440,8 @@ bool StateUpdateEvents::IsStopped()
 	return FStopped;
 }
 
-// The player sends nothing when a playlist's view, formatting or grouping settings
-// change, so they are compared on a timer instead.
+// An older player sends nothing when a playlist's view, formatting or grouping
+// settings change, so they are compared on a timer instead.
 void StateUpdateEvents::PollPlaylistSettings()
 {
 	constexpr std::chrono::seconds Interval{2};

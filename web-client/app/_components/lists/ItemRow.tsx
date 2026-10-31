@@ -25,6 +25,9 @@ export type RowView = Pick<
     'showNumbers' | 'showThumbnails' | 'showSecondLine' | 'showDuration' | 'showMarks'
 >;
 
+// A one-line row has no room for a thumbnail.
+const showsThumbnail = (view: RowView) => view.showThumbnails && view.showSecondLine;
+
 export type RowProps = {
     view: RowView;
     docked: boolean;
@@ -119,7 +122,7 @@ export function ItemRow({
                     {label}
                 </div>
             )}
-            {view.showThumbnails && (
+            {showsThumbnail(view) && (
                 <ItemCover
                     playlistId={playlistId}
                     index={item.index}
@@ -188,7 +191,7 @@ export function SkeletonRow({ view, docked, thumbnailSize, widestNumber, selecti
                     <Skeleton width="100%" />
                 </div>
             )}
-            {view.showThumbnails && (
+            {showsThumbnail(view) && (
                 <Skeleton shape="rect" className={styles.thumbnail} width={thumbnailSize} height={thumbnailSize} />
             )}
             <div className={styles.text}>

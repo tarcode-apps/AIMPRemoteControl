@@ -38,6 +38,10 @@ const groupRowHeight = 40;
 const overscanRows = 6;
 const pendingRows = 12;
 const noFolding: ReadonlyMap<number, boolean> = new Map();
+// Where each playlist's list was scrolled to when it last left the screen: the
+// pager keeps only the neighbouring playlists mounted, and a docked drawer shows
+// one at a time.
+const scrollOffsets = new Map<string, number>();
 
 export type PlaylistPageProps = {
     playlist: Playlist;
@@ -84,11 +88,23 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
     const active = useActiveRow(rows, row => virtualizer.scrollToIndex(row, { align: 'auto' }));
     const virtualRows = virtualizer.getVirtualItems();
 
+    // Back where the list was left, once it has its size; a search scrolls through
+    // other rows, so its offsets are not kept.
+    const [restoring, setRestoring] = useState(() => scrollOffsets.has(playlist.id));
+    const scrollOffset = virtualizer.scrollOffset ?? 0;
+    useEffect(() => {
+        if (!restoring || layout.pending) return;
+        virtualizer.scrollToOffset(scrollOffsets.get(playlist.id) ?? 0);
+        setRestoring(false);
+    }, [restoring, layout.pending, virtualizer, playlist.id]);
+    useEffect(() => {
+        if (!restoring && !searching) scrollOffsets.set(playlist.id, scrollOffset);
+    }, [restoring, searching, playlist.id, scrollOffset]);
+
     // Another screen asked for a track: the cursor goes to it once the rows are the
     // playlist's own, any list mode being left first. The request stays until
     // the row is in view: the rendered rows reach past the edges, and a scroll
     // asked for before the list has its size goes nowhere.
-    const scrollOffset = virtualizer.scrollOffset ?? 0;
     const viewHeight = virtualizer.scrollRect?.height ?? 0;
     useEffect(() => {
         if (!focus || focus.playlistId !== playlist.id || !mine) return;

@@ -43,7 +43,7 @@ namespace player
 
 	MutationResult RemovePlaylist(IAIMPCore *core, const std::string &playlistId);
 
-	// The playlist's view, formatting and grouping settings as one comparable string;
-	// they change without any notification from the player.
+	// The playlist's view, formatting and grouping settings as one comparable string,
+	// for a player that does not notify of their changes.
 	std::string SettingsSnapshot(IAIMPPlaylist *playlist);
 }

@@ -159,12 +159,12 @@ export function ItemRow({
                     className={clsx(styles.menuButton, menu.open && styles.menuButtonOpen)}
                     style={{ anchorName: menu.anchor } as CSSProperties}
                     popoverTarget={menu.popoverTarget}
-                    popoverTargetAction="show"
+                    popoverTargetAction={menu.popoverTargetAction}
                     // The row's own clicks would play the track.
                     onDoubleClick={event => event.stopPropagation()}
                     onClick={event => {
                         event.stopPropagation();
-                        menu.onOpen();
+                        menu.onClick(event);
                     }}
                 >
                     <Icon>more_vert</Icon>

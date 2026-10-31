@@ -163,8 +163,8 @@ function Playlists() {
                                 className={clsx(styles.menuButton, button.open && styles.menuButtonOpen)}
                                 style={{ anchorName: button.anchor } as CSSProperties}
                                 popoverTarget={button.popoverTarget}
-                                popoverTargetAction="show"
-                                onClick={button.onOpen}
+                                popoverTargetAction={button.popoverTargetAction}
+                                onClick={button.onClick}
                             >
                                 <Icon>more_vert</Icon>
                             </IconButton>

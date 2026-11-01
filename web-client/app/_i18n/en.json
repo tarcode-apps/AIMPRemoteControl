@@ -125,6 +125,39 @@
     "clear": "Clear the queue",
     "remove": "Remove from queue"
   },
+  "timer": {
+    "disabled": "Timer functions are disabled in the plugin settings",
+    "when": "When",
+    "triggers": {
+      "after": "After a set time",
+      "at": "At a set time",
+      "trackEnd": "At the end of the tracks",
+      "playlistEnd": "At the end of the playlist",
+      "queueEnd": "At the end of the queue"
+    },
+    "duration": "Duration, hours and minutes",
+    "time": "Time",
+    "tracks": "Number of tracks",
+    "tracksLeft": "Tracks left: {{count}}",
+    "waitTrackEnd": "Wait for the playing track to finish",
+    "then": "Then",
+    "actions": {
+      "pause": "Pause playback",
+      "closePlayer": "Close the player",
+      "shutdown": "Shut down the computer",
+      "sleep": "Put the computer to sleep",
+      "hibernate": "Hibernate the computer",
+      "reboot": "Restart the computer",
+      "logOff": "Log off"
+    },
+    "computer": "Computer",
+    "nothing": "Leave it on",
+    "start": "Start",
+    "cancel": "Cancel the timer",
+    "waitingTrackEnd": "Waiting for the track to finish",
+    "at": "At {{time}}",
+    "badge": "{{when}}: {{actions}}"
+  },
   "playlist": {
     "add": "Add",
     "select": "Select tracks",

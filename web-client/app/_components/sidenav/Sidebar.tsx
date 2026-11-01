@@ -3,6 +3,8 @@
 import { errorMessage } from '@/app/_api/helpers/errors';
 import { usePlaylists } from '@/app/_api/playlists';
 import { useQueue } from '@/app/_api/queue';
+import { useSettings } from '@/app/_api/settings';
+import { useTimer } from '@/app/_api/timer';
 import type { Playlist } from '@/app/_api/types';
 import { useFavorites } from '@/app/_state/Favorites';
 import { useNavigation } from '@/app/_state/Navigation';
@@ -10,7 +12,7 @@ import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import clsx from 'clsx';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '../buttons';
 import { Icon } from '../icons';
@@ -21,6 +23,7 @@ import { usePlaylistActions } from '../playlists';
 import { Skeleton } from '../skeleton';
 import { useDrawer } from './Drawer';
 import styles from './Sidebar.module.scss';
+import { TimerBadge } from './TimerBadge';
 
 type NavItem = {
     href: string;
@@ -211,7 +214,11 @@ export function Sidebar() {
     const { t } = useTranslation();
     const { data: queue } = useQueue();
     const { records: favorites } = useFavorites();
-    const badges: Partial<Record<string, string | number | null>> = {
+    const { data: settings } = useSettings();
+    const { data: timer } = useTimer(settings?.permissions.scheduler === true);
+    // A count, or a picture of the state, as the timer's.
+    const badges: Partial<Record<string, ReactNode>> = {
+        '/timer/': timer?.timer && <TimerBadge timer={timer.timer} />,
         '/queue/': queue?.suspended ? '!' : queue?.items.length || null,
         '/favorites/': favorites.length || null,
     };
@@ -232,7 +239,11 @@ export function Sidebar() {
                 >
                     <Icon>{icon}</Icon>
                     <span className={styles.label}>{t(label)}</span>
-                    {badge ? <span className={styles.badge}>{badge}</span> : null}
+                    {badge ? (
+                        <span className={clsx(styles.badge, typeof badge === 'object' && styles.pictureBadge)}>
+                            {badge}
+                        </span>
+                    ) : null}
                 </Link>
             </li>
         );

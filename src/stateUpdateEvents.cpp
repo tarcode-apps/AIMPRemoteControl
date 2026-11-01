@@ -31,8 +31,11 @@ public:
 		case AIMP_MSG_EVENT_STREAM_START_SUBTRACK:
 			FOwner.PlayerChanged(true);
 			break;
-		case AIMP_MSG_EVENT_PLAYER_STATE:
 		case AIMP_MSG_EVENT_STREAM_END:
+			FOwner.StreamEnded(static_cast<unsigned>(param1));
+			FOwner.PlayerChanged(false);
+			break;
+		case AIMP_MSG_EVENT_PLAYER_STATE:
 		case AIMP_MSG_EVENT_PLAYING_FILE_INFO:
 			FOwner.PlayerChanged(false);
 			break;
@@ -335,6 +338,17 @@ void StateUpdateEvents::QueueChanged()
 		FQueue.Suspended = state.Suspended;
 	}
 	Notify(Queue);
+}
+
+void StateUpdateEvents::OnStreamEnd(std::function<void(unsigned)> handler)
+{
+	FStreamEnd = std::move(handler);
+}
+
+void StateUpdateEvents::StreamEnded(unsigned flags)
+{
+	if (FStreamEnd)
+		FStreamEnd(flags);
 }
 
 StateUpdateEvents::QueueInfo StateUpdateEvents::CurrentQueue()

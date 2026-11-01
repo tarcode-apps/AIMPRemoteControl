@@ -4,7 +4,8 @@ import { playlistKeys } from '@/app/_api/playlists';
 import { queueKeys } from '@/app/_api/queue';
 import { searchKeys } from '@/app/_api/search';
 import { settingsKeys } from '@/app/_api/settings';
-import type { PlayerState, Playlist, Queue } from '@/app/_api/types';
+import { timerKeys } from '@/app/_api/timer';
+import type { PlayerState, Playlist, Queue, TimerState } from '@/app/_api/types';
 import { favoriteRecords } from '@/app/_state/Favorites';
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import { useEffect } from 'react';
@@ -14,7 +15,6 @@ type PlaylistsChanged = { playlists: { id: string; revision: number }[] };
 
 const invalidations: Record<string, QueryKey> = {
     queue: queueKeys.all,
-    timer: ['timer'],
     settings: settingsKeys.all,
 };
 
@@ -66,6 +66,9 @@ export function useEventStream(client: QueryClient) {
         });
         source.addEventListener('player', (event: MessageEvent<string>) => {
             client.setQueryData(playerKeys.state, snapshot(JSON.parse(event.data) as PlayerState));
+        });
+        source.addEventListener('timer', (event: MessageEvent<string>) => {
+            client.setQueryData(timerKeys.all, JSON.parse(event.data) as TimerState);
         });
         for (const [name, queryKey] of Object.entries(invalidations))
             source.addEventListener(name, () => client.invalidateQueries({ queryKey }));

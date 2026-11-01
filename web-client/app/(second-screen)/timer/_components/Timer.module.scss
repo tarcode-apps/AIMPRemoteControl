@@ -1,0 +1,118 @@
+.message {
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--color-text-secondary);
+}
+
+// "When" and "Then" side by side where two columns fit, one above the other
+// where they do not; the form and the running timer alike.
+.columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, max(260px, calc(50% - 24px))), 1fr));
+    column-gap: 48px;
+    padding: 0 16px 16px;
+}
+
+.heading {
+    margin: 20px 0 4px;
+    font-size: 14px;
+    font-weight: var(--font-weight-medium);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+}
+
+.subheading {
+    margin: 12px 0 0;
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-secondary);
+}
+
+// A row of a choice: a label and its radio or checkbox, as in the dialogs.
+.option {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 44px;
+    cursor: pointer;
+}
+
+// As in the player's Android app: a checkbox stands before its label, a radio after.
+.option:has(input[type="checkbox"]) {
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+}
+
+// What the chosen row asks for, set in under it.
+.nested {
+    padding-left: 24px;
+}
+
+.label {
+    flex: 1;
+}
+
+.disabled {
+    color: var(--color-text-secondary);
+    cursor: default;
+}
+
+.field {
+    width: 100%;
+    margin: 0 0 12px;
+}
+
+.countdown {
+    margin: 4px 0 8px;
+    font-size: 48px;
+    font-weight: var(--font-weight-bold);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+}
+
+.detail {
+    margin: 0;
+    line-height: 1.8;
+    color: var(--color-text-secondary);
+}
+
+// The actions as ticked boxes, not bullets.
+.actionList {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.action {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 36px;
+}
+
+.actionIcon {
+    --icon-size: 20px;
+
+    color: var(--color-text-secondary);
+}
+
+.error {
+    grid-column: 1 / -1;
+    margin: 8px 0 0;
+    color: var(--color-accent);
+}
+
+// The toolbar holds the one action, at its end.
+.toolbar {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 0 8px;
+}
+
+.mainButton {
+    min-width: 120px;
+    font-size: 16px;
+}

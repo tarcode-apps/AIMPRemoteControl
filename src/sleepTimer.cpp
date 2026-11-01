@@ -1,7 +1,6 @@
 #include "sleepTimer.h"
 
 #include <algorithm>
-#include <cmath>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -9,6 +8,7 @@
 #endif
 
 #include "apiCore.h"
+#include "apiMessages.h"
 #include "apiPlayer.h"
 #include "joinPumpingMessages.h"
 #include "mainThreadRunner.h"
@@ -16,16 +16,31 @@
 
 namespace
 {
-	const char *const ActionPlayerShutdown = "player_shutdown";
-	const char *const ActionPausePlayback = "pause_playback";
-	const char *const ActionMachineShutdown = "machine_shutdown";
-	const char *const ActionMachineSleep = "machine_sleep";
-	const char *const ActionMachineHibernate = "machine_hibernate";
+	// The timer sleeps in slices: the wall clock may be set, and a computer that
+	// was suspended resumes with the moment passed.
+	constexpr std::chrono::seconds WaitSlice{30};
 
-	void PausePlayback(IAIMPCore *core)
+	IAIMPServicePlayer *PlayerService(IAIMPCore *core)
 	{
 		IAIMPServicePlayer *player = nullptr;
 		if (Succeeded(core->QueryInterface(IID_IAIMPServicePlayer, reinterpret_cast<void **>(&player))) && player)
+			return player;
+		return nullptr;
+	}
+
+	bool IsPlaying(IAIMPCore *core)
+	{
+		IAIMPServicePlayer *player = PlayerService(core);
+		if (!player)
+			return false;
+		const bool playing = player->GetState() == AIMP_PLAYER_STATE_PLAYING;
+		player->Release();
+		return playing;
+	}
+
+	void PausePlayback(IAIMPCore *core)
+	{
+		if (IAIMPServicePlayer *player = PlayerService(core))
 		{
 			if (player->GetState() == AIMP_PLAYER_STATE_PLAYING)
 				player->Pause();
@@ -33,8 +48,54 @@ namespace
 		}
 	}
 
-	void Shutdown(IAIMPCore *core, DWORD flags)
+	DWORD MachineFlags(SleepTimer::Action action)
 	{
+		switch (action)
+		{
+		case SleepTimer::Action::Shutdown:
+			return AIMP_SERVICE_SHUTDOWN_FLAGS_POWEROFF;
+		case SleepTimer::Action::Reboot:
+			return AIMP_SERVICE_SHUTDOWN_FLAGS_REBOOT;
+		case SleepTimer::Action::LogOff:
+			return AIMP_SERVICE_SHUTDOWN_FLAGS_LOGOFF;
+		case SleepTimer::Action::Sleep:
+			return AIMP_SERVICE_SHUTDOWN_FLAGS_SLEEP | AIMP_SERVICE_SHUTDOWN_FLAGS_NO_CONFIRM;
+		case SleepTimer::Action::Hibernate:
+			return AIMP_SERVICE_SHUTDOWN_FLAGS_HIBERNATE | AIMP_SERVICE_SHUTDOWN_FLAGS_NO_CONFIRM;
+		default:
+			return 0;
+		}
+	}
+
+#ifdef _WIN32
+	// Modern standby (S0 low-power idle) counts as sleep, which IsPwrSuspendAllowed
+	// leaves out; hibernation needs its file as well as the state.
+	void PowerStates(bool &sleep, bool &hibernate)
+	{
+		SYSTEM_POWER_CAPABILITIES capabilities{};
+		if (!GetPwrCapabilities(&capabilities))
+			return;
+		sleep = capabilities.SystemS1 || capabilities.SystemS2 || capabilities.SystemS3 || capabilities.AoAc;
+		hibernate = capabilities.SystemS4 && capabilities.HiberFilePresent;
+	}
+#endif
+
+	// The player's thread. Pausing goes first, and the player takes one shutdown
+	// call: a machine action leaves the player to the system, so closing it is
+	// only asked for on its own.
+	void Execute(IAIMPCore *core, const std::vector<SleepTimer::Action> &actions)
+	{
+		const auto has = [&](SleepTimer::Action action)
+		{ return std::find(actions.begin(), actions.end(), action) != actions.end(); };
+		if (has(SleepTimer::Action::PausePlayback))
+			PausePlayback(core);
+		DWORD flags = 0;
+		for (const SleepTimer::Action action : actions)
+			flags |= MachineFlags(action);
+		if (!flags && has(SleepTimer::Action::ClosePlayer))
+			flags = AIMP_SERVICE_SHUTDOWN_FLAGS_CLOSE_APP;
+		if (!flags)
+			return;
 		IAIMPServiceShutdown *service = nullptr;
 		if (Succeeded(core->QueryInterface(IID_IAIMPServiceShutdown, reinterpret_cast<void **>(&service))) && service)
 		{
@@ -44,23 +105,28 @@ namespace
 	}
 }
 
-const std::vector<std::string> &SleepTimer::SupportedActions()
+const std::vector<SleepTimer::Action> &SleepTimer::SupportedActions()
 {
-	static const std::vector<std::string> actions = []
+	static const std::vector<Action> actions = []
 	{
-		std::vector<std::string> list{ActionPlayerShutdown, ActionPausePlayback, ActionMachineShutdown};
+		bool sleep = false;
+		bool hibernate = false;
 #ifdef _WIN32
-		if (IsPwrSuspendAllowed())
-			list.push_back(ActionMachineSleep);
-		if (IsPwrHibernateAllowed())
-			list.push_back(ActionMachineHibernate);
+		PowerStates(sleep, hibernate);
 #endif
+		std::vector<Action> list{Action::PausePlayback, Action::ClosePlayer, Action::Shutdown};
+		if (sleep)
+			list.push_back(Action::Sleep);
+		if (hibernate)
+			list.push_back(Action::Hibernate);
+		list.push_back(Action::Reboot);
+		list.push_back(Action::LogOff);
 		return list;
 	}();
 	return actions;
 }
 
-bool SleepTimer::IsSupported(const std::string &action)
+bool SleepTimer::IsSupported(Action action)
 {
 	const auto &actions = SupportedActions();
 	return std::find(actions.begin(), actions.end(), action) != actions.end();
@@ -78,16 +144,21 @@ void SleepTimer::Start(IAIMPCore *core, StateUpdateEvents &events)
 	FCore = core;
 	FEvents = &events;
 	FStopped = false;
+	events.OnStreamEnd([this](unsigned flags)
+					   { StreamEnded(flags); });
 	FThread = std::thread([this]
 						  { Run(); });
 }
 
 void SleepTimer::Stop()
 {
+	if (FEvents)
+		FEvents->OnStreamEnd(nullptr);
 	{
 		std::lock_guard lock(FMutex);
 		FStopped = true;
-		FActive = false;
+		FState.Active = false;
+		++FGeneration;
 	}
 	FChanged.notify_all();
 	JoinPumpingMessages(FThread);
@@ -98,24 +169,19 @@ void SleepTimer::Stop()
 SleepTimer::State SleepTimer::Get() const
 {
 	std::lock_guard lock(FMutex);
-	State state;
-	state.Active = FActive;
-	if (FActive)
-	{
-		state.Action = FAction;
-		const auto left = std::chrono::duration<double>(FDeadline - std::chrono::steady_clock::now()).count();
-		state.ExpiresInSeconds = static_cast<int>(std::max(0.0, std::round(left)));
-	}
-	return state;
+	return FState;
 }
 
-void SleepTimer::Set(const std::string &action, std::chrono::seconds delay)
+void SleepTimer::Set(const Request &request)
 {
 	{
 		std::lock_guard lock(FMutex);
-		FActive = true;
-		FAction = action;
-		FDeadline = std::chrono::steady_clock::now() + delay;
+		static_cast<Request &>(FState) = request;
+		FState.Active = true;
+		FState.SetAt = Clock::now();
+		FState.WaitingTrackEnd = false;
+		FState.TracksLeft = request.Tracks;
+		FState.TracksEnded = 0;
 		++FGeneration;
 	}
 	FChanged.notify_all();
@@ -127,7 +193,8 @@ void SleepTimer::Cancel()
 {
 	{
 		std::lock_guard lock(FMutex);
-		FActive = false;
+		FState.Active = false;
+		++FGeneration;
 	}
 	FChanged.notify_all();
 	if (FEvents)
@@ -139,47 +206,90 @@ void SleepTimer::Run()
 	std::unique_lock lock(FMutex);
 	while (!FStopped)
 	{
-		if (!FActive)
+		if (!FState.Active || !IsTimed(FState.When) || FState.WaitingTrackEnd)
 		{
-			FChanged.wait(lock, [&]
-						  { return FStopped || FActive; });
+			FChanged.wait(lock);
 			continue;
 		}
 		const std::uint64_t generation = FGeneration;
-		if (FChanged.wait_until(lock, FDeadline, [&]
-								{ return FStopped || !FActive || FGeneration != generation; }))
-			continue; // cancelled, replaced or stopping: re-evaluate
-		if (std::chrono::steady_clock::now() < FDeadline)
-			continue; // spurious wake-up
-		const std::string action = FAction;
-		FActive = false;
-		lock.unlock();
-		Execute(action);
-		if (FEvents)
-			FEvents->Notify(StateUpdateEvents::Timer);
-		lock.lock();
+		const Clock::duration left = FState.ExpiresAt - Clock::now();
+		if (left > Clock::duration::zero())
+		{
+			FChanged.wait_for(lock, std::min<Clock::duration>(left, WaitSlice), [&]
+							  { return FStopped || FGeneration != generation; });
+			continue;
+		}
+		if (FState.WaitTrackEnd)
+		{
+			// Asked without the lock: the player's thread takes it in StreamEnded().
+			lock.unlock();
+			const bool playing = RunOnMainThread(FCore, [&]
+												 { return IsPlaying(FCore); });
+			lock.lock();
+			if (FGeneration != generation)
+				continue;
+			if (playing)
+			{
+				FState.WaitingTrackEnd = true;
+				lock.unlock();
+				FEvents->Notify(StateUpdateEvents::Timer);
+				lock.lock();
+				continue;
+			}
+		}
+		Fire(lock, false);
 	}
 }
 
-void SleepTimer::Execute(const std::string &action)
+// The player's thread, on AIMP_MSG_EVENT_STREAM_END. A track's end counts
+// however it came, by itself, a switch or a stop; the end of the playlist or of
+// the queue is what the player says it was.
+void SleepTimer::StreamEnded(unsigned flags)
 {
-	if (action == ActionPausePlayback)
+	std::unique_lock lock(FMutex);
+	if (!FState.Active)
+		return;
+	bool due = false;
+	switch (FState.When)
 	{
-		RunOnMainThread(FCore, [&]
-						{ PausePlayback(FCore); });
-		return;
+	case Trigger::TrackEnd:
+		due = --FState.TracksLeft <= 0;
+		break;
+	case Trigger::PlaylistEnd:
+		due = (flags & AIMP_MES_END_OF_PLAYLIST) != 0;
+		break;
+	case Trigger::QueueEnd:
+		due = (flags & AIMP_MES_END_OF_QUEUE) != 0;
+		break;
+	default:
+		due = FState.WaitingTrackEnd;
+		break;
 	}
-	DWORD flags = 0;
-	if (action == ActionPlayerShutdown)
-		flags = AIMP_SERVICE_SHUTDOWN_FLAGS_CLOSE_APP;
-	else if (action == ActionMachineShutdown)
-		flags = AIMP_SERVICE_SHUTDOWN_FLAGS_POWEROFF;
-	else if (action == ActionMachineSleep)
-		flags = AIMP_SERVICE_SHUTDOWN_FLAGS_SLEEP | AIMP_SERVICE_SHUTDOWN_FLAGS_NO_CONFIRM;
-	else if (action == ActionMachineHibernate)
-		flags = AIMP_SERVICE_SHUTDOWN_FLAGS_HIBERNATE | AIMP_SERVICE_SHUTDOWN_FLAGS_NO_CONFIRM;
+	if (due)
+		Fire(lock, true);
+	else if (!IsTimed(FState.When))
+	{
+		++FState.TracksEnded;
+		lock.unlock();
+		FEvents->Notify(StateUpdateEvents::Timer);
+	}
+}
+
+// Takes the lock held and gives it back held. On the player's thread the actions
+// are posted: the player starts the next track right after the end of the
+// stream, and a pause must find it playing.
+void SleepTimer::Fire(std::unique_lock<std::mutex> &lock, bool fromPlayerThread)
+{
+	const std::vector<Action> actions = FState.Actions;
+	FState.Active = false;
+	++FGeneration;
+	lock.unlock();
+	if (fromPlayerThread)
+		PostToMainThread(FCore, [core = FCore, actions]
+						 { Execute(core, actions); });
 	else
-		return;
-	RunOnMainThread(FCore, [&]
-					{ Shutdown(FCore, flags); });
+		RunOnMainThread(FCore, [&]
+						{ Execute(FCore, actions); });
+	FEvents->Notify(StateUpdateEvents::Timer);
+	lock.lock();
 }

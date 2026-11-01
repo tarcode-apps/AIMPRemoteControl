@@ -5,6 +5,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -66,6 +67,10 @@ public:
 	void Notify(Kind kind);
 	bool IsStopped();
 
+	// Called on the player's thread when a stream ends, with the AIMP_MES_* flags;
+	// set and cleared on that thread too.
+	void OnStreamEnd(std::function<void(unsigned flags)> handler);
+
 private:
 	class MessageHook;
 	class PlaylistListener;
@@ -78,6 +83,7 @@ private:
 	void FilterChange(const std::string &playlistId, unsigned long flags, std::int32_t itemCount);
 	void PlaylistRemoved(const std::string &playlistId);
 	void QueueChanged();
+	void StreamEnded(unsigned flags);
 	void AllPlaylistsChanged();
 	void PollPlaylistSettings();
 
@@ -88,6 +94,7 @@ private:
 	QueueListener *FQueueListener = nullptr;
 	std::thread FSettingsPoller;
 	std::unique_ptr<PlaylistChangeFilter> FChangeFilter;
+	std::function<void(unsigned)> FStreamEnd;
 
 	std::mutex FMutex;
 	std::condition_variable FChanged;

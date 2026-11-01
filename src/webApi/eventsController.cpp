@@ -12,6 +12,7 @@
 #include "settings.h"
 #include "settingsController.h"
 #include "stateUpdateEvents.h"
+#include "timerController.h"
 
 namespace
 {
@@ -32,7 +33,8 @@ namespace
 		return {{"revision", queue.Revision}, {"count", queue.Count}, {"suspended", queue.Suspended}};
 	}
 
-	nlohmann::json EventData(IAIMPCore *core, StateUpdateEvents &events, webapi::CoverIndex &covers, const SharedSettings &settings, int kind)
+	nlohmann::json EventData(IAIMPCore *core, StateUpdateEvents &events, webapi::CoverIndex &covers, const SharedSettings &settings,
+							 const SleepTimer &timer, int kind)
 	{
 		switch (kind)
 		{
@@ -44,6 +46,8 @@ namespace
 			return QueueData(events);
 		case StateUpdateEvents::Settings:
 			return webapi::SettingsController::ToJson(settings.Get());
+		case StateUpdateEvents::Timer:
+			return webapi::TimerController::ToJson(timer);
 		default:
 			return nlohmann::json::object();
 		}
@@ -71,7 +75,7 @@ namespace
 
 void webapi::EventsController::Register(IEndpointRouteBuilder &endpoints)
 {
-	endpoints.MapEventStream("/api/v1/events", [core = FCore, &events = FEvents, &covers = FCovers, &settings = FSettings](IEventStream &stream)
+	endpoints.MapEventStream("/api/v1/events", [core = FCore, &events = FEvents, &covers = FCovers, &settings = FSettings, &timer = FTimer](IEventStream &stream)
 					   {
 		if (!stream.Send("hello", nlohmann::json{{"pluginVersion", PLUGIN_VERSION_STRING}}.dump()))
 			return;
@@ -97,7 +101,7 @@ void webapi::EventsController::Register(IEndpointRouteBuilder &endpoints)
 				changed |= more;
 			}
 			for (int kind = 0; kind < StateUpdateEvents::KindCount; ++kind)
-				if (changed.test(kind) && !stream.Send(EventName(kind), EventData(core, events, covers, settings, kind).dump()))
+				if (changed.test(kind) && !stream.Send(EventName(kind), EventData(core, events, covers, settings, timer, kind).dump()))
 					return;
 		} });
 }

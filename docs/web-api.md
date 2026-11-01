@@ -40,6 +40,7 @@ Error codes so far:
 | `403` | `uploadDisabled` | uploading tracks is not allowed in the plugin settings |
 | `507` | `uploadNoSpace` | the drive of the upload folder has no room for the uploaded file |
 | `500` | `uploadFailed` | the uploaded file could not be written into the upload folder; nothing of it is left behind |
+| `403` | `schedulerDisabled` | timer functions are not allowed in the plugin settings |
 
 ## Playlists
 
@@ -824,6 +825,86 @@ The extensions the player opens, lower-case and without the dot:
 { "audio": ["mp3", "flac", "ogg", "…"], "playlists": ["m3u", "m3u8", "pls", "cue", "…"] }
 ```
 
+## Timer
+
+The plugin's sleep timer: at its moment it does what it was told, on the
+player's computer. The player's own scheduler is a separate plugin the SDK does
+not reach, so a timer set there is not seen here, nor this one there. Every
+request needs the "Allow timer functions" permission of the plugin's options
+page.
+
+### `GET /api/v1/timer`
+
+```json
+{
+  "supportedActions": ["pause", "closePlayer", "shutdown", "sleep", "hibernate", "reboot", "logOff"],
+  "timer": {
+    "actions": ["pause", "shutdown"],
+    "trigger": "after",
+    "setAt": 1761994800000,
+    "expiresAt": 1761996600000,
+    "waitTrackEnd": true,
+    "waitingTrackEnd": false
+  }
+}
+```
+
+`supportedActions` are the actions this computer can do, in the order a client
+should offer them: `pause` pauses playback, `closePlayer` closes the player;
+`shutdown`, `reboot` and `logOff` do that to the computer after the player's
+own 10-second countdown dialog with a *Cancel* button; `sleep` and `hibernate`
+do it at once and are listed only when the system has them. `timer` is `null`
+while no timer is set. `trigger` is what brings the moment:
+`after` a delay, `at` a time, `trackEnd` once `tracks` tracks have ended, the
+playing one first, or `playlistEnd` and `queueEnd` when the playlist or the
+playback queue ends. `expiresAt` is that moment in milliseconds since the Unix
+epoch, for `after` and `at` only; the client counts down from it, and `setAt`,
+when the timer was set, lets it show how far along it is. `waitTrackEnd`
+says the timer lets a track that is playing at that moment finish first, and
+`waitingTrackEnd` that it is doing so now. A timer waiting for tracks to end
+carries `tracksEnded` instead, how many have ended since it was set, and a
+`trackEnd` timer also `tracks` and `tracksLeft`:
+
+```json
+{ "actions": ["pause"], "trigger": "trackEnd", "tracks": 3, "tracksLeft": 2, "tracksEnded": 1 }
+```
+
+A track's end counts however it comes: by itself, by a switch to another track
+or by a stop. The end of the playlist and of the queue are as the player
+reports them when a track ends, so a playlist on repeat does not end.
+
+### `PUT /api/v1/timer`
+
+Sets the timer in place of the one set before, if any:
+
+```json
+{ "actions": ["pause"], "trigger": "after", "seconds": 1800, "waitTrackEnd": true }
+```
+```json
+{ "actions": ["shutdown"], "trigger": "at", "at": 1762030800000 }
+```
+```json
+{ "actions": ["pause", "closePlayer"], "trigger": "trackEnd", "tracks": 3 }
+```
+
+`actions` names one or more of `supportedActions`, with at most one of the
+computer's own (`shutdown`, `sleep`, `hibernate`, `reboot`, `logOff`); beside
+one of those `closePlayer` is left to the system. `after` takes `seconds`, a
+positive number; `at` takes `at`, a moment in the future in milliseconds since
+the Unix epoch; both take `waitTrackEnd`, `false` by default. Neither may lie
+more than a year ahead. `trackEnd` takes `tracks`, 1 to 1000, 1 by default.
+The response is the state as `GET` returns it; the
+[`timer` event](#get-apiv1events) carries the same object.
+
+Errors: `400 invalidBody`, `403 schedulerDisabled`.
+
+### `DELETE /api/v1/timer`
+
+Cancels the timer; with none set it succeeds all the same. The response is an
+empty object.
+
+Errors: `403 schedulerDisabled`.
+
 ## Settings
 
 ### `GET /api/v1/settings`
@@ -860,7 +941,7 @@ change; the payload is a JSON object.
 | `player` | playback state, track, a seek, volume, mute, repeat, shuffle, radio capture, or a change of the playing playlist that may have moved the track's index | the same object as [`GET /api/v1/player`](#get-apiv1player) |
 | `playlists` | a playlist was added, removed, renamed or its content changed | `{"playlists": [{"id": "{A1B2C3D4-...}", "revision": 7}, …]}` — every loaded playlist with its current revision |
 | `queue` | an entry was added, removed or moved, the player took the next track out, or the queue was suspended or resumed | `{"revision": 12, "count": 3, "suspended": false}` — enough for a badge; the list itself is [`GET /api/v1/queue`](#get-apiv1queue) |
-| `timer` | the sleep timer was set, cancelled or fired | `{}` |
+| `timer` | the sleep timer was set, cancelled or fired, or began to wait for the end of the playing track | the same object as [`GET /api/v1/timer`](#get-apiv1timer) |
 | `settings` | the plugin's settings were saved on its options page | the same object as [`GET /api/v1/settings`](#get-apiv1settings) |
 
 A track switch raises several player changes within a few milliseconds, with

@@ -145,7 +145,7 @@ so build with `--debug`.
 | `src/rpcApi/` | one class per RPC method / HTTP endpoint |
 | `src/helpers/` | AIMP SDK helpers, network interface enumeration and watcher, JSON helpers |
 | `src/optionsFrame.*`, `Langs/` | options page and its localization |
-| `src/sleepTimer.*` | timer behind the `Scheduler` command |
+| `src/sleepTimer.*` | sleep timer behind the `Scheduler` command and `/api/v1/timer` |
 | `web-client/` | the web client (Next.js, static export); builds into `web-client/out/` |
 | `docs/remote-control-protocol.md` | protocol reference |
 | `docs/catalog/` | files for the entry in the AIMP addons catalog |

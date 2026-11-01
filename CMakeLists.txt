@@ -117,9 +117,9 @@ target_link_libraries(AIMPRemoteControlPlugin PRIVATE
   # SHGetKnownFolderPath / CoTaskMemFree for the default upload folder.
   $<$<BOOL:${WIN32}>:shell32>
   $<$<BOOL:${WIN32}>:ole32>
-  # IsPwrSuspendAllowed / IsPwrHibernateAllowed for the sleep timer capabilities.
   # PathGetCharType for upload file names.
   $<$<BOOL:${WIN32}>:shlwapi>
+  # GetPwrCapabilities for the sleep timer's actions.
   $<$<BOOL:${WIN32}>:powrprof>
   # GetAdaptersAddresses for the address list in the options dialog.
   $<$<BOOL:${WIN32}>:iphlpapi>

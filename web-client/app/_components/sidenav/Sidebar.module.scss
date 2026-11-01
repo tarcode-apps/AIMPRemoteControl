@@ -80,6 +80,11 @@
     color: var(--color-text);
 }
 
+// A picture needs no room for digits beside it.
+.pictureBadge {
+    padding: 0;
+}
+
 .divider {
     margin: 0 20px;
     border: 0;

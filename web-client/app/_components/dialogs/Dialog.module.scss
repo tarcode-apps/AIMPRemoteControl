@@ -71,8 +71,14 @@
     display: flex;
     align-items: center;
     gap: 16px;
-    min-height: 48px;
+    min-height: 44px;
     cursor: pointer;
+}
+
+// As in the player's Android app: a checkbox stands before its label, a radio after.
+.option:has(input[type="checkbox"]) {
+    flex-direction: row-reverse;
+    justify-content: flex-end;
 }
 
 .label {

@@ -310,6 +310,48 @@ export type Settings = {
     permissions: Permissions;
 };
 
+// What the sleep timer does at its moment.
+export type TimerAction = 'pause' | 'closePlayer' | 'shutdown' | 'sleep' | 'hibernate' | 'reboot' | 'logOff';
+// The actions done to the computer, of which a timer takes one at most.
+export const machineActions: readonly TimerAction[] = ['shutdown', 'sleep', 'hibernate', 'reboot', 'logOff'];
+// What brings the moment: a delay, a time, or the end of the playing track, its
+// playlist or the playback queue.
+export type TimerTrigger = 'after' | 'at' | 'trackEnd' | 'playlistEnd' | 'queueEnd';
+export const timerTriggers: readonly TimerTrigger[] = ['after', 'at', 'trackEnd', 'playlistEnd', 'queueEnd'];
+
+export type ActiveTimer = {
+    actions: TimerAction[];
+    trigger: TimerTrigger;
+    // The moment and when it was set, in milliseconds since the Unix epoch; for
+    // `after` and `at` only.
+    expiresAt?: number;
+    setAt?: number;
+    // A track playing at the moment finishes first.
+    waitTrackEnd?: boolean;
+    // The moment has come and the track is being let finish.
+    waitingTrackEnd?: boolean;
+    // For `trackEnd`: how many tracks are to end, and how many still are.
+    tracks?: number;
+    tracksLeft?: number;
+    // For the triggers that wait for tracks to end: how many have since the timer was set.
+    tracksEnded?: number;
+};
+
+export type TimerState = {
+    // What this computer can do, in the order to offer it.
+    supportedActions: TimerAction[];
+    timer: ActiveTimer | null;
+};
+
+export type SetTimerRequest = {
+    actions: TimerAction[];
+    trigger: TimerTrigger;
+    seconds?: number;
+    at?: number;
+    waitTrackEnd?: boolean;
+    tracks?: number;
+};
+
 export type FileType = 'audio' | 'playlist';
 
 export type FileRoot = {

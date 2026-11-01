@@ -611,6 +611,11 @@ Error `-1` when timer functions are disabled in the plugin settings; `-32602`
 for an unknown action or a missing/non-positive delay. Changes are pushed
 through the `timer_state_change` event.
 
+The web client shares this timer (`/api/v1/timer`). A timer it set to wait for
+the end of the playing track, the playlist or the queue, or whose actions are
+none of the above, has no `current_timer` here; of a mixed set of actions only
+those above are reported.
+
 ---
 
 ## 8. Long polling: `SubscribeOnAIMPStateUpdateEvent`

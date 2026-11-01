@@ -40,6 +40,7 @@ namespace player
 		TrackMarks Marks;
 		bool Enabled = true;
 		bool IsUrl = false;
+		bool InContainer = false; // a part of a container file, such as one track of a CUE sheet
 		CoverSource Cover;
 		std::string FileUri; // the URI as the player stores it: a path, an URL, or a part of a container
 	};
@@ -155,6 +156,8 @@ namespace player
 		PlaylistReadOnly,
 		GroupNotFound,
 		ItemNotFound,
+		ItemInContainer,   // a part of a container file cannot be deleted from disk
+		FilesNotDeletable, // some files cannot be deleted from disk right now
 		Failed
 	};
 
@@ -199,4 +202,15 @@ namespace player
 	// resulting playlist. They keep their relative order.
 	MutationResult MovePlaylistItems(IAIMPCore *core, const std::string &playlistId, std::vector<std::int32_t> indexes,
 									 std::int32_t target);
+
+	// Takes the items at the sorted `indexes` out of the playlist in one pass, with
+	// `physically` also deleting their files from disk, as the player's own command does.
+	HRESULT DeleteItems(IAIMPPlaylist *playlist, const std::vector<std::int32_t> &indexes, bool physically);
+
+	// Removes the selected items; with `physically` their files go too. A selection
+	// is refused as a whole when it has a part of a container file, or files that
+	// cannot be deleted, which `undeletable` then names: the player reports a failed
+	// deletion in a dialog of its own, or not at all, so it is ruled out beforehand.
+	MutationResult RemovePlaylistItems(IAIMPCore *core, const std::string &playlistId, const ItemSelection &selection,
+									   bool physically, std::vector<std::string> &undeletable);
 }

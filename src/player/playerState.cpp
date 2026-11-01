@@ -91,7 +91,8 @@ namespace
 			track.Title = ToStringAndRelease(ItemTitleOrFileName(ctx));
 			track.Artist = ToStringAndRelease(ItemFileInfoString(ctx, AIMP_FILEINFO_PROPID_ARTIST));
 			track.Album = ToStringAndRelease(ItemFileInfoString(ctx, AIMP_FILEINFO_PROPID_ALBUM));
-			track.IsUrl = fileUriService && ctx.FileUri && fileUriService->IsURL(ctx.FileUri) == S_OK;
+			track.IsUrl = ItemIsUrl(ctx);
+			track.InContainer = ItemInContainer(ctx);
 			track.Marks = player::ReadMarks(ctx.FileInfo);
 			if (ctx.FileInfo && !track.IsUrl)
 				track.Cover = player::DescribeCoverSource(ctx.FileInfo, false);

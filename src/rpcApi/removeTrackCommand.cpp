@@ -12,19 +12,13 @@
 #include "helpers/idLookup.h"
 #include "mainThreadRunner.h"
 #include "helpers/remoteControlIdManager.h"
+#include "player/playlistItems.h"
 #include "settings.h"
 
 namespace
 {
 	constexpr int ErrorTrackNotFound = 21;
 	constexpr int ErrorRemoveFailed = 28;
-
-	BOOL WINAPI DeleteOnlyIndex(IAIMPPlaylistItem *item, void *userData)
-	{
-		INT32 index = -1;
-		item->GetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_INDEX, &index);
-		return index == *static_cast<const INT32 *>(userData);
-	}
 }
 
 void rpcapi::RemoveTrackCommand::Register(IEndpointRouteBuilder &endpoints)
@@ -44,15 +38,9 @@ void rpcapi::RemoveTrackCommand::Register(IEndpointRouteBuilder &endpoints)
 			IAIMPPlaylistItem *item = FindPlaylistItem(core, idManager, trackId, &playlist);
 			if (!item)
 				return E_INVALIDARG;
-			HRESULT hr;
-			if (physically)
-			{
-				INT32 index = -1;
-				item->GetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_INDEX, &index);
-				hr = playlist->Delete3(AIMP_PLAYLIST_DELETE_FLAGS_PHYSICALLY | AIMP_PLAYLIST_DELETE_FLAGS_NOCONFIRMATION, DeleteOnlyIndex, &index);
-			}
-			else
-				hr = playlist->Delete(item);
+			INT32 index = -1;
+			item->GetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_INDEX, &index);
+			const HRESULT hr = player::DeleteItems(playlist, {index}, physically);
 			item->Release();
 			playlist->Release();
 			return hr;

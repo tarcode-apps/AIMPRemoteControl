@@ -269,6 +269,22 @@ export type ItemDetailsRequest = ItemSelection & {
     revision?: number;
 };
 
+export type RemoveItemsRequest = ItemSelection & {
+    playlistId: string;
+    revision?: number;
+    // The files go from disk too.
+    physically: boolean;
+};
+
+// Not predicted: the pages are windows over the playlist, which the `playlists`
+// event reloads once the player has taken the items out.
+export function useRemovePlaylistItems() {
+    return useMutation({
+        mutationFn: ({ playlistId, ...body }: RemoveItemsRequest) =>
+            request<unknown>('POST', `/playlists/${encodeURIComponent(playlistId)}/items/remove`, { body }),
+    });
+}
+
 export function useItemDetails() {
     return useMutation({
         mutationFn: ({ playlistId, ...body }: ItemDetailsRequest) =>

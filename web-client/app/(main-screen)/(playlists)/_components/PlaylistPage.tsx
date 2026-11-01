@@ -21,7 +21,8 @@ import {
     usePlaylistDrag,
 } from '@/app/_components/lists';
 import styles from '@/app/_components/lists/ListPage.module.scss';
-import { useRowMenu } from '@/app/_components/menus';
+import { menuSeparator, useRowMenu } from '@/app/_components/menus';
+import { useItemRemoval } from '@/app/_components/playlists';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
@@ -257,9 +258,15 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
     const hasMenu = mode.mode === null || searching;
     const trackActions = useTrackActions();
     const favoriteActions = useFavoriteActions();
+    const removal = useItemRemoval();
     const rowMenu = useRowMenu((item: PlaylistItem) => {
         const track = { ...item, playlistId: playlist.id, revision: playlist.revision };
-        return [...trackActions.enqueueItems(track), favoriteActions.favoriteMenuItem(track)];
+        return [
+            ...trackActions.enqueueItems(track),
+            favoriteActions.favoriteMenuItem(track),
+            menuSeparator,
+            ...removal.trackItems({ ...track, name: item.displayText }),
+        ];
     });
 
     // A row's item goes with its group in the selection: the server picks out a
@@ -470,6 +477,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                 </div>
             )}
             {rowMenu.popover}
+            {removal.dialogs}
         </section>
     );
 }

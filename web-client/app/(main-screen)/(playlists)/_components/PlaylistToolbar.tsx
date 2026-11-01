@@ -11,7 +11,7 @@ import { Icon } from '@/app/_components/icons';
 import { ListToolbar } from '@/app/_components/lists';
 import toolbarStyles from '@/app/_components/lists/ListToolbar.module.scss';
 import { Menu, menuSeparator, type MenuEntry } from '@/app/_components/menus';
-import { AddUrlDialog, usePlaylistActions } from '@/app/_components/playlists';
+import { AddUrlDialog, useItemRemoval, usePlaylistActions } from '@/app/_components/playlists';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { useNavigation } from '@/app/_state/Navigation';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
@@ -39,6 +39,7 @@ export function PlaylistToolbar() {
     const enqueue = useEnqueue();
     const favoriteActions = useFavoriteActions();
     const playlistActions = usePlaylistActions();
+    const removal = useItemRemoval();
     const uploads = useUploads();
     const permissions = useSettings().data?.permissions;
     const { data: formats } = useFormats();
@@ -58,6 +59,12 @@ export function PlaylistToolbar() {
         const selection = mode.itemSelection();
         if (selected && selection)
             void favoriteActions.addSelections([{ playlistId: selected.id, revision: selected.revision, selection }]);
+    };
+    const selectedRemoval = () => {
+        const selection = mode.itemSelection();
+        return selected && selection
+            ? { parts: [{ playlistId: selected.id, revision: selected.revision, selection }] }
+            : undefined;
     };
     // The extended search takes the text a search here was typed with; coming back
     // finds the plain playlist.
@@ -173,7 +180,7 @@ export function PlaylistToolbar() {
                         disabled: mode.nothingSelected,
                         onSelect: addSelectedToFavorites,
                     },
-                    { label: t('playlist.removeSelected'), icon: 'delete', disabled: true, onSelect: () => {} },
+                    ...removal.selectionItems(selectedRemoval, mode.nothingSelected || !selected || selected.readOnly),
                     ...(mode.mode === 'search' ? [extendedSearch] : []),
                 ]}
                 sorting={
@@ -206,6 +213,7 @@ export function PlaylistToolbar() {
                 }
             />
             {playlistActions.dialogs}
+            {removal.dialogs}
             {urlDialog && selected && <AddUrlDialog playlist={selected} onClose={() => setUrlDialog(false)} />}
             <input
                 ref={fileInput}

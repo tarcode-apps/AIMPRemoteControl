@@ -23,6 +23,7 @@ namespace webapi
 			{"displayingMark", item.Marks.DisplayingMark},
 			{"enabled", item.Enabled},
 			{"isUrl", item.IsUrl},
+			{"inContainer", item.InContainer},
 			{"cover", player::CoverKey(item.Cover)},
 			{"fileUri", item.FileUri},
 		};

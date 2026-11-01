@@ -28,6 +28,9 @@ IAIMPString *ItemParentDirName(const PlaylistItemContext &ctx);
 IAIMPString *ItemFileInfoString(const PlaylistItemContext &ctx, int propId);
 // The tag title, or the file name when the tag is empty, as the player shows it.
 IAIMPString *ItemTitleOrFileName(const PlaylistItemContext &ctx);
+bool ItemIsUrl(const PlaylistItemContext &ctx);
+// A part of a container file, such as one track of a CUE sheet.
+bool ItemInContainer(const PlaylistItemContext &ctx);
 
 // The texts of an item a search looks through. The defaults are the playlist's own
 // quick search; the extended search of the web API names its fields.

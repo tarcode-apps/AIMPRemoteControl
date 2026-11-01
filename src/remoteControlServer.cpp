@@ -151,7 +151,9 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 	{
 		res.status = e.Status();
 		res.set_header("Cache-Control", "no-store");
-		res.set_content(nlohmann::json{{"error", {{"code", e.Code()}, {"message", LocalizeMessage(std::string("AIMPRemoteControlErrors\\") + e.Code())}}}}.dump(), "application/json");
+		nlohmann::json error = {{"code", e.Code()}, {"message", LocalizeMessage(std::string("AIMPRemoteControlErrors\\") + e.Code())}};
+		error.update(e.Details());
+		res.set_content(nlohmann::json{{"error", std::move(error)}}.dump(), "application/json");
 	}
 
 	static std::vector<HttpUploadedFile> UploadedFiles(const httplib::Request &req)

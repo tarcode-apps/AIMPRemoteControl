@@ -343,4 +343,20 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 		ThrowUnlessOk(RunOnMainThread(core, [&]
 									  { return player::MovePlaylistItems(core, playlistId, move.first, move.second); }));
 		return nlohmann::json::object(); });
+
+	endpoints.MapApi(HttpMethod::Post, R"(/api/v1/playlists/([^/]+)/items/remove)", [core = FCore, &events = FEvents, &settings = FSettings](const ApiRequest &request) -> nlohmann::json
+			   {
+		const std::string playlistId = request.PathMatches.at(0);
+		const player::ItemSelection selection = SelectionBody(request.Body);
+		const bool physically = OptionalField<bool>(request.Body, "physically", &nlohmann::json::is_boolean).value_or(false);
+		if (physically && !settings.Get().Features.PhysicalDeletion)
+			throw ApiError(403, "physicalDeletionDisabled");
+		CheckRevision(request.Body, events, playlistId);
+		std::vector<std::string> undeletable;
+		const player::MutationResult result = RunOnMainThread(core, [&]
+															  { return player::RemovePlaylistItems(core, playlistId, selection, physically, undeletable); });
+		if (result == player::MutationResult::FilesNotDeletable)
+			throw ApiError(403, "filesNotDeletable", {{"files", undeletable}});
+		ThrowUnlessOk(result);
+		return nlohmann::json::object(); });
 }

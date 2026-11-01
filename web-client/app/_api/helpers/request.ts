@@ -13,9 +13,16 @@ export const basePath = '/api/v1';
 export function responseError(status: number, contentType: string | null, text: string): Error {
     if (contentType?.includes('application/json')) {
         const body: unknown = JSON.parse(text);
-        const error = (body as { error?: { code?: unknown; message?: unknown } })?.error;
+        const error = (body as { error?: { code?: unknown; message?: unknown; files?: unknown } })?.error;
         if (typeof error?.code === 'string')
-            return new ApiError(status, error.code, typeof error.message === 'string' ? error.message : error.code);
+            return new ApiError(
+                status,
+                error.code,
+                typeof error.message === 'string' ? error.message : error.code,
+                Array.isArray(error.files)
+                    ? error.files.filter((file): file is string => typeof file === 'string')
+                    : [],
+            );
     }
     return new HttpError(status);
 }

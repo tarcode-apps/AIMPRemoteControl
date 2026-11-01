@@ -66,6 +66,27 @@ IAIMPString *ItemTitleOrFileName(const PlaylistItemContext &ctx)
 	return ItemFileName(ctx);
 }
 
+bool ItemIsUrl(const PlaylistItemContext &ctx)
+{
+	return ctx.FileUriService && ctx.FileUri && ctx.FileUriService->IsURL(ctx.FileUri) == S_OK;
+}
+
+bool ItemInContainer(const PlaylistItemContext &ctx)
+{
+	if (!ctx.FileUriService || !ctx.FileUri)
+		return false;
+	IAIMPString *container = nullptr;
+	IAIMPString *part = nullptr;
+	if (Failed(ctx.FileUriService->Parse(ctx.FileUri, &container, &part)))
+		return false;
+	const bool inContainer = part && part->GetLength() > 0;
+	if (container)
+		container->Release();
+	if (part)
+		part->Release();
+	return inContainer;
+}
+
 bool PlaylistItemMatches(const PlaylistItemContext &ctx, IAIMPString *searchString, const SearchFields &fields)
 {
 	const auto contains = [&](IAIMPString *s)

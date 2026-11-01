@@ -18,7 +18,8 @@ import {
     type RowView,
 } from '@/app/_components/lists';
 import styles from '@/app/_components/lists/ListPage.module.scss';
-import { useRowMenu } from '@/app/_components/menus';
+import { menuSeparator, useRowMenu } from '@/app/_components/menus';
+import { useItemRemoval } from '@/app/_components/playlists';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { useFavoriteRelink, useFavorites, type FavoriteRecord } from '@/app/_state/Favorites';
 import { useNavigation } from '@/app/_state/Navigation';
@@ -53,6 +54,7 @@ function snapshotItem(record: FavoriteRecord): PlaylistItem {
         displayingMark: 0,
         enabled: true,
         isUrl: record.isUrl,
+        inContainer: false,
         cover: '',
         fileUri: record.fileUri,
     };
@@ -137,6 +139,7 @@ export function FavoritesPage() {
     }
 
     const queuePositions = useQueuePositions();
+    const removal = useItemRemoval();
     const rowMenu = useRowMenu(({ record, located }: FavoriteEntry) => {
         const remove = {
             label: t('favorites.remove'),
@@ -161,6 +164,10 @@ export function FavoritesPage() {
             ...trackActions.enqueueItems(located),
             { ...showItem, onSelect: () => mode.leaveThen(showItem.onSelect) },
             remove,
+            menuSeparator,
+            ...removal.trackItems({ ...located, name: record.displayText }, physically => {
+                if (physically) favorites.remove([record.fileUri]);
+            }),
         ];
     });
 
@@ -331,6 +338,7 @@ export function FavoritesPage() {
                 </div>
             )}
             {rowMenu.popover}
+            {removal.dialogs}
         </section>
     );
 }

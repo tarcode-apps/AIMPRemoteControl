@@ -203,6 +203,10 @@ namespace webapi
 			throw ApiError(404, "groupNotFound");
 		case player::MutationResult::ItemNotFound:
 			throw ApiError(404, "itemNotFound");
+		case player::MutationResult::ItemInContainer:
+			throw ApiError(400, "itemInContainer");
+		case player::MutationResult::FilesNotDeletable:
+			throw ApiError(403, "filesNotDeletable");
 		case player::MutationResult::Failed:
 			throw ApiError(500, "playlistUpdateFailed");
 		}

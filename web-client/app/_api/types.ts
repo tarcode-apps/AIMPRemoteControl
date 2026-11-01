@@ -52,6 +52,8 @@ export type PlaylistItem = {
     displayingMark: number;
     enabled: boolean;
     isUrl: boolean;
+    // A part of a container file, such as one track of a CUE sheet.
+    inContainer: boolean;
     // Names the cover in its URL; changes when the tags are written.
     cover: string;
     // The URI as the player stores it: the one stable name of a track, compared
@@ -257,6 +259,7 @@ export type PlayingTrack = {
     artist: string;
     album: string;
     isUrl: boolean;
+    inContainer: boolean;
     mark: number;
     rating: number;
     displayingMark: number;

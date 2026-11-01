@@ -4,6 +4,7 @@ import { useEnqueueSelections } from '@/app/_api/queue';
 import { ToolbarButton } from '@/app/_components/buttons';
 import { Icon } from '@/app/_components/icons';
 import { ListToolbar } from '@/app/_components/lists';
+import { useItemRemoval } from '@/app/_components/playlists';
 import { useFavoriteRelink } from '@/app/_state/Favorites';
 import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
 import { useState } from 'react';
@@ -17,6 +18,7 @@ export function SearchToolbar() {
     const mode = useSearchMode();
     const enqueueSelections = useEnqueueSelections();
     const favoriteActions = useFavoriteActions();
+    const removal = useItemRemoval();
     const { relinking } = useFavoriteRelink();
     const [dialog, setDialog] = useState<'playlists' | 'fields' | null>(null);
     const closeDialog = () => setDialog(null);
@@ -79,8 +81,13 @@ export function SearchToolbar() {
                         disabled: mode.nothingSelected,
                         onSelect: () => void favoriteActions.addSelections(mode.selectionByPlaylist() ?? []),
                     },
+                    ...removal.selectionItems(() => {
+                        const parts = mode.selectionByPlaylist();
+                        return parts && { parts };
+                    }, mode.nothingSelected),
                 ]}
             />
+            {removal.dialogs}
             <SearchPlaylistsDialog open={dialog === 'playlists'} onClose={closeDialog} />
             <SearchFieldsDialog open={dialog === 'fields'} onClose={closeDialog} />
         </>

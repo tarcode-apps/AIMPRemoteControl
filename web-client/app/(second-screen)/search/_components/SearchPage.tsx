@@ -20,7 +20,8 @@ import {
     type RowView,
 } from '@/app/_components/lists';
 import styles from '@/app/_components/lists/ListPage.module.scss';
-import { useRowMenu } from '@/app/_components/menus';
+import { menuSeparator, useRowMenu } from '@/app/_components/menus';
+import { useItemRemoval } from '@/app/_components/playlists';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { useFavoriteRelink } from '@/app/_state/Favorites';
 import { useNavigation } from '@/app/_state/Navigation';
@@ -98,10 +99,13 @@ export function SearchPage() {
     };
 
     const queuePositions = useQueuePositions();
+    const removal = useItemRemoval();
     const rowMenu = useRowMenu((hit: SearchHit) => [
         ...trackActions.enqueueItems(hit),
         trackActions.showItem(hit),
         favoriteActions.favoriteMenuItem(hit),
+        menuSeparator,
+        ...removal.trackItems({ ...hit, name: hit.displayText }),
     ]);
 
     // The results are always in groups, one per playlist, which a row goes with.
@@ -281,6 +285,7 @@ export function SearchPage() {
         >
             {content}
             {rowMenu.popover}
+            {removal.dialogs}
         </section>
     );
 }

@@ -3,6 +3,8 @@
 #include <stdexcept>
 #include <string>
 
+#include <nlohmann/json.hpp>
+
 class RpcError : public std::runtime_error
 {
 public:
@@ -23,10 +25,14 @@ public:
 class ApiError : public std::runtime_error
 {
 public:
-	ApiError(int status, const std::string &code) : std::runtime_error(code), FStatus(status) {}
+	// `details` are fields the error object carries besides `code` and `message`.
+	ApiError(int status, const std::string &code, nlohmann::json details = nlohmann::json::object())
+		: std::runtime_error(code), FStatus(status), FDetails(std::move(details)) {}
 	int Status() const { return FStatus; }
 	const char *Code() const { return what(); }
+	const nlohmann::json &Details() const { return FDetails; }
 
 private:
 	int FStatus;
+	nlohmann::json FDetails;
 };

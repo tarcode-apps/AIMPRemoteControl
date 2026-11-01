@@ -15,6 +15,7 @@ import { TrackCover } from '../cover';
 import { Icon } from '../icons';
 import { Slider } from '../inputs';
 import { Menu, menuSeparator, type MenuEntry } from '../menus';
+import { useItemRemoval } from '../playlists';
 import { Rating } from '../rating';
 import { useDrawer } from '../sidenav';
 import { Marquee } from './Marquee';
@@ -56,6 +57,7 @@ export function NowPlaying() {
     const playingRef = playing && { ...playing, revision: playing.playlistRevision };
     const isFavorite = !!playing && favorites.has(playing.fileUri);
     const favoriteItem = playingRef && favoriteActions.favoriteMenuItem(playingRef);
+    const removal = useItemRemoval();
     const trackMenu: MenuEntry[] =
         playingRef && favoriteItem
             ? [
@@ -66,6 +68,8 @@ export function NowPlaying() {
                       icon: 'queue_music',
                       onSelect: () => showTrack(playingRef),
                   },
+                  menuSeparator,
+                  ...removal.trackItems({ ...playingRef, name: playingRef.title }),
               ]
             : [];
 
@@ -218,6 +222,7 @@ export function NowPlaying() {
                 ) : (
                     <span />
                 )}
+                {removal.dialogs}
             </div>
             <div className={styles.controls}>
                 <IconButton

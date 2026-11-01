@@ -108,6 +108,7 @@ nlohmann::json webapi::PlayerController::Snapshot(IAIMPCore *core, StateUpdateEv
 			{"artist", state.Track->Artist},
 			{"album", state.Track->Album},
 			{"isUrl", state.Track->IsUrl},
+			{"inContainer", state.Track->InContainer},
 			{"mark", state.Track->Marks.Mark},
 			{"rating", state.Track->Marks.Rating},
 			{"displayingMark", state.Track->Marks.DisplayingMark},

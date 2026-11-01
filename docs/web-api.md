@@ -13,7 +13,7 @@ with the client that ships in the same package.
 | Authentication | the same HTTP Digest as the frozen protocol; every method, `GET` included |
 | Identifiers | a playlist `id` is AIMP's own playlist id (string), stable across player restarts |
 | Field names | camelCase |
-| Errors | HTTP status plus `{"error": {"code": string, "message": string}}`; `code` is stable, `message` is for humans and comes in the language of the player's interface (`Langs/*.lng`, section `[AIMPRemoteControlErrors]`, keyed by `code`) |
+| Errors | HTTP status plus `{"error": {"code": string, "message": string}}`; `code` is stable, `message` is for humans and comes in the language of the player's interface (`Langs/*.lng`, section `[AIMPRemoteControlErrors]`, keyed by `code`). An error may carry more fields, which its description names |
 | Limits | request bodies above 16 MB are refused with `413`; only the [upload](#post-apiv1playlistsidupload) takes up to 2 GB |
 
 Error codes so far:
@@ -28,6 +28,9 @@ Error codes so far:
 | `409` | `playlistChanged` | the `revision` in the request is not the playlist's current one |
 | `403` | `playlistReadOnly` | the playlist is read-only in the player, so it cannot be sorted or reordered |
 | `404` | `itemNotFound` | an item index in the request is outside the playlist |
+| `400` | `itemInContainer` | an item to delete from disk is a part of a container file, such as one track of a CUE sheet |
+| `403` | `physicalDeletionDisabled` | deleting files from disk is not allowed in the plugin settings |
+| `403` | `filesNotDeletable` | some of the files to delete from disk cannot be deleted right now; `files` lists their paths |
 | `500` | `playlistUpdateFailed` | the player refused the change |
 | `500` | `playerCommandFailed` | the player refused a playback command or setting |
 | `404` | `coverNotFound` | the item has no cover, the `key` is not the item's current one, or the image named by this hash is no longer known |
@@ -154,6 +157,7 @@ it is only valid for the `revision` the page was read at.
       "displayingMark": 4,
       "enabled": true,
       "isUrl": false,
+      "inContainer": false,
       "cover": "7068c7442182d15a",
       "fileUri": "C:\\Music\\Artist A\\Track One.mp3"
     }
@@ -167,7 +171,9 @@ when the playlist hides its second line. `duration` is in seconds, `size` in byt
 `mark` is the stars the user gave, `0..5`; `rating` is the player's own rating
 of the track from its statistics, `0..1`; `displayingMark` is what the player
 shows, in halves of a star: the mark, or, when there is none, the rating as
-stars, which the player draws hollow. `enabled` is the check box in front of the track, `isUrl` marks streams. `cover` is the
+stars, which the player draws hollow. `enabled` is the check box in front of the track, `isUrl` marks streams, `inContainer`
+marks a part of a container file, such as one track of a CUE sheet, which cannot be
+deleted from disk on its own. `cover` is the
 key the item's [cover URL](#get-apiv1playlistsiditemsindexcoverkeysize) takes: it
 names the file, so it only changes when the file is replaced. The client shows the covers of
 the playlists whose `showThumbnails` is on. `fileUri` is the track's URI as the
@@ -253,6 +259,7 @@ plus an optional `revision`.
       "displayingMark": 4,
       "enabled": true,
       "isUrl": false,
+      "inContainer": false,
       "cover": "7068c7442182d15a",
       "fileUri": "C:\\Music\\Artist A\\Track One.mp3",
       "artist": "Artist A",
@@ -298,6 +305,7 @@ Finds remembered files in the playlists they were remembered from:
       "displayingMark": 4,
       "enabled": true,
       "isUrl": false,
+      "inContainer": false,
       "cover": "7068c7442182d15a"
     }
   ]
@@ -404,6 +412,38 @@ the group requests. The response is an empty object.
 Errors: `400 invalidBody`, `403 playlistReadOnly`, `404 playlistNotFound`,
 `404 itemNotFound`, `409 playlistChanged`, `500 playlistUpdateFailed`.
 
+### `POST /api/v1/playlists/{id}/items/remove`
+
+Takes items out of the playlist. The body names them as
+[`POST /api/v1/queue/items`](#post-apiv1queueitems) does, `playlistId` aside,
+plus an optional `revision`; with `physically` the files are deleted from disk
+too, the way the player's own command does it (on Windows into the Recycle Bin),
+which the plugin settings must allow.
+
+```json
+{ "indexes": [12, 13], "physically": false, "revision": 7 }
+{ "search": "", "groups": [2], "except": [40], "physically": true, "revision": 7 }
+```
+
+The items go in one pass, so the playlist changes once. A part of a container
+file, such as one track of a CUE sheet, cannot be deleted from disk: a selection
+with one is refused as a whole and nothing is removed. So is a selection with a
+file that cannot be deleted right now (no rights, a read-only volume, a file held
+by another program): the player would report such a failure in a dialog of its
+own, or not at all, so every file is checked first and
+`403 filesNotDeletable` names the offenders in `files`:
+
+```json
+{"error": {"code": "filesNotDeletable", "message": "…", "files": ["Z:\\Music\\Track.mp3"]}}
+```
+
+The response is an empty object; the new content arrives through the
+[`playlists` event](#get-apiv1events).
+
+Errors: `400 invalidBody`, `400 itemInContainer`, `403 playlistReadOnly`,
+`403 physicalDeletionDisabled`, `403 filesNotDeletable`, `404 playlistNotFound`,
+`404 itemNotFound`, `409 playlistChanged`, `500 playlistUpdateFailed`.
+
 ## Search
 
 ### `GET /api/v1/search`
@@ -439,6 +479,7 @@ are paged as a whole.
       "displayingMark": 4,
       "enabled": true,
       "isUrl": false,
+      "inContainer": false,
       "cover": "7068c7442182d15a",
       "fileUri": "C:\\Music\\Artist A\\Track One.mp3"
     }
@@ -487,6 +528,7 @@ track it is, `index` being valid for the playlist's current revision.
       "displayingMark": 0,
       "enabled": true,
       "isUrl": false,
+      "inContainer": false,
       "cover": "3f9a1c2e5b7d8e01",
       "fileUri": "C:\\Music\\Artist\\Title.mp3"
     }
@@ -595,6 +637,7 @@ The player's state at request time.
     "artist": "Artist A",
     "album": "Album X",
     "isUrl": false,
+    "inContainer": false,
     "mark": 4,
     "rating": 0.8,
     "displayingMark": 4,

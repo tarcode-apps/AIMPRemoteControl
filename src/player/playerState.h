@@ -34,6 +34,7 @@ namespace player
 		std::string Artist;
 		std::string Album;
 		bool IsUrl = false;
+		bool InContainer = false; // a part of a container file, such as one track of a CUE sheet
 		TrackMarks Marks;
 		CoverSource Cover;
 		std::string FileUri;

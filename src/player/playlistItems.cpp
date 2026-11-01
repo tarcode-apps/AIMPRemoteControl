@@ -9,6 +9,7 @@
 #include "apiPlaylists.h"
 #include "aimpHelper.h"
 #include "covers.h"
+#include "fileAccess.h"
 #include "playlistItemContext.h"
 #include "playlists.h"
 
@@ -76,7 +77,8 @@ player::PlaylistItem player::ReadPlaylistItem(const PlaylistItemContext &ctx, st
 	INT32 enabled = 1;
 	ctx.Item->GetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_PLAYINGSWITCH, &enabled);
 	item.Enabled = enabled != 0;
-	item.IsUrl = ctx.FileUriService && ctx.FileUri && ctx.FileUriService->IsURL(ctx.FileUri) == S_OK;
+	item.IsUrl = ItemIsUrl(ctx);
+	item.InContainer = ItemInContainer(ctx);
 	if (ctx.FileInfo)
 		item.Cover = DescribeCoverSource(ctx.FileInfo, item.IsUrl);
 	if (ctx.FileUri)
@@ -130,39 +132,46 @@ namespace
 			fileUriService->Release();
 		return true;
 	}
+
+	// The indexes of the selected items, sorted and without repeats: the matches
+	// are gathered first, so that they and the extra indexes come in playlist order
+	// together. False when an index or a group is outside the playlist.
+	bool ResolveSelection(IAIMPCore *core, IAIMPPlaylist *playlist, const player::ItemSelection &selection,
+						  std::vector<std::int32_t> &indexes)
+	{
+		indexes = selection.Indexes;
+		if (selection.Search)
+		{
+			std::vector<std::int32_t> except = selection.Except;
+			std::sort(except.begin(), except.end());
+			const auto match = [&](std::int32_t index)
+			{
+				if (!std::binary_search(except.begin(), except.end(), index))
+					indexes.push_back(index);
+			};
+			if (selection.Groups)
+			{
+				if (!GroupMatches(core, playlist, *selection.Groups, *selection.Search, selection.Fields, match))
+					return false;
+			}
+			else
+			{
+				player::ItemsQuery query;
+				query.Limit = INT32_MAX;
+				query.Search = *selection.Search;
+				query.Fields = selection.Fields;
+				player::VisitPlaylistItems(core, playlist, query, [&](const PlaylistItemContext &, std::int32_t index)
+										   { match(index); });
+			}
+		}
+		return player::NormalizeIndexes(indexes, playlist->GetItemCount());
+	}
 }
 
 bool player::VisitSelectedItems(IAIMPCore *core, IAIMPPlaylist *playlist, const ItemSelection &selection, const ItemVisitor &visit)
 {
-	// The matches are gathered first, so that they and the extra indexes come in
-	// playlist order together.
-	std::vector<std::int32_t> indexes = selection.Indexes;
-	if (selection.Search)
-	{
-		std::vector<std::int32_t> except = selection.Except;
-		std::sort(except.begin(), except.end());
-		const auto match = [&](std::int32_t index)
-		{
-			if (!std::binary_search(except.begin(), except.end(), index))
-				indexes.push_back(index);
-		};
-		if (selection.Groups)
-		{
-			if (!GroupMatches(core, playlist, *selection.Groups, *selection.Search, selection.Fields, match))
-				return false;
-		}
-		else
-		{
-			ItemsQuery query;
-			query.Limit = INT32_MAX;
-			query.Search = *selection.Search;
-			query.Fields = selection.Fields;
-			VisitPlaylistItems(core, playlist, query, [&](const PlaylistItemContext &, std::int32_t index)
-							   { match(index); });
-		}
-	}
-
-	if (!NormalizeIndexes(indexes, playlist->GetItemCount()))
+	std::vector<std::int32_t> indexes;
+	if (!ResolveSelection(core, playlist, selection, indexes))
 		return false;
 	IAIMPServiceFileURI *fileUriService = AcquireService<IAIMPServiceFileURI>(core, IID_IAIMPServiceFileURI);
 	for (const std::int32_t index : indexes)
@@ -535,4 +544,65 @@ player::MutationResult player::MovePlaylistItems(IAIMPCore *core, const std::str
 			item->Release();
 	playlist->Release();
 	return found ? (Succeeded(result) ? MutationResult::Ok : MutationResult::Failed) : MutationResult::ItemNotFound;
+}
+
+namespace
+{
+	BOOL WINAPI DeleteListed(IAIMPPlaylistItem *item, void *userData)
+	{
+		const auto &indexes = *static_cast<const std::vector<std::int32_t> *>(userData);
+		INT32 index = -1;
+		item->GetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_INDEX, &index);
+		return std::binary_search(indexes.begin(), indexes.end(), index);
+	}
+}
+
+HRESULT player::DeleteItems(IAIMPPlaylist *playlist, const std::vector<std::int32_t> &indexes, bool physically)
+{
+	// The client confirms the deletion itself.
+	DWORD flags = AIMP_PLAYLIST_DELETE_FLAGS_NOCONFIRMATION;
+	if (physically)
+		flags |= AIMP_PLAYLIST_DELETE_FLAGS_PHYSICALLY;
+	return playlist->Delete3(flags, DeleteListed, const_cast<std::vector<std::int32_t> *>(&indexes));
+}
+
+player::MutationResult player::RemovePlaylistItems(IAIMPCore *core, const std::string &playlistId, const ItemSelection &selection,
+												   bool physically, std::vector<std::string> &undeletable)
+{
+	IAIMPPlaylist *playlist = nullptr;
+	if (const MutationResult opened = OpenWritablePlaylist(core, playlistId, playlist); opened != MutationResult::Ok)
+		return opened;
+
+	std::vector<std::int32_t> indexes;
+	MutationResult result = ResolveSelection(core, playlist, selection, indexes) ? MutationResult::Ok : MutationResult::ItemNotFound;
+	if (result == MutationResult::Ok && physically)
+	{
+		IAIMPServiceFileURI *fileUriService = AcquireService<IAIMPServiceFileURI>(core, IID_IAIMPServiceFileURI);
+		for (auto it = indexes.begin(); it != indexes.end() && result == MutationResult::Ok; ++it)
+		{
+			IAIMPPlaylistItem *item = nullptr;
+			if (Failed(playlist->GetItem(*it, IID_IAIMPPlaylistItem, reinterpret_cast<void **>(&item))) || !item)
+				continue;
+			const PlaylistItemContext ctx(fileUriService, item);
+			if (ItemInContainer(ctx))
+				result = MutationResult::ItemInContainer;
+			else if (ctx.FileUri && !ItemIsUrl(ctx))
+			{
+				const std::string path = IAIMPStringToString(ctx.FileUri);
+				if (!CanDeleteFile(path))
+					undeletable.push_back(path);
+			}
+			item->Release();
+		}
+		if (fileUriService)
+			fileUriService->Release();
+		std::sort(undeletable.begin(), undeletable.end());
+		undeletable.erase(std::unique(undeletable.begin(), undeletable.end()), undeletable.end());
+		if (result == MutationResult::Ok && !undeletable.empty())
+			result = MutationResult::FilesNotDeletable;
+	}
+	if (result == MutationResult::Ok && !indexes.empty() && Failed(DeleteItems(playlist, indexes, physically)))
+		result = MutationResult::Failed;
+	playlist->Release();
+	return result;
 }

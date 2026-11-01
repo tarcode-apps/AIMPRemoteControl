@@ -7,6 +7,7 @@ import { SortDialog } from '@/app/_components/dialogs';
 import { Icon } from '@/app/_components/icons';
 import { ListToolbar } from '@/app/_components/lists';
 import toolbarStyles from '@/app/_components/lists/ListToolbar.module.scss';
+import { useItemRemoval } from '@/app/_components/playlists';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { favoritesSortModes, useFavorites } from '@/app/_state/Favorites';
 import { media } from '@/app/_styles/media';
@@ -21,18 +22,30 @@ export function FavoritesToolbar() {
     const mode = useFavoritesMode();
     const favorites = useFavorites();
     const enqueueSelections = useEnqueueSelections();
+    const removal = useItemRemoval();
     const [dialog, setDialog] = useState<'grouping' | 'sort' | null>(null);
     const closeDialog = () => setDialog(null);
     const empty = mode.entries.length === 0;
 
-    const enqueueSelected = (atBeginning: boolean) => {
+    // The selected tracks that are in their playlists, by playlist.
+    const selectedParts = () => {
         const tracks = mode.selectedEntries().flatMap(({ located }) => (located ? [located] : []));
-        const parts = [...groupByPlaylist(tracks)].map(([playlistId, located]) => ({
+        return [...groupByPlaylist(tracks)].map(([playlistId, located]) => ({
             playlistId,
             revision: located[0].revision,
             selection: { indexes: located.map(track => track.index) },
         }));
-        return enqueueSelections(parts, atBeginning);
+    };
+    const enqueueSelected = (atBeginning: boolean) => enqueueSelections(selectedParts(), atBeginning);
+    // A favorite whose file is deleted goes with it.
+    const selectedRemoval = () => {
+        const files = mode.selectedEntries().flatMap(({ record, located }) => (located ? [record.fileUri] : []));
+        return {
+            parts: selectedParts(),
+            onRemoved: (physically: boolean) => {
+                if (physically) favorites.remove(files);
+            },
+        };
     };
 
     const removeSelected = () => {
@@ -100,6 +113,7 @@ export function FavoritesToolbar() {
                         disabled: mode.nothingSelected,
                         onSelect: removeSelected,
                     },
+                    ...removal.selectionItems(selectedRemoval, mode.nothingSelected),
                 ]}
                 sorting={
                     <>
@@ -119,6 +133,7 @@ export function FavoritesToolbar() {
                     </>
                 }
             />
+            {removal.dialogs}
             <GroupingDialog open={dialog === 'grouping'} onClose={closeDialog} />
             <SortDialog
                 open={dialog === 'sort'}

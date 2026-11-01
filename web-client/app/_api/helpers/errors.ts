@@ -5,6 +5,8 @@ export class ApiError extends Error {
         readonly status: number,
         readonly code: string,
         message: string,
+        // The files the error is about, when it names some.
+        readonly files: string[] = [],
     ) {
         super(message);
         this.name = 'ApiError';

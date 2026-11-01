@@ -154,19 +154,36 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 		res.set_content(nlohmann::json{{"error", {{"code", e.Code()}, {"message", LocalizeMessage(std::string("AIMPRemoteControlErrors\\") + e.Code())}}}}.dump(), "application/json");
 	}
 
+	static std::vector<HttpUploadedFile> UploadedFiles(const httplib::Request &req)
+	{
+		std::vector<HttpUploadedFile> files;
+		for (const auto &[name, part] : req.form.files)
+			files.push_back({name, part.filename, part.content_type, part.content});
+		return files;
+	}
+
 	void MapUpload(const std::string &pathPattern, HttpUploadHandler handler) override
 	{
 		UploadPaths.emplace_back(pathPattern);
 		Routes.push_back([pathPattern, handler = std::move(handler)](httplib::Server &http)
 						 { http.Post(pathPattern, [handler](const httplib::Request &req, httplib::Response &res)
+									 { res.status = handler(ParseRequest(req).PathMatches, UploadedFiles(req)); }); });
+	}
+
+	void MapApiUpload(const std::string &pathPattern, ApiUploadHandler handler) override
+	{
+		UploadPaths.emplace_back(pathPattern);
+		Routes.push_back([this, pathPattern, handler = std::move(handler)](httplib::Server &http)
+						 { http.Post(pathPattern, [this, handler](const httplib::Request &req, httplib::Response &res)
 									 {
-				std::vector<std::string> matches;
-				for (std::size_t i = 1; i < req.matches.size(); ++i)
-					matches.push_back(req.matches[i].str());
-				std::vector<HttpUploadedFile> files;
-				for (const auto &[name, part] : req.form.files)
-					files.push_back({name, part.filename, part.content_type, part.content});
-				res.status = handler(matches, files); }); });
+				try
+				{
+					res.set_content(handler(ParseRequest(req), UploadedFiles(req)).dump(), "application/json");
+				}
+				catch (const ApiError &e)
+				{
+					SetApiError(res, e);
+				} }); });
 	}
 
 	using HttpRoute = httplib::Server &(httplib::Server::*)(const std::string &, httplib::Server::Handler);

@@ -294,3 +294,63 @@ export type PlayTrackRequest = {
 };
 
 export type PlayerPatch = Partial<Pick<PlayerState, 'position' | 'volume' | 'mute' | 'repeat' | 'shuffle'>>;
+
+// What the plugin's options page lets a client do.
+export type Permissions = {
+    uploadTracks: boolean;
+    browseFiles: boolean;
+    physicalDeletion: boolean;
+    scheduler: boolean;
+};
+
+export type Settings = {
+    permissions: Permissions;
+};
+
+export type FileType = 'audio' | 'playlist';
+
+export type FileRoot = {
+    path: string;
+    // The volume label; empty when it has none.
+    label: string;
+};
+
+export type FolderEntry = {
+    name: string;
+    path: string;
+};
+
+export type FileEntry = {
+    name: string;
+    path: string;
+    type: FileType;
+    size: number;
+};
+
+export type FilesSortBy = 'name' | 'modified';
+
+export const filesSortModes: readonly FilesSortBy[] = ['name', 'modified'];
+
+// The order a folder is listed in, applied by the server.
+export type FilesSort = {
+    by: FilesSortBy;
+    descending: boolean;
+};
+
+// The roots of the computer's file system, or one folder of it.
+export type FolderListing =
+    | { roots: FileRoot[]; parent?: undefined; folders?: undefined; files?: undefined }
+    | { roots?: undefined; parent: string; folders: FolderEntry[]; files: FileEntry[] };
+
+// Extensions, lower-case and without the dot.
+export type FileFormats = {
+    audio: string[];
+    playlists: string[];
+};
+
+// Paths of files, folders and playlist files on the player's computer, and URLs.
+export type AddItemsRequest = {
+    playlistId: string;
+    files?: string[];
+    urls?: string[];
+};

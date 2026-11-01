@@ -5,6 +5,7 @@ import { DetectLanguage } from './_i18n/DetectLanguage';
 import { fallbackLanguage, resources } from './_i18n/resources';
 import { NavigationProvider } from './_state/Navigation';
 import { PlaylistSelectionProvider } from './_state/PlaylistSelection';
+import { UploadsProvider } from './_state/Uploads';
 import './_styles/globals.scss';
 
 export const metadata: Metadata = {
@@ -34,15 +35,17 @@ export default function RootLayout({
                 <ApiProvider>
                     <NavigationProvider>
                         <PlaylistSelectionProvider>
-                            <PlayerPanelProvider>
-                                <DrawerContainer>
-                                    <Drawer>
-                                        <Sidebar />
-                                    </Drawer>
-                                    <DrawerContent>{children}</DrawerContent>
-                                    <PlayerPanel />
-                                </DrawerContainer>
-                            </PlayerPanelProvider>
+                            <UploadsProvider>
+                                <PlayerPanelProvider>
+                                    <DrawerContainer>
+                                        <Drawer>
+                                            <Sidebar />
+                                        </Drawer>
+                                        <DrawerContent>{children}</DrawerContent>
+                                        <PlayerPanel />
+                                    </DrawerContainer>
+                                </PlayerPanelProvider>
+                            </UploadsProvider>
                         </PlaylistSelectionProvider>
                     </NavigationProvider>
                 </ApiProvider>

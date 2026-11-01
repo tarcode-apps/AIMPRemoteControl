@@ -9,6 +9,17 @@ export type RequestOptions = {
 
 export const basePath = '/api/v1';
 
+// The error of a failed response: the API's own when the body carries one.
+export function responseError(status: number, contentType: string | null, text: string): Error {
+    if (contentType?.includes('application/json')) {
+        const body: unknown = JSON.parse(text);
+        const error = (body as { error?: { code?: unknown; message?: unknown } })?.error;
+        if (typeof error?.code === 'string')
+            return new ApiError(status, error.code, typeof error.message === 'string' ? error.message : error.code);
+    }
+    return new HttpError(status);
+}
+
 export async function request<T>(method: HttpMethod, path: string, options: RequestOptions = {}): Promise<T> {
     let response: Response;
     try {
@@ -27,22 +38,11 @@ export async function request<T>(method: HttpMethod, path: string, options: Requ
         throw new NetworkError(cause);
     }
 
-    const isJson = response.headers.get('Content-Type')?.includes('application/json') ?? false;
+    const contentType = response.headers.get('Content-Type');
     if (response.ok) {
         if (response.status === 204) return undefined as T;
-        if (!isJson) throw new HttpError(response.status);
+        if (!contentType?.includes('application/json')) throw new HttpError(response.status);
         return (await response.json()) as T;
     }
-
-    if (isJson) {
-        const body: unknown = await response.json();
-        const error = (body as { error?: { code?: unknown; message?: unknown } })?.error;
-        if (typeof error?.code === 'string')
-            throw new ApiError(
-                response.status,
-                error.code,
-                typeof error.message === 'string' ? error.message : error.code,
-            );
-    }
-    throw new HttpError(response.status);
+    throw responseError(response.status, contentType, await response.text());
 }

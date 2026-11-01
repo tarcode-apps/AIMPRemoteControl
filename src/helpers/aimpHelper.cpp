@@ -132,40 +132,6 @@ HRESULT AddFilesToPlaylist(IAIMPCore *core, IAIMPPlaylist *playlist, const std::
 	return hr;
 }
 
-std::vector<std::string> SupportedAudioExtensions(IAIMPCore *core)
-{
-	std::string masks;
-	IAIMPServiceFileFormats *service = nullptr;
-	if (Succeeded(core->QueryInterface(IID_IAIMPServiceFileFormats, reinterpret_cast<void **>(&service))) && service)
-	{
-		IAIMPString *s = nullptr;
-		if (Succeeded(service->GetFormats(AIMP_SERVICE_FILEFORMATS_CATEGORY_AUDIO, &s)) && s)
-		{
-			masks = IAIMPStringToString(s);
-			s->Release();
-		}
-		service->Release();
-	}
-
-	std::vector<std::string> extensions;
-	std::size_t start = 0;
-	while (start < masks.size())
-	{
-		std::size_t end = masks.find(';', start);
-		if (end == std::string::npos)
-			end = masks.size();
-		std::string mask = masks.substr(start, end - start);
-		if (mask.rfind("*.", 0) == 0)
-			mask.erase(0, 2);
-		for (char &c : mask)
-			c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-		if (!mask.empty())
-			extensions.push_back(mask);
-		start = end + 1;
-	}
-	return extensions;
-}
-
 bool MoveFocus(IAIMPPlaylistItem *item, int delta)
 {
 	IAIMPPlaylist *playlist = nullptr;

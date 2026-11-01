@@ -241,7 +241,7 @@ player::MutationResult player::RemoveQueueItems(IAIMPCore *core, std::vector<std
 			continue;
 		if (removedTracks.count(tracks[position]))
 		{
-			result = queue->Add(items[position], FALSE);
+			result = queue->Add(items[position], false);
 			if (Succeeded(result))
 				result = queue->Move2(queue->GetItemCount() - 1, kept);
 		}

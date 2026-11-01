@@ -44,7 +44,9 @@
 #include "webApi/eventsController.h"
 #include "webApi/coversController.h"
 #include "webApi/playerController.h"
+#include "webApi/filesController.h"
 #include "webApi/playlistsController.h"
+#include "webApi/settingsController.h"
 #include "webApi/queueController.h"
 #include "webApi/searchController.h"
 
@@ -93,6 +95,7 @@ HRESULT WINAPI AIMPPlugin::Initialize(IAIMPCore *Core)
 	FOptionsFrame = new OptionsFrame(Core, [this](const Settings &s)
 									 {
 		FSettings.Set(s);
+		FStateEvents.Notify(StateUpdateEvents::Settings);
 		FNetworkWatcher.SetExcludedInterfaces(s.Network.ExcludedInterfaces);
 		if (FRemoteControlServer)
 			FRemoteControlServer->ApplySettings(s); });
@@ -139,17 +142,19 @@ HRESULT WINAPI AIMPPlugin::Initialize(IAIMPCore *Core)
 	commands.push_back(std::make_unique<rpcapi::DownloadTrackCommand>(Core, FIdManager));
 	commands.push_back(std::make_unique<rpcapi::GetFormatsCommand>(Core));
 	commands.push_back(std::make_unique<rpcapi::BrowseFilesCommand>(Core, FSettings));
-	commands.push_back(std::make_unique<rpcapi::AddFilesCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::AddFilesCommand>(Core, FIdManager, FSettings));
 	commands.push_back(std::make_unique<rpcapi::AddUrlToPlaylistCommand>(Core, FIdManager));
 	commands.push_back(std::make_unique<rpcapi::UploadTrackCommand>(Core, FIdManager, FSettings));
 	commands.push_back(std::make_unique<rpcapi::StatusCommand>(Core));
 	commands.push_back(std::make_unique<rpcapi::SubscribeOnAIMPStateUpdateEventCommand>(Core, FIdManager, FStateEvents, FSleepTimer));
-	commands.push_back(std::make_unique<webapi::PlaylistsController>(Core, FStateEvents));
+	commands.push_back(std::make_unique<webapi::PlaylistsController>(Core, FStateEvents, FSettings));
+	commands.push_back(std::make_unique<webapi::FilesController>(Core, FSettings));
+	commands.push_back(std::make_unique<webapi::SettingsController>(FSettings));
 	commands.push_back(std::make_unique<webapi::QueueController>(Core, FStateEvents));
 	commands.push_back(std::make_unique<webapi::SearchController>(Core, FStateEvents));
 	commands.push_back(std::make_unique<webapi::PlayerController>(Core, FStateEvents, *FCoverIndex));
 	commands.push_back(std::make_unique<webapi::CoversController>(Core, FStateEvents, *FCoverIndex));
-	commands.push_back(std::make_unique<webapi::EventsController>(Core, FStateEvents, *FCoverIndex));
+	commands.push_back(std::make_unique<webapi::EventsController>(Core, FStateEvents, *FCoverIndex, FSettings));
 	FRemoteControlServer = std::make_unique<AIMPRemoteControlServer>(std::move(commands), FNetworkWatcher,
 		[core = FCore](const std::string &keyPath)
 		{

@@ -1,23 +1,32 @@
 'use client';
 
+import { useFormats } from '@/app/_api/files';
 import { usePlayer } from '@/app/_api/player';
 import { useSetGroupExpanded } from '@/app/_api/playlists';
 import { useEnqueue } from '@/app/_api/queue';
+import { useSettings } from '@/app/_api/settings';
+import type { FileType } from '@/app/_api/types';
 import { ToolbarButton } from '@/app/_components/buttons';
 import { Icon } from '@/app/_components/icons';
 import { ListToolbar } from '@/app/_components/lists';
 import toolbarStyles from '@/app/_components/lists/ListToolbar.module.scss';
-import { menuSeparator, type MenuEntry } from '@/app/_components/menus';
-import { usePlaylistActions } from '@/app/_components/playlists';
+import { Menu, menuSeparator, type MenuEntry } from '@/app/_components/menus';
+import { AddUrlDialog, usePlaylistActions } from '@/app/_components/playlists';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { useNavigation } from '@/app/_state/Navigation';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
+import { useUploads } from '@/app/_state/Uploads';
 import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
 import { media } from '@/app/_styles/media';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePlaylistMode } from './PlaylistMode';
 import { PlaylistSortDialog } from './SortDialog';
+
+// The address of the file browser, adding to `playlistId` what it picks.
+export function filesScreenHref(playlistId: string, type: FileType) {
+    return `/files/?to=${encodeURIComponent(playlistId)}&types=${type}`;
+}
 
 export function PlaylistToolbar() {
     const { t } = useTranslation();
@@ -30,7 +39,12 @@ export function PlaylistToolbar() {
     const enqueue = useEnqueue();
     const favoriteActions = useFavoriteActions();
     const playlistActions = usePlaylistActions();
+    const uploads = useUploads();
+    const permissions = useSettings().data?.permissions;
+    const { data: formats } = useFormats();
+    const fileInput = useRef<HTMLInputElement>(null);
     const [sortDialog, setSortDialog] = useState(false);
+    const [urlDialog, setUrlDialog] = useState(false);
     const grouped = selected?.grouping.enabled ?? false;
     const expandAll = (expanded: boolean) => {
         if (selected) setExpanded.mutate({ expanded, revision: selected.revision });
@@ -60,6 +74,36 @@ export function PlaylistToolbar() {
         ? [menuSeparator, playlistActions.renameItem(selected), playlistActions.removeItem(selected)]
         : [];
 
+    // What the player's settings allow; a URL needs no permission.
+    const pickFiles = () => fileInput.current?.click();
+    const canBrowse = selected !== undefined && permissions?.browseFiles === true;
+    const canUpload = permissions?.uploadTracks === true;
+    const browseEntries: MenuEntry[] =
+        canBrowse && selected
+            ? [
+                  {
+                      label: t('playlist.addFiles'),
+                      icon: 'audio_file',
+                      onSelect: () => mode.leaveThen(() => openSecondScreen(filesScreenHref(selected.id, 'audio'))),
+                  },
+                  {
+                      label: t('playlist.addPlaylistFile'),
+                      icon: 'queue_music',
+                      onSelect: () => mode.leaveThen(() => openSecondScreen(filesScreenHref(selected.id, 'playlist'))),
+                  },
+              ]
+            : [];
+    const uploadEntries: MenuEntry[] = canUpload
+        ? [{ label: t('playlist.upload'), icon: 'upload', disabled: uploads.progress !== null, onSelect: pickFiles }]
+        : [];
+    const separator: MenuEntry[] = canBrowse || canUpload ? [menuSeparator] : [];
+    const addEntries: MenuEntry[] = [
+        ...browseEntries,
+        ...uploadEntries,
+        ...separator,
+        { label: t('playlist.addUrl'), icon: 'link', onSelect: () => setUrlDialog(true) },
+    ];
+
     return (
         <>
             <ListToolbar
@@ -67,9 +111,13 @@ export function PlaylistToolbar() {
                 searchPlaceholder={t('playlist.searchPlaceholder')}
                 idle={
                     <>
-                        <ToolbarButton title={t('playlist.add')} disabled>
-                            <Icon>add</Icon>
-                        </ToolbarButton>
+                        <Menu
+                            title={t('playlist.add')}
+                            icon="add"
+                            Button={ToolbarButton}
+                            disabled={!selected || selected.readOnly}
+                            items={addEntries}
+                        />
                         <ToolbarButton title={t('playlist.select')} onClick={() => mode.setMode('select')}>
                             <Icon>checklist</Icon>
                         </ToolbarButton>
@@ -158,6 +206,19 @@ export function PlaylistToolbar() {
                 }
             />
             {playlistActions.dialogs}
+            {urlDialog && selected && <AddUrlDialog playlist={selected} onClose={() => setUrlDialog(false)} />}
+            <input
+                ref={fileInput}
+                type="file"
+                multiple
+                hidden
+                accept={formats?.audio.map(extension => `.${extension}`).join(',')}
+                onChange={event => {
+                    if (selected) uploads.start(selected.id, [...event.target.files!]);
+                    // The same files may be picked again.
+                    event.target.value = '';
+                }}
+            />
         </>
     );
 }

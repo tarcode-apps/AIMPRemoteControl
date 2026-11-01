@@ -190,7 +190,7 @@ export function SearchPage() {
                         className={styles.row}
                         style={{ height: twoLineRowHeight, transform: `translateY(${i * twoLineRowHeight}px)` }}
                     >
-                        <SkeletonRow {...rowProps} />
+                        <SkeletonRow {...rowProps} index={i} />
                     </div>
                 ))}
             </div>
@@ -257,7 +257,7 @@ export function SearchPage() {
                                     menu={selecting || relinking ? undefined : rowMenu.button(index, hit)}
                                 />
                             ) : (
-                                <SkeletonRow {...rowProps} />
+                                <SkeletonRow {...rowProps} index={index} />
                             )}
                         </div>
                     );

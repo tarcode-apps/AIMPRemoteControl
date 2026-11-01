@@ -3,7 +3,7 @@
 import { Skeleton } from '@/app/_components/skeleton';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import clsx from 'clsx';
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './PlaylistTabs.module.scss';
 
@@ -15,10 +15,13 @@ export function PlaylistTabs() {
     const listRef = useRef<HTMLDivElement>(null);
     const selectedId = selected?.id;
 
-    useEffect(() => {
-        listRef.current
-            ?.querySelector('[aria-selected="true"]')
-            ?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    // In place before the screen is first painted; a change while it is shown glides.
+    const shown = useRef(false);
+    useLayoutEffect(() => {
+        const tab = listRef.current?.querySelector('[aria-selected="true"]');
+        if (!tab) return;
+        tab.scrollIntoView({ inline: 'center', block: 'nearest', behavior: shown.current ? 'smooth' : 'instant' });
+        shown.current = true;
     }, [selectedId]);
 
     if (!playlists)

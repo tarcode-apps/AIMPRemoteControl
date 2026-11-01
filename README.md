@@ -18,7 +18,9 @@ real-time push of player state. The protocol is documented in
 Security is opt-in and configured in the player: HTTP Digest authentication,
 per-feature permissions (browsing the computer's files, deleting tracks from
 disk, uploading tracks, timer), and per-interface listening — an excluded
-network interface has no open port at all.
+network interface has no open port at all. Browsing and uploading are separate
+permissions for the web client; the Android app reaches the file browser
+through its upload menu, so there it needs both.
 
 ## The Android app
 

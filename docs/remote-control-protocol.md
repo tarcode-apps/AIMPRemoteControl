@@ -547,14 +547,19 @@ nothing is found, `21` for an unknown track.
   (`GetFormats`) and exclude hidden/system files; all folders are listed.
 
 Error `33` if the path cannot be read, or if file browsing is not allowed in
-the plugin settings (it is disallowed by default).
+the plugin settings (it is disallowed by default). The app reaches the
+computer's files through its upload menu only, so here browsing takes both the
+upload and the browse permission, as it did when the browse setting was a
+child of the upload one.
 
 #### `AddFiles`
 
 `{"playlist_id": int, "files": [path, …]} → {"success": true}`
 
 Appends files and/or folders to the playlist. Folders are expanded by the
-player, which keeps only supported formats. Errors `20`, `27`.
+player, which keeps only supported formats. Errors `20`, `27`; `27` also when
+browsing is not allowed (the same two permissions as `BrowseFiles`), since the
+paths come from there.
 
 #### `AddURLToPlaylist`
 

@@ -360,11 +360,7 @@ void OptionsFrame::BuildFeaturesGroup(IAIMPServiceUI *svc)
 
 	FBrowseFilesCheck = CreateCheckBox(FCore, svc, FForm, group, FEvents, "cbBrowseFiles");
 	if (FBrowseFilesCheck)
-	{
-		Align(FBrowseFilesCheck, ualTop, RowHeight, {RowIndent + LabelWidth + LabelGap, RowGap, 0, GroupBottomPad}); // left edge of the upload folder edit
-		FBrowseFilesCheck->AddRef();
-		FUploadChildren.push_back(FBrowseFilesCheck);
-	}
+		Align(FBrowseFilesCheck, ualTop, RowHeight, {RowIndent, RowGap, 0, GroupBottomPad});
 
 	group->Release();
 }

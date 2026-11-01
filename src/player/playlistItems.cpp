@@ -10,6 +10,7 @@
 #include "aimpHelper.h"
 #include "covers.h"
 #include "playlistItemContext.h"
+#include "playlists.h"
 
 namespace
 {
@@ -433,17 +434,6 @@ player::MutationResult player::SetGroupExpanded(IAIMPCore *core, const std::stri
 
 namespace
 {
-	bool IsReadOnly(IAIMPPlaylist *playlist)
-	{
-		IAIMPPlaylistProperties *props = nullptr;
-		if (Failed(playlist->QueryInterface(IID_IAIMPPlaylistProperties, reinterpret_cast<void **>(&props))) || !props)
-			return false;
-		INT32 readOnly = 0;
-		props->GetValueAsInt32(AIMP_PLAYLIST_PROPID_READONLY, &readOnly);
-		props->Release();
-		return readOnly != 0;
-	}
-
 	HRESULT Sort(IAIMPCore *core, IAIMPPlaylist *playlist, const player::SortOptions &options)
 	{
 		using player::SortMode;
@@ -483,14 +473,9 @@ namespace
 
 player::MutationResult player::SortPlaylist(IAIMPCore *core, const std::string &playlistId, const SortOptions &options)
 {
-	IAIMPPlaylist *playlist = LoadedPlaylistByAIMPId(core, playlistId);
-	if (!playlist)
-		return MutationResult::PlaylistNotFound;
-	if (IsReadOnly(playlist))
-	{
-		playlist->Release();
-		return MutationResult::PlaylistReadOnly;
-	}
+	IAIMPPlaylist *playlist = nullptr;
+	if (const MutationResult opened = OpenWritablePlaylist(core, playlistId, playlist); opened != MutationResult::Ok)
+		return opened;
 
 	playlist->BeginUpdate();
 	HRESULT result = Sort(core, playlist, options);
@@ -504,14 +489,9 @@ player::MutationResult player::SortPlaylist(IAIMPCore *core, const std::string &
 player::MutationResult player::MovePlaylistItems(IAIMPCore *core, const std::string &playlistId, std::vector<std::int32_t> indexes,
 												 std::int32_t target)
 {
-	IAIMPPlaylist *playlist = LoadedPlaylistByAIMPId(core, playlistId);
-	if (!playlist)
-		return MutationResult::PlaylistNotFound;
-	if (IsReadOnly(playlist))
-	{
-		playlist->Release();
-		return MutationResult::PlaylistReadOnly;
-	}
+	IAIMPPlaylist *playlist = nullptr;
+	if (const MutationResult opened = OpenWritablePlaylist(core, playlistId, playlist); opened != MutationResult::Ok)
+		return opened;
 
 	const std::int32_t count = playlist->GetItemCount();
 	const bool inside = NormalizeIndexes(indexes, count);

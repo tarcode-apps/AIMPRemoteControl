@@ -22,6 +22,10 @@ const playerDepth = 0;
 const mainDepth = 1;
 const secondDepth = 2;
 
+// For a second screen that keeps entries of its own in the history, to tell
+// an entry of its own from the screen it is left for.
+export const secondScreenDepth = secondDepth;
+
 type Router = ReturnType<typeof useRouter>;
 
 function storedDepth(): number | undefined {
@@ -81,6 +85,11 @@ export type NavigationContextValue = {
     depth: number;
     // On the way back to the player, which covers the screens it passes.
     returning: boolean;
+    // Inside a popstate: whether it is a step of a navigation unwinding the
+    // history entry by entry, which a screen's own history must leave alone.
+    walking(): boolean;
+    // The depth of the entry just shown, as `depth` will be after the render.
+    entryDepth(): number;
     goToPlayer(): void;
     // Shows the main screen under the player, which back returns from.
     leavePlayer(): void;
@@ -199,6 +208,8 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     const value: NavigationContextValue = {
         depth,
         returning,
+        walking: () => walk.current !== null,
+        entryDepth: () => storedDepth() ?? playerDepth,
         goToPlayer,
         leavePlayer,
         openScreen: href => {

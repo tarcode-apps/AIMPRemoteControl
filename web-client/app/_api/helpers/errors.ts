@@ -25,9 +25,18 @@ export class NetworkError extends Error {
     }
 }
 
+// The statuses an answer without a body of its own may carry, from the HTTP
+// server itself or a proxy in front of the player.
+const knownStatuses = [400, 401, 403, 404, 413, 500, 502, 503, 504, 507] as const;
+type KnownStatus = (typeof knownStatuses)[number];
+const isKnownStatus = (status: number): status is KnownStatus => knownStatuses.includes(status as KnownStatus);
+
 export function errorMessage(error: unknown, t: TFunction): string {
     if (error instanceof ApiError) return error.message;
-    if (error instanceof HttpError) return t('errors.http', { status: error.status });
+    if (error instanceof HttpError)
+        return isKnownStatus(error.status)
+            ? t(`errors.status.${error.status}`)
+            : t('errors.http', { status: error.status });
     if (error instanceof NetworkError) return t('errors.network');
     return error instanceof Error ? error.message : String(error);
 }

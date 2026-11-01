@@ -7,7 +7,19 @@
   },
   "errors": {
     "network": "The player is unreachable",
-    "http": "The player answered {{status}}"
+    "http": "The player answered {{status}}",
+    "status": {
+      "400": "The player received a malformed request",
+      "401": "The player asks for a login",
+      "403": "The player refused the request",
+      "404": "The player has no such thing",
+      "413": "The file is too large for the player to take",
+      "500": "The player ran into an error",
+      "502": "The player is unreachable right now",
+      "503": "The player is unreachable right now",
+      "504": "The player is unreachable right now",
+      "507": "The player has no room for the file"
+    }
   },
   "app": {
     "name": "AIMP Remote Control"
@@ -156,6 +168,32 @@
       "randomAll": "Shuffle groups and tracks"
     },
     "goToTrack": "Go to track",
-    "goToPlaying": "Go to the playing track"
+    "goToPlaying": "Go to the playing track",
+    "addFiles": "Files from this computer",
+    "addPlaylistFile": "Playlist from this computer",
+    "upload": "Upload from this device",
+    "addUrl": "Add URL…",
+    "addUrlTitle": "Add URL",
+    "url": "Enter a link to a playlist, audio, stream or file"
+  },
+  "files": {
+    "computer": "This computer",
+    "playlists": "Playlists on this computer",
+    "addingTo": "Adding to “{{name}}”",
+    "empty": "No suitable files here",
+    "selectFile": "Select file",
+    "addSelected": "Add the selected files ({{count}})",
+    "selectFolder": "Select folder",
+    "sortModes": {
+      "name": "Name",
+      "modified": "Date modified"
+    },
+    "up": "Up one level",
+    "home": "Go to the top level",
+    "leave": "Back to the playlist"
+  },
+  "upload": {
+    "progress": "Uploading {{current}} of {{total}}:",
+    "failed": "Could not upload {{name}}: {{message}}"
   }
 }

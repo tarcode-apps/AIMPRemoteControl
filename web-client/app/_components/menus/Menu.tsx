@@ -145,12 +145,13 @@ export type MenuProps = {
     title: string;
     icon: string;
     items: MenuEntry[];
+    disabled?: boolean;
     className?: string;
     buttonClassName?: string;
     Button?: ComponentType<IconButtonProps>;
 };
 
-export function Menu({ title, icon, items, className, buttonClassName, Button = IconButton }: MenuProps) {
+export function Menu({ title, icon, items, disabled, className, buttonClassName, Button = IconButton }: MenuProps) {
     const id = useId();
     const anchor = anchorName('menu', id);
 
@@ -159,6 +160,7 @@ export function Menu({ title, icon, items, className, buttonClassName, Button = 
             <Button
                 title={title}
                 className={buttonClassName}
+                disabled={disabled}
                 aria-haspopup="menu"
                 popoverTarget={id}
                 style={{ anchorName: anchor } as CSSProperties}

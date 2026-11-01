@@ -17,6 +17,9 @@ export type ScreenProps = {
     search?: ReactNode;
     // Shows a back arrow that does this instead of the usual navigation.
     onBack?(): void;
+    // Another icon and title for that button, such as an arrow up a folder.
+    backIcon?: string;
+    backTitle?: string;
     actions?: ReactNode;
     // A strip under the app bar for a state the whole list is in.
     notice?: ReactNode;
@@ -33,6 +36,8 @@ export function Screen({
     tabs,
     search,
     onBack,
+    backIcon = 'arrow_back',
+    backTitle,
     actions,
     notice,
     toolbar,
@@ -62,8 +67,8 @@ export function Screen({
         <div className={clsx(styles.screen, withPlayer && styles.withPlayer)}>
             <header className={clsx(styles.appBar, tabs && styles.withTabs, search && styles.withSearch)}>
                 {secondary || onBack ? (
-                    <IconButton title={t('nav.back')} className={styles.nav} onClick={onBack ?? goBack}>
-                        <Icon>arrow_back</Icon>
+                    <IconButton title={backTitle ?? t('nav.back')} className={styles.nav} onClick={onBack ?? goBack}>
+                        <Icon>{backIcon}</Icon>
                     </IconButton>
                 ) : (
                     <IconButton title={t('nav.menu')} className={styles.nav} onClick={open}>

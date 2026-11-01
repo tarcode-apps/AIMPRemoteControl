@@ -292,6 +292,13 @@
     .number {
         color: var(--color-text);
     }
+
+    // The stars, their outlines and the dots alike.
+    .rating {
+        --color-text-secondary: var(--color-text);
+        --color-text-dim: var(--color-text);
+        color: var(--color-text);
+    }
 }
 
 .groupButton:focus {

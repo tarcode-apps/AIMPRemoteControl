@@ -177,7 +177,19 @@ export function ItemRow({
     );
 }
 
-export function SkeletonRow({ view, docked, thumbnailSize, widestNumber, selecting, sorting }: RowProps) {
+// Placeholder titles of varying length, so that the rows do not read as one block.
+const skeletonTitleWidths = ['45%', '75%', '60%'];
+
+// `index` is the row's place in the list, which picks its placeholder's length.
+export function SkeletonRow({
+    index,
+    view,
+    docked,
+    thumbnailSize,
+    widestNumber,
+    selecting,
+    sorting,
+}: RowProps & { index: number }) {
     return (
         <>
             {selecting && (
@@ -196,12 +208,16 @@ export function SkeletonRow({ view, docked, thumbnailSize, widestNumber, selecti
             )}
             <div className={styles.text}>
                 <div className={styles.line}>
-                    <Skeleton className={styles.title} width="60%" />
+                    <div className={styles.title}>
+                        <Skeleton width={skeletonTitleWidths[index % skeletonTitleWidths.length]} />
+                    </div>
                     {view.showDuration && <Skeleton className={styles.duration} width="2.5em" />}
                 </div>
                 {view.showSecondLine && (
                     <div className={styles.line}>
-                        <Skeleton className={styles.details} width="40%" />
+                        <div className={styles.details}>
+                            <Skeleton width="40%" />
+                        </div>
                     </div>
                 )}
             </div>

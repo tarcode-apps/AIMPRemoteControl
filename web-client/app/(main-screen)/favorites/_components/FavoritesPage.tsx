@@ -233,7 +233,7 @@ export function FavoritesPage() {
                 {entry && row.kind === 'item' ? (
                     <ItemRow {...itemProps(entry)} number={row.position + 1} selected={false} onSelect={() => {}} />
                 ) : (
-                    <SkeletonRow {...rowProps} />
+                    <SkeletonRow {...rowProps} index={drag.state.source.row} />
                 )}
             </div>
         );

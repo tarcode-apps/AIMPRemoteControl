@@ -3,6 +3,7 @@ import { playerKeys, snapshot } from '@/app/_api/player';
 import { playlistKeys } from '@/app/_api/playlists';
 import { queueKeys } from '@/app/_api/queue';
 import { searchKeys } from '@/app/_api/search';
+import { settingsKeys } from '@/app/_api/settings';
 import type { PlayerState, Playlist, Queue } from '@/app/_api/types';
 import { favoriteRecords } from '@/app/_state/Favorites';
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
@@ -14,6 +15,7 @@ type PlaylistsChanged = { playlists: { id: string; revision: number }[] };
 const invalidations: Record<string, QueryKey> = {
     queue: queueKeys.all,
     timer: ['timer'],
+    settings: settingsKeys.all,
 };
 
 // Kept outside React on purpose: it must survive remounts and die with the page,

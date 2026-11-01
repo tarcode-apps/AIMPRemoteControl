@@ -155,7 +155,7 @@ export function QueuePage() {
                 {item ? (
                     <ItemRow {...itemProps(item)} selected={false} onSelect={() => {}} />
                 ) : (
-                    <SkeletonRow {...rowProps} />
+                    <SkeletonRow {...rowProps} index={drag.state.source.row} />
                 )}
             </div>
         );
@@ -190,7 +190,7 @@ export function QueuePage() {
                             className={styles.row}
                             style={{ height: twoLineRowHeight, transform: `translateY(${i * twoLineRowHeight}px)` }}
                         >
-                            <SkeletonRow {...rowProps} />
+                            <SkeletonRow {...rowProps} index={i} />
                         </div>
                     ))}
                 </div>

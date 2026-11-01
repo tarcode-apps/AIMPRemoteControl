@@ -43,6 +43,14 @@ namespace player
 
 	MutationResult RemovePlaylist(IAIMPCore *core, const std::string &playlistId);
 
+	// The loaded playlist that may be changed, acquired for the caller to release;
+	// otherwise why not, with `playlist` left null.
+	MutationResult OpenWritablePlaylist(IAIMPCore *core, const std::string &playlistId, IAIMPPlaylist *&playlist);
+
+	// Appends files, folders, playlist files and URLs; the player expands folders
+	// and playlist files itself.
+	MutationResult AddFiles(IAIMPCore *core, const std::string &playlistId, const std::vector<std::string> &uris);
+
 	// The playlist's view, formatting and grouping settings as one comparable string,
 	// for a player that does not notify of their changes.
 	std::string SettingsSnapshot(IAIMPPlaylist *playlist);

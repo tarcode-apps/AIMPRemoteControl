@@ -3,6 +3,7 @@
 #include "apiController.h"
 
 class IAIMPCore;
+class SharedSettings;
 class StateUpdateEvents;
 
 namespace webapi
@@ -12,8 +13,8 @@ namespace webapi
 	class EventsController : public IApiController
 	{
 	public:
-		EventsController(IAIMPCore *core, StateUpdateEvents &events, CoverIndex &covers)
-			: FCore(core), FEvents(events), FCovers(covers) {}
+		EventsController(IAIMPCore *core, StateUpdateEvents &events, CoverIndex &covers, const SharedSettings &settings)
+			: FCore(core), FEvents(events), FCovers(covers), FSettings(settings) {}
 
 		void Register(IEndpointRouteBuilder &endpoints) override;
 
@@ -21,5 +22,6 @@ namespace webapi
 		IAIMPCore *FCore;
 		StateUpdateEvents &FEvents;
 		CoverIndex &FCovers;
+		const SharedSettings &FSettings;
 	};
 }

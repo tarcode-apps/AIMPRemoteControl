@@ -40,6 +40,9 @@ struct ApiRequest
 
 using ApiHandler = std::function<nlohmann::json(const ApiRequest &request)>;
 
+// The files of a multipart upload; an ApiError is answered like one of an ApiHandler.
+using ApiUploadHandler = std::function<nlohmann::json(const ApiRequest &request, const std::vector<HttpUploadedFile> &files)>;
+
 // Nullopt is a plain 404; an ApiError is answered like one of an ApiHandler.
 using HttpGetHandler = std::function<std::optional<HttpContent>(const ApiRequest &request)>;
 
@@ -70,6 +73,7 @@ public:
 	virtual void MapGet(const std::string &pathPattern, HttpGetHandler handler) = 0;
 	virtual void MapUpload(const std::string &pathPattern, HttpUploadHandler handler) = 0;
 	virtual void MapApi(HttpMethod method, const std::string &pathPattern, ApiHandler handler) = 0;
+	virtual void MapApiUpload(const std::string &pathPattern, ApiUploadHandler handler) = 0;
 	virtual void MapEventStream(const std::string &pathPattern, EventStreamHandler handler) = 0;
 };
 

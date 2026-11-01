@@ -11,8 +11,10 @@
 #include "apiCore.h"
 #include "aimpHelper.h"
 #include "helpers/idLookup.h"
+#include "helpers/permissions.h"
 #include "mainThreadRunner.h"
 #include "helpers/remoteControlIdManager.h"
+#include "settings.h"
 
 namespace
 {
@@ -22,12 +24,14 @@ namespace
 
 void rpcapi::AddFilesCommand::Register(IEndpointRouteBuilder &endpoints)
 {
-	endpoints.MapRpc("AddFiles", [core = FCore, &idManager = FIdManager](const nlohmann::json &params) -> nlohmann::json
+	endpoints.MapRpc("AddFiles", [core = FCore, &idManager = FIdManager, &settings = FSettings](const nlohmann::json &params) -> nlohmann::json
 			{
 		if (!params.contains("playlist_id") || !params["playlist_id"].is_number_integer())
 			throw RpcError(-32602, "playlist_id is required");
 		if (!params.contains("files") || !params["files"].is_array())
 			throw RpcError(-32602, "files is required");
+		if (!CanBrowseFiles(settings.Get().Features))
+			throw LocalizedRpcError(ErrorAddFailed, "addFilesDisabled");
 		const std::int32_t playlistId = params["playlist_id"].get<std::int32_t>();
 		const std::vector<std::string> files = params["files"].get<std::vector<std::string>>();
 

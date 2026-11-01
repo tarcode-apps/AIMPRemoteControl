@@ -339,7 +339,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                             onSelect={() => {}}
                         />
                     ) : (
-                        <SkeletonRow {...rowProps} />
+                        <SkeletonRow {...rowProps} index={drag.state.source.row} />
                     )}
                 </div>
             );
@@ -374,7 +374,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                             className={styles.row}
                             style={{ height: itemRowHeight, transform: `translateY(${i * itemRowHeight}px)` }}
                         >
-                            <SkeletonRow {...rowProps} />
+                            <SkeletonRow {...rowProps} index={i} />
                         </div>
                     ))}
                 </div>
@@ -461,7 +461,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                                         onRate={onRate}
                                     />
                                 ) : (
-                                    <SkeletonRow {...rowProps} />
+                                    <SkeletonRow {...rowProps} index={index} />
                                 )}
                             </div>
                         );

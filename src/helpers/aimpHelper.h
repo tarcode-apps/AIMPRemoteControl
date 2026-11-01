@@ -29,6 +29,4 @@ IAIMPPlaylist *LoadedPlaylistByAIMPId(IAIMPCore *core, const std::string &aimpId
 
 HRESULT AddFilesToPlaylist(IAIMPCore *core, IAIMPPlaylist *playlist, const std::vector<std::string> &fileUris);
 
-std::vector<std::string> SupportedAudioExtensions(IAIMPCore *core);
-
 bool MoveFocus(IAIMPPlaylistItem *item, int delta);

@@ -14,7 +14,7 @@ with the client that ships in the same package.
 | Identifiers | a playlist `id` is AIMP's own playlist id (string), stable across player restarts |
 | Field names | camelCase |
 | Errors | HTTP status plus `{"error": {"code": string, "message": string}}`; `code` is stable, `message` is for humans and comes in the language of the player's interface (`Langs/*.lng`, section `[AIMPRemoteControlErrors]`, keyed by `code`) |
-| Limits | request bodies above 16 MB are refused with `413` |
+| Limits | request bodies above 16 MB are refused with `413`; only the [upload](#post-apiv1playlistsidupload) takes up to 2 GB |
 
 Error codes so far:
 
@@ -32,6 +32,11 @@ Error codes so far:
 | `500` | `playerCommandFailed` | the player refused a playback command or setting |
 | `404` | `coverNotFound` | the item has no cover, the `key` is not the item's current one, or the image named by this hash is no longer known |
 | `409` | `queueChanged` | the `revision` in the request is not the playback queue's current one |
+| `403` | `browseFilesDisabled` | browsing the computer's files is not allowed in the plugin settings, so neither is adding them by path |
+| `404` | `pathInaccessible` | the folder does not exist or cannot be read |
+| `403` | `uploadDisabled` | uploading tracks is not allowed in the plugin settings |
+| `507` | `uploadNoSpace` | the drive of the upload folder has no room for the uploaded file |
+| `500` | `uploadFailed` | the uploaded file could not be written into the upload folder; nothing of it is left behind |
 
 ## Playlists
 
@@ -173,6 +178,42 @@ Every page is read from the player at request time, nothing is cached in the
 plugin; a search is one pass over the whole playlist per page.
 
 Errors: `404 playlistNotFound`, `400 invalidQuery`.
+
+### `POST /api/v1/playlists/{id}/items`
+
+Appends to the playlist files, folders and playlist files of the player's
+computer, and URLs of streams:
+
+```json
+{
+  "files": ["C:\\Music\\Artist A", "C:\\Music\\Album.cue"],
+  "urls": ["https://stream.example/radio"]
+}
+```
+
+Either list may be left out, but not both. The player expands folders, keeping
+the formats it plays, and imports the tracks of a playlist file, CUE sheets
+included. `files` needs the
+[permission](#get-apiv1settings) to browse files; a URL needs none, as in the
+frozen protocol, but must carry a scheme. The response is an empty object; the
+new content arrives through the [`playlists` event](#get-apiv1events).
+
+Errors: `400 invalidBody`, `403 browseFilesDisabled`, `404 playlistNotFound`,
+`403 playlistReadOnly`, `500 playlistUpdateFailed`.
+
+### `POST /api/v1/playlists/{id}/upload`
+
+`multipart/form-data` with one or more file parts, each saved under its
+`filename` into the upload folder configured on the player and then appended
+to the playlist. Only the file name part of the name is used; characters the
+file system refuses become `_`, a clash gets a ` (2)`, ` (3)`… suffix. The
+playlist is checked before anything is written. Needs the permission to
+upload tracks. The body may be up to 2 GB; the web client sends one file per
+request. The response is an empty object.
+
+Errors: `400 invalidBody` (no file parts), `403 uploadDisabled`,
+`404 playlistNotFound`, `403 playlistReadOnly`, `507 uploadNoSpace`,
+`500 uploadFailed`, `500 playlistUpdateFailed`.
 
 ### `PATCH /api/v1/playlists/{id}/items/{index}`
 
@@ -687,6 +728,80 @@ with `Cache-Control: no-store`.
 
 Errors: `400 invalidQuery`, `404 coverNotFound`.
 
+## Files
+
+The computer the player runs on, for picking what to add. Needs the permission
+to browse files.
+
+### `GET /api/v1/files`
+
+| Query | Default | |
+|---|---|---|
+| `path` | | the folder to list; without it, the roots |
+| `types` | `audio` | comma-separated, which files to list: `audio`, `playlists` |
+| `sort` | `name` | the order of the folders and of the files: `name`, or `modified` for the time of the last change |
+| `descending` | `false` | `true` reverses the order |
+
+Without `path`, the drives (with their volume labels) on Windows, the file
+system root on Linux:
+
+```json
+{ "roots": [{ "path": "C:\\", "label": "" }, { "path": "D:\\", "label": "Data" }] }
+```
+
+With `path`, the folders and the files of the formats asked for, each in the
+order asked for; hidden and system entries are left out:
+
+```json
+{
+  "parent": "C:\\Music",
+  "folders": [{ "name": "Artist A", "path": "C:\\Music\\Artist A" }],
+  "files": [
+    { "name": "Track One.mp3", "path": "C:\\Music\\Track One.mp3", "type": "audio", "size": 10655744 },
+    { "name": "Album.cue", "path": "C:\\Music\\Album.cue", "type": "playlist", "size": 1832 }
+  ]
+}
+```
+
+Names sort as the file manager of the player's system sorts them, with
+"Track 9" before "Track 10": on Windows in Explorer's order, elsewhere by the
+player's locale with runs of digits compared by value. `parent` is empty
+for a drive or the file system root. Paths are returned
+whole, so the client never joins them: the separator depends on the player's
+system. A CUE sheet counts as a playlist: the player expands it into its
+tracks when added, like a playlist file.
+
+Errors: `400 invalidQuery`, `403 browseFilesDisabled`, `404 pathInaccessible`.
+
+### `GET /api/v1/formats`
+
+The extensions the player opens, lower-case and without the dot:
+
+```json
+{ "audio": ["mp3", "flac", "ogg", "…"], "playlists": ["m3u", "m3u8", "pls", "cue", "…"] }
+```
+
+## Settings
+
+### `GET /api/v1/settings`
+
+What the client may know of the plugin's settings, grouped so that more can be
+added beside the permissions:
+
+```json
+{
+  "permissions": {
+    "uploadTracks": true,
+    "browseFiles": false,
+    "physicalDeletion": false,
+    "scheduler": true
+  }
+}
+```
+
+`permissions` are the client permissions of the plugin's options page. The
+[`settings` event](#get-apiv1events) tells when they change.
+
 ## Events
 
 ### `GET /api/v1/events`
@@ -703,6 +818,7 @@ change; the payload is a JSON object.
 | `playlists` | a playlist was added, removed, renamed or its content changed | `{"playlists": [{"id": "{A1B2C3D4-...}", "revision": 7}, …]}` — every loaded playlist with its current revision |
 | `queue` | an entry was added, removed or moved, the player took the next track out, or the queue was suspended or resumed | `{"revision": 12, "count": 3, "suspended": false}` — enough for a badge; the list itself is [`GET /api/v1/queue`](#get-apiv1queue) |
 | `timer` | the sleep timer was set, cancelled or fired | `{}` |
+| `settings` | the plugin's settings were saved on its options page | the same object as [`GET /api/v1/settings`](#get-apiv1settings) |
 
 A track switch raises several player changes within a few milliseconds, with
 a stopped player in between; the stream waits for a 100 ms lull and sends one

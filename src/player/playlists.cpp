@@ -151,6 +151,35 @@ player::MutationResult player::RemovePlaylist(IAIMPCore *core, const std::string
 	return Succeeded(hr) ? MutationResult::Ok : MutationResult::Failed;
 }
 
+player::MutationResult player::OpenWritablePlaylist(IAIMPCore *core, const std::string &playlistId, IAIMPPlaylist *&playlist)
+{
+	playlist = LoadedPlaylistByAIMPId(core, playlistId);
+	if (!playlist)
+		return MutationResult::PlaylistNotFound;
+	INT32 readOnly = 0;
+	IAIMPPlaylistProperties *props = nullptr;
+	if (Succeeded(playlist->QueryInterface(IID_IAIMPPlaylistProperties, reinterpret_cast<void **>(&props))) && props)
+	{
+		props->GetValueAsInt32(AIMP_PLAYLIST_PROPID_READONLY, &readOnly);
+		props->Release();
+	}
+	if (!readOnly)
+		return MutationResult::Ok;
+	playlist->Release();
+	playlist = nullptr;
+	return MutationResult::PlaylistReadOnly;
+}
+
+player::MutationResult player::AddFiles(IAIMPCore *core, const std::string &playlistId, const std::vector<std::string> &uris)
+{
+	IAIMPPlaylist *playlist = nullptr;
+	if (const MutationResult opened = OpenWritablePlaylist(core, playlistId, playlist); opened != MutationResult::Ok)
+		return opened;
+	const HRESULT hr = AddFilesToPlaylist(core, playlist, uris);
+	playlist->Release();
+	return Succeeded(hr) ? MutationResult::Ok : MutationResult::Failed;
+}
+
 std::string player::SettingsSnapshot(IAIMPPlaylist *playlist)
 {
 	IAIMPPlaylistProperties *props = nullptr;

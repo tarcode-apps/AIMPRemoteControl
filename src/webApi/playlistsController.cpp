@@ -11,12 +11,15 @@
 
 #include <nlohmann/json.hpp>
 
+#include "apiPlaylists.h"
 #include "helpers/itemJson.h"
 #include "helpers/requestHelpers.h"
 #include "mainThreadRunner.h"
 #include "player/locate.h"
 #include "player/playlistItems.h"
 #include "player/playlists.h"
+#include "player/uploads.h"
+#include "settings.h"
 #include "stateUpdateEvents.h"
 
 namespace
@@ -30,7 +33,18 @@ namespace
 	using webapi::RevisionOf;
 	using webapi::SearchText;
 	using webapi::SelectionBody;
+	using webapi::StringArray;
 	using webapi::ThrowUnlessOk;
+
+	// A scheme and "://", which no path has.
+	bool IsUrl(const std::string &text)
+	{
+		const std::size_t colon = text.find("://");
+		if (colon == std::string::npos || colon == 0)
+			return false;
+		return std::all_of(text.begin(), text.begin() + static_cast<std::ptrdiff_t>(colon), [](unsigned char c)
+						   { return std::isalnum(c) || c == '+' || c == '-' || c == '.'; });
+	}
 
 	nlohmann::json ToJson(const player::PlaylistInfo &playlist, std::uint64_t revision)
 	{
@@ -154,6 +168,57 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 		const std::string playlistId = request.PathMatches.at(0);
 		ThrowUnlessOk(RunOnMainThread(core, [&]
 									  { return player::RemovePlaylist(core, playlistId); }));
+		return nlohmann::json::object(); });
+
+	endpoints.MapApi(HttpMethod::Post, R"(/api/v1/playlists/([^/]+)/items)", [core = FCore, &settings = FSettings](const ApiRequest &request) -> nlohmann::json
+			   {
+		const std::string playlistId = request.PathMatches.at(0);
+		const nlohmann::json &body = request.Body;
+		if (!body.is_object())
+			throw ApiError(400, "invalidBody");
+		std::vector<std::string> uris = StringArray(body, "files", false);
+		const std::vector<std::string> urls = StringArray(body, "urls", false);
+		if (uris.empty() && urls.empty())
+			throw ApiError(400, "invalidBody");
+		for (const std::string &file : uris)
+			if (file.empty())
+				throw ApiError(400, "invalidBody");
+		for (const std::string &url : urls)
+			if (!IsUrl(url))
+				throw ApiError(400, "invalidBody");
+		if (!uris.empty() && !settings.Get().Features.BrowseFiles)
+			throw ApiError(403, "browseFilesDisabled");
+		uris.insert(uris.end(), urls.begin(), urls.end());
+		ThrowUnlessOk(RunOnMainThread(core, [&]
+									  { return player::AddFiles(core, playlistId, uris); }));
+		return nlohmann::json::object(); });
+
+	endpoints.MapApiUpload(R"(/api/v1/playlists/([^/]+)/upload)", [core = FCore, &settings = FSettings](const ApiRequest &request, const std::vector<HttpUploadedFile> &files) -> nlohmann::json
+			   {
+		const std::string playlistId = request.PathMatches.at(0);
+		const Settings::FeatureSettings features = settings.Get().Features;
+		if (!features.UploadTracks)
+			throw ApiError(403, "uploadDisabled");
+		if (files.empty())
+			throw ApiError(400, "invalidBody");
+		// Nothing is written for a playlist that cannot take the files.
+		ThrowUnlessOk(RunOnMainThread(core, [&]
+									  {
+			IAIMPPlaylist *playlist = nullptr;
+			const player::MutationResult writable = player::OpenWritablePlaylist(core, playlistId, playlist);
+			if (playlist)
+				playlist->Release();
+			return writable; }));
+		std::vector<player::UploadedFile> uploads;
+		for (const HttpUploadedFile &file : files)
+			uploads.push_back({file.FileName.empty() ? file.Name : file.FileName, file.Content});
+		const player::SavedUploads saved = player::SaveUploads(features.EffectiveUploadFolder(), uploads);
+		if (saved.Failure == player::UploadFailure::NoSpace)
+			throw ApiError(507, "uploadNoSpace");
+		if (saved.Failure != player::UploadFailure::None)
+			throw ApiError(500, "uploadFailed");
+		ThrowUnlessOk(RunOnMainThread(core, [&]
+									  { return player::AddFiles(core, playlistId, saved.Paths); }));
 		return nlohmann::json::object(); });
 
 	endpoints.MapApi(HttpMethod::Get, R"(/api/v1/playlists/([^/]+)/items)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json

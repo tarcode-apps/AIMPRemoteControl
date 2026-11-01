@@ -119,6 +119,28 @@
     min-width: 0;
 }
 
+// Parts of a notice: the name gives way first, so that what is said about it
+// stays in view; a notice that may run long wraps instead.
+.noticeParts {
+    display: flex;
+    gap: 0.35em;
+}
+
+.noticeName {
+    @include mixins.ellipsis;
+
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.noticeDetail {
+    flex: none;
+}
+
+.noticeWrap {
+    white-space: normal;
+}
+
 .noticeButton {
     font-size: 14px;
 }

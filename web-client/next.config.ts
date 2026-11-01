@@ -24,6 +24,9 @@ const nextConfig: NextConfig = {
     experimental: isDev
         ? {
               proxyTimeout: 5 * 60 * 1000,
+              // The dev server clones request bodies for its rewrites and cuts
+              // them at this size; the player takes uploads up to 2 GB.
+              proxyClientMaxBodySize: '2gb',
           }
         : undefined,
     rewrites: isDev

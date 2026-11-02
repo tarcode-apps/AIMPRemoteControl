@@ -399,3 +399,46 @@ export type AddItemsRequest = {
     files?: string[];
     urls?: string[];
 };
+
+export type EqualizerBand = {
+    frequency: number; // Hz
+    gain: number; // dB, -15..15
+};
+
+export type EqualizerState = {
+    active: boolean;
+    // The player picks a preset by the track's genre.
+    auto: boolean;
+    preamp: number; // dB, -15..15
+    // The preset whose gains the bands hold; none for a custom curve.
+    preset: string | null;
+    bands: EqualizerBand[];
+};
+
+// The sound effects besides the equalizer, by the SDK's names.
+export type SoundEffect =
+    'echo' | 'reverb' | 'flanger' | 'chorus' | 'trueBass' | 'enhancer' | 'speed' | 'tempo' | 'pitch';
+
+// The player's sound, in its own ranges.
+export type EffectsState = Record<SoundEffect, number> & {
+    // Grows with every change: the greater one is the newer state.
+    revision: number;
+    balance: number; // -1..1
+    equalizer: EqualizerState;
+};
+
+export type EqualizerPatch = {
+    active?: boolean;
+    auto?: boolean;
+    preamp?: number;
+    // Only the bands to change.
+    bands?: { index: number; gain: number }[];
+};
+
+export type EffectsPatch = Partial<Record<SoundEffect | 'balance', number>> & {
+    equalizer?: EqualizerPatch;
+};
+
+export type EqualizerPreset = {
+    name: string;
+};

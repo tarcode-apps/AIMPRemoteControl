@@ -41,6 +41,8 @@ Error codes so far:
 | `507` | `uploadNoSpace` | the drive of the upload folder has no room for the uploaded file |
 | `500` | `uploadFailed` | the uploaded file could not be written into the upload folder; nothing of it is left behind |
 | `403` | `schedulerDisabled` | timer functions are not allowed in the plugin settings |
+| `404` | `presetNotFound` | the player's equalizer library has no preset of this name |
+| `409` | `presetExists` | another equalizer preset already has the new name |
 
 ## Playlists
 
@@ -726,6 +728,109 @@ unless it is set to do nothing. The response is an empty object.
 
 Errors: `400 invalidBody`, `500 playerCommandFailed`.
 
+## Effects
+
+The player's sound: the balance, speed, tempo and pitch, the effects of its
+"Sound Effects: General" page and the equalizer with its preset library. The
+player's own windows and the frozen protocol's `Status` change the same
+values, and every change comes through the [`effects` event](#get-apiv1events).
+
+### `GET /api/v1/effects`
+
+```json
+{
+  "revision": 42,
+  "balance": 0,
+  "speed": 1,
+  "tempo": 1,
+  "pitch": 0,
+  "echo": 0,
+  "reverb": 0,
+  "flanger": 0,
+  "chorus": 0,
+  "trueBass": 0,
+  "enhancer": 1,
+  "equalizer": {
+    "active": true,
+    "auto": false,
+    "preamp": 0.3,
+    "preset": "Rock",
+    "bands": [{ "frequency": 31.5, "gain": 7.4 }, { "frequency": 43, "gain": 7 }, …]
+  }
+}
+```
+
+The names are the SDK's and the ranges the player's own, which the SDK header
+understates for some: `balance` `-1..1` from left to right, `speed` and
+`tempo` `0.5..3` with `1` the normal rate, `pitch` `-10..10`, `echo`,
+`reverb`, `flanger` and `chorus` `0..1`, `trueBass` `0..2`, `enhancer`
+(the stereo enhancer) `1..5` with `1` off. `preamp` and each band's `gain`
+are in dB, `-15..15`; `frequency` is in Hz, and the player has 20 bands.
+`auto` is the player's automatic choice of a preset by the track's genre.
+`preset` names the preset whose gains the bands hold right now and is `null`
+while they match none, which the player's own windows call the custom setting:
+the player does not remember which preset was applied, so a preset changed by
+hand is no longer that preset. `revision` grows with every change; of two
+states, the one with the greater revision is the newer, which lets a client
+drop an event that arrives after a newer response.
+
+### `PATCH /api/v1/effects`
+
+Changes any of the values; the others stay as they are. `equalizer` takes any
+of `active`, `auto`, `preamp` and `bands`, the last naming only the bands to
+change by their index in the list above. An empty body is refused.
+
+```json
+{ "balance": 0.1, "equalizer": { "active": true, "bands": [{ "index": 0, "gain": 3.5 }] } }
+```
+
+A value outside its range is refused rather than clamped. The response is the
+state after the change, as `GET` returns it.
+
+Errors: `400 invalidBody`, `500 playerCommandFailed`.
+
+### `GET /api/v1/effects/presets`
+
+The equalizer presets of the player's library, in its order:
+
+```json
+[{ "name": "Rock" }, { "name": "Mine" }]
+```
+
+Nothing announces a change of the list; a client reads it again after its own
+changes.
+
+### `POST /api/v1/effects/presets`
+
+`{ "name": "Mine" }` keeps the equalizer's current gains as a preset: a new
+one, or the one of that name, whose gains are replaced. The name is trimmed and
+must be 1 to 100 characters long. The response is an empty object.
+
+Errors: `400 invalidBody`, `500 playerCommandFailed`.
+
+### `POST /api/v1/effects/presets/apply`
+
+`{ "name": "Rock" }` sets the equalizer's bands to the preset's gains, so that
+the state then reports it as `preset`. The response is an empty object.
+
+Errors: `400 invalidBody`, `404 presetNotFound`, `500 playerCommandFailed`.
+
+### `POST /api/v1/effects/presets/remove`
+
+`{ "name": "Mine" }` deletes the preset from the library. The response is an
+empty object.
+
+Errors: `400 invalidBody`, `404 presetNotFound`, `500 playerCommandFailed`.
+
+### `POST /api/v1/effects/presets/rename`
+
+`{ "name": "Mine", "newName": "Evening" }` renames the preset; the new name is
+trimmed and checked like a saved one. A name another preset has is refused. The
+response is an empty object.
+
+Errors: `400 invalidBody`, `404 presetNotFound`, `409 presetExists`,
+`500 playerCommandFailed`.
+
 ## Covers
 
 A cover is served by the hash of its bytes, so that the tracks of an album,
@@ -942,11 +1047,13 @@ change; the payload is a JSON object.
 | `playlists` | a playlist was added, removed, renamed or its content changed | `{"playlists": [{"id": "{A1B2C3D4-...}", "revision": 7}, …]}` — every loaded playlist with its current revision |
 | `queue` | an entry was added, removed or moved, the player took the next track out, or the queue was suspended or resumed | `{"revision": 12, "count": 3, "suspended": false}` — enough for a badge; the list itself is [`GET /api/v1/queue`](#get-apiv1queue) |
 | `timer` | the sleep timer was set, cancelled or fired, or began to wait for the end of the playing track | the same object as [`GET /api/v1/timer`](#get-apiv1timer) |
+| `effects` | the balance, speed, tempo, pitch, a sound effect or the equalizer changed, in the player's window or through the API | the same object as [`GET /api/v1/effects`](#get-apiv1effects) |
 | `settings` | the plugin's settings were saved on its options page | the same object as [`GET /api/v1/settings`](#get-apiv1settings) |
 
 A track switch raises several player changes within a few milliseconds, with
-a stopped player in between; the stream waits for a 100 ms lull and sends one
-`player` event with the state after the burst.
+a stopped player in between, and a slider dragged in the player's window raises
+an effects change per step; the stream waits for a 100 ms lull and sends one
+`player` or `effects` event with the state after the burst.
 
 A comment line (`: ping`) goes out after 30 s without events; it keeps
 intermediaries from closing an idle connection and lets the server notice a

@@ -1,0 +1,450 @@
+@use "../../../_styles/mixins" as mixins;
+
+// The page scrolls here rather than in the screen's body, so that its own size
+// stays the same whatever it shows.
+.area {
+    height: 100%;
+    overflow-y: auto;
+}
+
+// The equalizer as a band across a large screen, the effects under it.
+.combined {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    height: 100%;
+}
+
+// As tall as the room left allows, between a band and a block.
+.combinedEqualizer {
+    flex: 1 1 340px;
+    min-height: 300px;
+    max-height: 440px;
+}
+
+.effects.combinedEffects {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, max(200px, calc(33.3% - 22px))), 1fr));
+    column-gap: 32px;
+    padding: 0 12px 12px;
+}
+
+.message {
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--color-text-secondary);
+}
+
+// The sliders of the screen as the player's Android app draws them: a thin
+// track and a white thumb.
+.equalizer,
+.effects {
+    --slider-track-height: 2px;
+    --slider-thumb-size: 14px;
+    --slider-thumb-color: #f0f0f0;
+}
+
+// One grid for the screen: the balance above the bands and the preamp below
+// them on a portrait screen, each a row across it; upright beside the bands on a
+// wide one, as tall as the plot.
+.equalizer {
+    display: grid;
+    grid-template:
+        "balanceLabel balanceLabel balanceLabel" auto
+        "balanceRow   balanceRow   balanceRow  " auto
+        "balanceValue balanceValue balanceValue" auto
+        "labels       plot         values      " 1fr
+        "preampLabel  preampLabel  preampLabel " auto
+        "preampRow    preampRow    preampRow   " auto
+        "preampValue  preampValue  preampValue " auto
+        / var(--label-width) 1fr var(--label-width);
+    --end-width: 4.8em;
+    // As wide as "11.2 k" and "+10.6".
+    --label-width: 3.2em;
+
+    column-gap: 6px;
+    height: 100%;
+    min-height: 480px;
+    padding: 2px 5px 6px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-secondary);
+
+    &.horizontal {
+        // A side as wide as an end on either side of the track, so that the
+        // track stands under the middle of its name.
+        grid-template:
+            "balanceLabel labels preampLabel" auto
+            "balanceRow   plot   preampRow  " 1fr
+            "balanceValue values preampValue" auto
+            / calc(2 * var(--end-width) + 26px) 1fr calc(2 * var(--end-width) + 26px);
+        column-gap: 6px;
+        row-gap: 4px;
+        min-height: 220px;
+        padding: 6px 5px 6px;
+    }
+}
+
+.balanceLabel {
+    grid-area: balanceLabel;
+}
+
+.balanceRow {
+    grid-area: balanceRow;
+}
+
+.balanceValue {
+    grid-area: balanceValue;
+}
+
+.preampLabel {
+    grid-area: preampLabel;
+}
+
+.preampRow {
+    grid-area: preampRow;
+}
+
+.preampValue {
+    grid-area: preampValue;
+}
+
+// Room between the sliders and the plot.
+.equalizer:not(.horizontal) {
+    .balanceValue {
+        margin-bottom: 10px;
+    }
+
+    .preampLabel {
+        margin-top: 10px;
+    }
+}
+
+// Ends of one width, so that every track of a view is as long as the others.
+.sideRow {
+    display: grid;
+    grid-template-columns: var(--end-width) 1fr var(--end-width);
+    align-items: center;
+    gap: 8px;
+
+    .end:first-child {
+        justify-self: end;
+    }
+
+    // Upright, the track in the middle and the ends beside it, the high one at
+    // the top: the balance's to its left, the preamp's to its right, each
+    // aligned on the track.
+    .horizontal & {
+        grid-template-columns: 1fr auto 1fr;
+        grid-template-rows: 1fr 1fr;
+        align-items: stretch;
+        column-gap: 6px;
+        row-gap: 0;
+        min-height: 0;
+    }
+}
+
+.horizontal {
+    .sideSlider {
+        grid-column: 2;
+        grid-row: 1 / 3;
+    }
+
+    .high {
+        grid-row: 1;
+        align-self: start;
+    }
+
+    .low {
+        grid-row: 2;
+        align-self: end;
+    }
+
+    // As specific as the row's own rule for its first end.
+    .sideRow .balanceHigh,
+    .sideRow .balanceLow {
+        grid-column: 1;
+        justify-self: end;
+    }
+
+    .sideRow .preampHigh,
+    .sideRow .preampLow {
+        grid-column: 3;
+        justify-self: start;
+    }
+}
+
+.sideLabel {
+    justify-self: center;
+    align-self: end;
+    font-size: 12px;
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text);
+    white-space: nowrap;
+}
+
+.sideSlider {
+    min-width: 0;
+
+    .horizontal & {
+        justify-self: center;
+        align-self: stretch;
+    }
+}
+
+.end {
+    white-space: nowrap;
+}
+
+.sideValue {
+    justify-self: center;
+    white-space: nowrap;
+}
+
+// The frequencies before the plot and the gains after it, each in the slot the
+// plot gives its band.
+.labels,
+.values {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+
+    .horizontal & {
+        flex-direction: row;
+        min-width: 0;
+    }
+}
+
+.labels {
+    grid-area: labels;
+}
+
+.values {
+    grid-area: values;
+}
+
+.label,
+.value {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    min-height: 0;
+    white-space: nowrap;
+
+    .horizontal & {
+        justify-content: center;
+    }
+}
+
+.label {
+    justify-content: flex-end;
+}
+
+.plot {
+    grid-area: plot;
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    box-shadow: inset 0 0 0 1px var(--color-divider);
+    cursor: crosshair;
+    touch-action: none;
+    user-select: none;
+}
+
+.canvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+}
+
+.zero {
+    stroke: var(--color-text-secondary);
+    stroke-width: 1.5;
+    stroke-dasharray: 2 4;
+}
+
+.curve {
+    fill: none;
+    stroke: var(--color-accent);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+}
+
+.point {
+    fill: var(--color-text);
+}
+
+// A switched-off equalizer is dimmed, as in the player's Android app, and stays
+// editable; the balance is not a part of it.
+.inactive :is(.labels, .plot, .values, .preampLabel, .preampRow, .preampValue) {
+    opacity: 0.45;
+}
+
+// The keyboard's handle on each point; the pointer works on the plot itself.
+.handle {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    margin: -12px 0 0 -12px;
+    border-radius: 50%;
+    pointer-events: none;
+
+    &:focus-visible {
+        outline: 2px solid var(--color-accent);
+    }
+}
+
+// The effects as the equalizer's sliders, two columns where they fit.
+.effects {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, max(260px, calc(50% - 24px))), 1fr));
+    column-gap: 48px;
+    --end-width: 3.6em;
+
+    row-gap: 4px;
+    padding: 6px 4px 12px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-secondary);
+}
+
+.effect {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    .sideLabel,
+    .sideValue {
+        align-self: center;
+    }
+}
+
+// Fixed slots: the switch, AUTO, a spare one, the view and the menu.
+.toolbar {
+    flex: 1;
+    align-self: stretch;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    justify-items: center;
+    align-items: center;
+
+    @include mixins.drawer-docked {
+        grid-template-columns: auto auto minmax(0, 1fr) 52px 52px;
+        justify-items: start;
+        gap: 8px;
+        padding: 0 8px 0 16px;
+    }
+}
+
+.active {
+    color: var(--color-accent);
+}
+
+.auto {
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 10px;
+    background: var(--color-surface-raised);
+    color: var(--color-text);
+    font-size: 12px;
+    font-weight: var(--font-weight-medium);
+    letter-spacing: 0.04em;
+    transition:
+        background-color 0.15s,
+        color 0.15s;
+
+    &.autoOn {
+        background: var(--color-accent);
+        color: var(--color-bg);
+    }
+
+    &:disabled {
+        color: var(--color-text-dim);
+        cursor: default;
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 2px;
+    }
+}
+
+// The presets dialog lets the equalizer show through, so that a chosen preset
+// is seen at once; over the dialog's own background and backdrop, whichever
+// stylesheet loads last.
+dialog.translucent {
+    background: color-mix(in srgb, var(--color-dialog) 72%, transparent);
+    box-shadow: none;
+
+    &::backdrop {
+        background: color-mix(in srgb, var(--color-bg) 25%, transparent);
+    }
+}
+
+.manageButton {
+    flex: none;
+    margin-top: 16px;
+    color: var(--color-text-secondary);
+
+    &[aria-pressed="true"] {
+        color: var(--color-accent);
+    }
+}
+
+.presetList {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+// The delete button's icon sits where the radios are in the other mode: a
+// radio is 20 px at the content's edge, the button 40 px around its icon.
+.presetRow {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    margin-right: -10px;
+}
+
+.presetName {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.presetAction {
+    --icon-size: 20px;
+
+    flex: none;
+    width: 40px;
+    height: 40px;
+    color: var(--color-text-secondary);
+}
+
+.fieldLabel {
+    display: block;
+    margin: 4px 0 2px;
+}
+
+.field {
+    width: 100%;
+    font-size: 18px;
+}
+
+.hint {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.question {
+    margin: 8px 0;
+}
+
+.error {
+    margin: 8px 0 0;
+    color: var(--color-accent);
+}

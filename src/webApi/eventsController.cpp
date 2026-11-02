@@ -6,6 +6,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "effectsController.h"
 #include "helpers/coverIndex.h"
 #include "playerController.h"
 #include "pluginInfo.h"
@@ -48,6 +49,8 @@ namespace
 			return webapi::SettingsController::ToJson(settings.Get());
 		case StateUpdateEvents::Timer:
 			return webapi::TimerController::ToJson(timer);
+		case StateUpdateEvents::Effects:
+			return webapi::EffectsController::ToJson(core, events);
 		default:
 			return nlohmann::json::object();
 		}
@@ -65,6 +68,8 @@ namespace
 			return "queue";
 		case StateUpdateEvents::Timer:
 			return "timer";
+		case StateUpdateEvents::Effects:
+			return "effects";
 		case StateUpdateEvents::Settings:
 			return "settings";
 		default:
@@ -91,9 +96,12 @@ void webapi::EventsController::Register(IEndpointRouteBuilder &endpoints)
 				continue;
 			}
 			// A track switch raises several player changes in a row, with a stopped
-			// player in between, and one queue request raises one queue change per
-			// item; one event after the burst is what the client wants.
-			while ((changed.test(StateUpdateEvents::ControlPanel) || changed.test(StateUpdateEvents::Queue)) && !events.IsStopped())
+			// player in between, one queue request raises one queue change per item,
+			// and a slider dragged in the player's window raises an effects change per
+			// step; one event after the burst is what the client wants.
+			while ((changed.test(StateUpdateEvents::ControlPanel) || changed.test(StateUpdateEvents::Queue) ||
+					changed.test(StateUpdateEvents::Effects)) &&
+				   !events.IsStopped())
 			{
 				const std::bitset<StateUpdateEvents::KindCount> more = events.WaitAny(seen, BurstInterval);
 				if (more.none())

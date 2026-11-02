@@ -26,6 +26,7 @@ public:
 		Playlists,	  // playlist added/removed/renamed or its content changed
 		Queue,		  // playback queue changed
 		Timer,		  // sleep timer set/cancelled/fired (SleepTimer)
+		Effects,	  // balance, speed, tempo, pitch, a sound effect or the equalizer
 		Settings,	  // the plugin's settings were saved (OptionsFrame)
 		KindCount
 	};

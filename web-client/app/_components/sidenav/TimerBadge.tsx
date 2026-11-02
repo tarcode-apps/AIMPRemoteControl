@@ -34,7 +34,10 @@ const triggerIcons = {
     queueEnd: 'queue_music',
 } as const;
 
-const radius = 10;
+// The ring runs along the edge of the sidebar's round badge, its stroke inside it.
+const size = 36;
+const center = size / 2;
+const radius = center - 1.25;
 const circumference = 2 * Math.PI * radius;
 // Beyond this many tracks the gaps would vanish, so the ring runs down smoothly instead.
 const maxSegments = 60;
@@ -51,8 +54,8 @@ function Arc({ className, fraction, offset = 0 }: { className: string; fraction:
     return (
         <circle
             className={className}
-            cx={12}
-            cy={12}
+            cx={center}
+            cy={center}
             r={radius}
             style={{ strokeDasharray: `${dash} ${circumference - dash}`, strokeDashoffset: -circumference * offset }}
         />
@@ -65,7 +68,7 @@ function SegmentRing({ ended, left }: Segments) {
     if (total > maxSegments)
         return (
             <>
-                <circle className={styles.track} cx={12} cy={12} r={radius} />
+                <circle className={styles.track} cx={center} cy={center} r={radius} />
                 <Arc className={styles.arc} fraction={left / total} offset={ended / total} />
             </>
         );
@@ -120,12 +123,12 @@ export function TimerBadge({ timer }: TimerBadgeProps) {
     if (timed)
         ring = (
             <>
-                <circle className={styles.track} cx={12} cy={12} r={radius} />
+                <circle className={styles.track} cx={center} cy={center} r={radius} />
                 <Arc className={styles.arc} fraction={fraction} />
             </>
         );
     else if (segments) ring = <SegmentRing {...segments} />;
-    else ring = <circle className={styles.waiting} cx={12} cy={12} r={radius} />;
+    else ring = <circle className={styles.waiting} cx={center} cy={center} r={radius} />;
 
     const when = timed
         ? formatDuration(Math.ceil(remaining / 1000))
@@ -136,7 +139,7 @@ export function TimerBadge({ timer }: TimerBadgeProps) {
 
     return (
         <span className={styles.badge} title={t('timer.badge', { when, actions })}>
-            <svg className={styles.ring} viewBox="0 0 24 24" aria-hidden="true">
+            <svg className={styles.ring} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
                 {ring}
             </svg>
             {inside}

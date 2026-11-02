@@ -7,6 +7,8 @@ import styles from './Dialog.module.scss';
 export type DialogProps = {
     open: boolean;
     title: string;
+    // At the end of the title, such as a button that switches a mode.
+    titleAction?: ReactNode;
     onClose(): void;
     // The content is a form: Enter and a submit button among `actions` submit it.
     onSubmit?(): void;
@@ -20,7 +22,18 @@ export type DialogProps = {
 };
 
 // A modal on the native dialog, which traps the focus and closes on Escape itself.
-export function Dialog({ open, title, onClose, onSubmit, footer, actions, children, className, compact }: DialogProps) {
+export function Dialog({
+    open,
+    title,
+    titleAction,
+    onClose,
+    onSubmit,
+    footer,
+    actions,
+    children,
+    className,
+    compact,
+}: DialogProps) {
     const ref = useRef<HTMLDialogElement>(null);
     const titleId = useId();
 
@@ -45,9 +58,12 @@ export function Dialog({ open, title, onClose, onSubmit, footer, actions, childr
                     onSubmit?.();
                 }}
             >
-                <h2 id={titleId} className={styles.title}>
-                    {title}
-                </h2>
+                <div className={styles.titleBar}>
+                    <h2 id={titleId} className={styles.title}>
+                        {title}
+                    </h2>
+                    {titleAction}
+                </div>
                 <div className={styles.body}>{children}</div>
                 {footer && <div className={styles.footer}>{footer}</div>}
                 {actions && <div className={styles.actions}>{actions}</div>}

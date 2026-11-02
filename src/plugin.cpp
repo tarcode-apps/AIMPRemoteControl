@@ -50,6 +50,7 @@
 #include "webApi/queueController.h"
 #include "webApi/searchController.h"
 #include "webApi/timerController.h"
+#include "webApi/effectsController.h"
 
 namespace
 {
@@ -156,6 +157,7 @@ HRESULT WINAPI AIMPPlugin::Initialize(IAIMPCore *Core)
 	commands.push_back(std::make_unique<webapi::PlayerController>(Core, FStateEvents, *FCoverIndex));
 	commands.push_back(std::make_unique<webapi::CoversController>(Core, FStateEvents, *FCoverIndex));
 	commands.push_back(std::make_unique<webapi::TimerController>(FSleepTimer, FSettings));
+	commands.push_back(std::make_unique<webapi::EffectsController>(Core, FStateEvents));
 	commands.push_back(std::make_unique<webapi::EventsController>(Core, FStateEvents, *FCoverIndex, FSettings, FSleepTimer));
 	FRemoteControlServer = std::make_unique<AIMPRemoteControlServer>(std::move(commands), FNetworkWatcher,
 		[core = FCore](const std::string &keyPath)

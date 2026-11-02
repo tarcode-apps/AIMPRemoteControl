@@ -1,5 +1,6 @@
 'use client';
 
+import { activeEffects, useEffects } from '@/app/_api/effects';
 import { errorMessage } from '@/app/_api/helpers/errors';
 import { usePlaylists } from '@/app/_api/playlists';
 import { useQueue } from '@/app/_api/queue';
@@ -216,9 +217,19 @@ export function Sidebar() {
     const { records: favorites } = useFavorites();
     const { data: settings } = useSettings();
     const { data: timer } = useTimer(settings?.permissions.scheduler === true);
+    const { data: effects } = useEffects();
+    const soundChanged = effects && activeEffects(effects);
     // A count, or a picture of the state, as the timer's.
     const badges: Partial<Record<string, ReactNode>> = {
         '/timer/': timer?.timer && <TimerBadge timer={timer.timer} />,
+        '/effects/': soundChanged && (
+            <Icon
+                className={styles.badgeIcon}
+                title={t(soundChanged === 'equalizer' ? 'effects.enable' : 'effects.effectsOn')}
+            >
+                {soundChanged === 'equalizer' ? 'equalizer' : 'graphic_eq'}
+            </Icon>
+        ),
         '/queue/': queue?.suspended ? '!' : queue?.items.length || null,
         '/favorites/': favorites.length || null,
     };

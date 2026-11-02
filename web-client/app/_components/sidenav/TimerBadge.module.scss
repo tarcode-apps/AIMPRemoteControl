@@ -3,8 +3,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
+    width: 36px;
+    height: 36px;
 }
 
 .ring {
@@ -44,11 +44,11 @@
 }
 
 .icon {
-    --icon-size: 14px;
+    --icon-size: 18px;
 }
 
 .count {
-    font-size: 12px;
+    font-size: 14px;
     font-weight: var(--font-weight-medium);
     line-height: 1;
 }

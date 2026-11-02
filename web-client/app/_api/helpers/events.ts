@@ -1,3 +1,4 @@
+import { receiveEffects } from '@/app/_api/effects';
 import { favoriteKeys } from '@/app/_api/favorites';
 import { playerKeys, snapshot } from '@/app/_api/player';
 import { playlistKeys } from '@/app/_api/playlists';
@@ -5,7 +6,7 @@ import { queueKeys } from '@/app/_api/queue';
 import { searchKeys } from '@/app/_api/search';
 import { settingsKeys } from '@/app/_api/settings';
 import { timerKeys } from '@/app/_api/timer';
-import type { PlayerState, Playlist, Queue, TimerState } from '@/app/_api/types';
+import type { EffectsState, PlayerState, Playlist, Queue, TimerState } from '@/app/_api/types';
 import { favoriteRecords } from '@/app/_state/Favorites';
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import { useEffect } from 'react';
@@ -69,6 +70,9 @@ export function useEventStream(client: QueryClient) {
         });
         source.addEventListener('timer', (event: MessageEvent<string>) => {
             client.setQueryData(timerKeys.all, JSON.parse(event.data) as TimerState);
+        });
+        source.addEventListener('effects', (event: MessageEvent<string>) => {
+            receiveEffects(client, JSON.parse(event.data) as EffectsState);
         });
         for (const [name, queryKey] of Object.entries(invalidations))
             source.addEventListener(name, () => client.invalidateQueries({ queryKey }));

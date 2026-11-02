@@ -146,6 +146,7 @@ so build with `--debug`.
 | `src/helpers/` | AIMP SDK helpers, network interface enumeration and watcher, JSON helpers |
 | `src/optionsFrame.*`, `Langs/` | options page and its localization |
 | `src/sleepTimer.*` | sleep timer behind the `Scheduler` command and `/api/v1/timer` |
+| `src/player/effects.*` | balance, sound effects and the equalizer with its presets, behind `/api/v1/effects` |
 | `web-client/` | the web client (Next.js, static export); builds into `web-client/out/` |
 | `docs/remote-control-protocol.md` | protocol reference |
 | `docs/catalog/` | files for the entry in the AIMP addons catalog |

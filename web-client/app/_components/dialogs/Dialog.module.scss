@@ -7,7 +7,7 @@
     padding: 0;
     border: 0;
     border-radius: 12px;
-    background: var(--color-surface-raised);
+    background: var(--color-dialog);
     color: var(--color-text);
     box-shadow: 0 8px 32px var(--color-shadow);
 
@@ -40,7 +40,26 @@
     flex-direction: column;
 }
 
+// A button at the end of the title lines up with the radios and buttons at the
+// end of the rows: the bar keeps the room of the body's scrollbar too, and its
+// 48 px button centres on the 20 px column inside the body's 24 px padding.
+// It keeps its height when a long list fills the dialog: clipping makes it
+// shrinkable otherwise.
+.titleBar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    padding-right: 10px;
+    overflow: hidden;
+    scrollbar-gutter: stable;
+}
+
+// One line, so that a long title does not push the content down.
 .title {
+    @include mixins.ellipsis;
+
+    flex: 1;
+    min-width: 0;
     margin: 0;
     padding: 24px 24px 8px;
     font-size: 20px;
@@ -52,6 +71,7 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+    scrollbar-gutter: stable;
     padding: 0 24px;
 }
 

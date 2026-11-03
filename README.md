@@ -148,6 +148,7 @@ so build with `--debug`.
 | `src/sleepTimer.*` | sleep timer behind the `Scheduler` command and `/api/v1/timer` |
 | `src/player/effects.*` | balance, sound effects and the equalizer with its presets, behind `/api/v1/effects` |
 | `web-client/` | the web client (Next.js, static export); builds into `web-client/out/` |
+| `web-client/e2e/` | end-to-end tests of the API and the client against a throwaway AIMP (Playwright) |
 | `docs/remote-control-protocol.md` | protocol reference |
 | `docs/catalog/` | files for the entry in the AIMP addons catalog |
 

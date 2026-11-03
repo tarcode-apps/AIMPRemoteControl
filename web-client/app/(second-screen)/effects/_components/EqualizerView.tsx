@@ -268,6 +268,7 @@ function BandPlot({ bands, preamp, horizontal, onChange }: BandPlotProps) {
             <div
                 ref={plot}
                 className={styles.plot}
+                data-testid="equalizer-plot"
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerEnd}

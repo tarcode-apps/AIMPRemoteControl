@@ -403,6 +403,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                                     key={index}
                                     id={rowId(index)}
                                     role="option"
+                                    data-testid="group-row"
                                     aria-selected={isActive}
                                     className={clsx(
                                         styles.groupRow,
@@ -440,6 +441,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                                 key={index}
                                 id={rowId(index)}
                                 role="option"
+                                data-testid="item-row"
                                 aria-selected={isActive}
                                 className={clsx(
                                     styles.row,

@@ -213,6 +213,7 @@ export function SearchPage() {
                                 key={index}
                                 id={rowId(index)}
                                 role="option"
+                                data-testid="group-row"
                                 aria-selected={isActive}
                                 className={clsx(styles.groupRow, isActive && styles.active)}
                                 style={{ height: groupRowHeight, transform }}
@@ -237,6 +238,7 @@ export function SearchPage() {
                             key={index}
                             id={rowId(index)}
                             role="option"
+                            data-testid="item-row"
                             aria-selected={isActive}
                             className={clsx(
                                 styles.row,

@@ -209,7 +209,9 @@ export function NowPlaying() {
                     <h2 className={styles.title}>
                         <Marquee>{adjusting ? volumeLabel : (track?.title ?? blank)}</Marquee>
                     </h2>
-                    <p className={styles.details}>{track?.artist || blank}</p>
+                    <p className={styles.details} data-testid="track-artist">
+                        {track?.artist || blank}
+                    </p>
                     <p className={styles.details}>{track?.album || blank}</p>
                 </div>
                 {playing ? (
@@ -286,7 +288,7 @@ export function NowPlaying() {
             />
             <div className={styles.times}>
                 <span>{track ? formatDuration(position) : t('player.noTime')}</span>
-                <span>{numbers()}</span>
+                <span data-testid="track-position">{numbers()}</span>
                 <span>{track ? formatDuration(duration) : t('player.noTime')}</span>
             </div>
         </div>

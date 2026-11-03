@@ -108,10 +108,10 @@ export function PlayerPanel() {
             }}
             {...drag.handlers}
         >
-            <div ref={miniRef} className={styles.mini}>
+            <div ref={miniRef} className={styles.mini} data-testid="mini-player">
                 <MiniPlayer onExpand={expand} />
             </div>
-            <div className={styles.full}>
+            <div className={styles.full} data-testid="now-playing">
                 <NowPlaying />
             </div>
         </aside>

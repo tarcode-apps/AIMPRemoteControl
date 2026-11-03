@@ -210,6 +210,7 @@ export function QueuePage() {
                                 key={index}
                                 id={rowId(index)}
                                 role="option"
+                                data-testid="item-row"
                                 aria-selected={isActive}
                                 className={clsx(
                                     styles.row,

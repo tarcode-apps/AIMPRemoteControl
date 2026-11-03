@@ -5,7 +5,11 @@
   "scripts": {
     "dev": "next dev --webpack --hostname localhost --port 3334",
     "build": "next build --webpack && node fix-build.mjs",
-    "lint": "eslint"
+    "lint": "eslint",
+    "e2e": "playwright test --config e2e/playwright.config.ts",
+    "e2e:api": "playwright test --config e2e/playwright.config.ts --project api",
+    "e2e:ui": "playwright test --config e2e/playwright.config.ts --project ui-mobile --project ui-desktop --project ui-desktop-wide",
+    "e2e:report": "playwright show-report e2e/runtime/report"
   },
   "dependencies": {
     "@fontsource-utils/scss": "^0.2.4",
@@ -22,6 +26,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.64.1",
     "@types/node": "^26",
     "@types/react": "^19",
     "@types/react-dom": "^19",

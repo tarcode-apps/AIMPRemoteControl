@@ -105,7 +105,7 @@ export function ListToolbar({
         );
 
     return (
-        <div className={styles.toolbar}>
+        <div className={styles.toolbar} data-testid="list-toolbar">
             {docked && (
                 <SearchField
                     className={styles.search}

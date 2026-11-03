@@ -278,6 +278,7 @@ export function FavoritesPage() {
                                     key={index}
                                     id={rowId(index)}
                                     role="option"
+                                    data-testid="group-row"
                                     aria-selected={isActive}
                                     className={clsx(
                                         styles.groupRow,
@@ -305,6 +306,7 @@ export function FavoritesPage() {
                                 key={index}
                                 id={rowId(index)}
                                 role="option"
+                                data-testid="item-row"
                                 aria-selected={isActive}
                                 title={located ? undefined : t('favorites.missing')}
                                 className={clsx(

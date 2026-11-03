@@ -105,7 +105,11 @@ export function Drawer({ children }: { children: ReactNode }) {
     if (!element) throw new Error('<Drawer> must be used inside <DrawerContainer>');
     const { drawerRef, dragging } = element;
     return (
-        <aside ref={drawerRef} className={clsx(styles.drawer, opened && styles.open, dragging && styles.dragging)}>
+        <aside
+            ref={drawerRef}
+            className={clsx(styles.drawer, opened && styles.open, dragging && styles.dragging)}
+            data-testid="drawer"
+        >
             {children}
         </aside>
     );

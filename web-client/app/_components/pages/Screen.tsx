@@ -81,7 +81,11 @@ export function Screen({
                 ) : (
                     <div className={styles.heading}>
                         <h1 className={styles.title}>{title}</h1>
-                        {subtitle && <p className={styles.subtitle}>{subtitle}</p>}
+                        {subtitle && (
+                            <p className={styles.subtitle} data-testid="screen-subtitle">
+                                {subtitle}
+                            </p>
+                        )}
                     </div>
                 )}
                 <div className={styles.actions}>{actions}</div>

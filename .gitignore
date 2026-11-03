@@ -6,6 +6,9 @@
 # Packaged build artifacts
 /dist/
 
+# What the end-to-end tests create: the throwaway player, media, results
+/web-client/e2e/runtime/
+
 # User-specific files
 *.rsuser
 *.suo

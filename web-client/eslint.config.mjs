@@ -12,7 +12,11 @@ const eslintConfig = defineConfig([
         'out/**',
         'build/**',
         'next-env.d.ts',
+        // What the end-to-end tests create, traces included.
+        'e2e/runtime/**',
     ]),
+    // Playwright fixtures hand their value over through a function named `use`.
+    { files: ['e2e/**'], rules: { 'react-hooks/rules-of-hooks': 'off' } },
 ]);
 
 export default eslintConfig;

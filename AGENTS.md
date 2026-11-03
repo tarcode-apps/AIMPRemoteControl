@@ -74,8 +74,14 @@ Notes:
 
 ## Verifying changes
 
-There are no unit tests; the test bench is a running AIMP. Quick smoke test
-(port 3333, method names are in the protocol doc):
+The test bench is a running AIMP: by hand, or through the end-to-end tests
+in `web-client/e2e/` (Playwright; `npm run e2e` in `web-client/`, `e2e:api`
+for the API alone). They start a throwaway copy of the installed AIMP with a
+clean profile and the built plugin, so your own AIMP must be closed first and
+nothing of your profile is touched; everything a run creates lands in
+`web-client/e2e/runtime/` (ignored). See `web-client/e2e/README.md` for what
+a run needs and how the tests are laid out. Quick smoke test by hand (port
+3333, method names are in the protocol doc):
 
 ```bash
 curl -s -X POST http://localhost:3333/RPC_JSON \

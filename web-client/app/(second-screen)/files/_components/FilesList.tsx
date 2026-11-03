@@ -99,7 +99,7 @@ export function FilesList() {
                         const { folder } = row;
                         const selected = mode.selected.has(folder.path);
                         return (
-                            <div key={folder.path} className={styles.row} style={style}>
+                            <div key={folder.path} className={styles.row} style={style} data-testid="folder-row">
                                 <ListCheckbox
                                     title={t('files.selectFolder')}
                                     checked={selected}
@@ -116,7 +116,7 @@ export function FilesList() {
                     const { file } = row;
                     const selected = mode.selected.has(file.path);
                     return (
-                        <label key={file.path} className={styles.row} style={style}>
+                        <label key={file.path} className={styles.row} style={style} data-testid="file-row">
                             <ListCheckbox
                                 title={t('files.selectFile')}
                                 checked={selected}

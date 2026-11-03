@@ -3,21 +3,20 @@
     "configurations": [
         {
             // The plugin DLL cannot run on its own: start AIMP and debug the
-            // plugin inside it. Expects the plugin to be installed in AIMP's
-            // Plugins folder (e.g. a junction from %APPDATA%\AIMP\Plugins\
-            // aimp_remote_control to dist\windows-x64); the .pdb next to the
-            // DLL makes breakpoints bind.
+            // plugin inside it. The preLaunchTask (deploy-windows.ps1) links
+            // AIMP's Plugins folder at the Debug build; the .pdb next to the
+            // DLL makes breakpoints bind. A player elsewhere needs its path here.
             "name": "AIMP (Windows)",
             "type": "cppvsdbg",
             "request": "launch",
             "program": "C:\\Program Files\\AIMP\\AIMP.exe",
             "cwd": "C:\\Program Files\\AIMP",
-            "preLaunchTask": "Build Windows x64 (Debug)"
+            "preLaunchTask": "Deploy to AIMP (Debug)"
         },
         {
             // Debugs the Linux AIMP under gdb inside WSL (needs gdb installed
-            // there: sudo apt-get install -y gdb). The preLaunchTask builds
-            // the .so and installs it into /opt/aimp/Plugins.
+            // there: sudo apt-get install -y gdb). The preLaunchTask
+            // (deploy-wsl.ps1) links /opt/aimp/Plugins at the Debug build.
             "name": "AIMP (WSL)",
             "type": "cppdbg",
             "request": "launch",
@@ -36,7 +35,7 @@
                 "/mnt/c": "c:\\",
                 "/mnt/d": "d:\\"
             },
-            "preLaunchTask": "Install into WSL AIMP"
+            "preLaunchTask": "Deploy to WSL AIMP (Debug)"
         }
     ]
 }

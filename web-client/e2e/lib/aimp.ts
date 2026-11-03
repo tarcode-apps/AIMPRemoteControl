@@ -212,20 +212,20 @@ export async function restartThrowawayPlayer(url: string, settings: PluginSettin
     await start(url);
 }
 
-// Closes the throwaway player as its close button would, so that it exits
-// cleanly and saves its profile; one that does not go is killed.
+// Closes the throwaway player through its own command line, as its menu would,
+// so that it saves its profile: the running copy takes -EXIT over from the
+// second one. One that does not go (a dialog of its own open) is killed, so
+// that a run never hangs.
 export async function stopThrowawayPlayer(): Promise<void> {
     const pid = savedPid();
     if (pid) {
-        execFileSync('powershell', [
-            '-NoProfile',
-            '-NonInteractive',
-            '-Command',
-            `(Get-Process -Id ${pid}).CloseMainWindow() | Out-Null`,
-        ]);
+        execFileSync(path.join(playerDir, 'AIMP.exe'), ['-EXIT'], { cwd: playerDir, stdio: 'ignore' });
         const deadline = Date.now() + stopTimeout;
         while (isAlive(pid) && Date.now() < deadline) await sleep(250);
-        if (isAlive(pid)) execFileSync('taskkill', ['/PID', String(pid), '/F'], { stdio: 'ignore' });
+        if (isAlive(pid)) {
+            console.warn('e2e: the throwaway AIMP did not quit and is killed');
+            execFileSync('taskkill', ['/PID', String(pid), '/F'], { stdio: 'ignore' });
+        }
     }
     fs.rmSync(pidFile, { force: true });
 }

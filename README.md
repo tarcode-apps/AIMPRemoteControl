@@ -84,6 +84,26 @@ Artifacts land in `dist/<platform>/` together with `Langs` and
 before rebuilding. The same scripts run in
 [GitHub Actions](.github/workflows/build.yml).
 
+For the daily round there is one script per platform: it closes AIMP, links
+the player's `Plugins` folder at `dist/<platform>/` (once), builds and starts
+AIMP again. It finds the installed player itself and builds for its
+architecture; set `AIMP_DIR` for another one.
+
+```powershell
+.\deploy-windows.ps1            # -Config Debug, -NoStart, -Force
+```
+
+```bash
+./deploy-linux.sh               # --debug, --no-start, --force; /opt/aimp by default
+```
+
+The AIMP in WSL is deployed from Windows with `.\deploy-wsl.ps1` (same
+options as `deploy-windows.ps1`); it runs `deploy-linux.sh` there and starts
+the player through a `wsl.exe` that stays open with it.
+
+After moving the repository, `-Force` / `--force` points the links at the new
+place; a real folder found where a link belongs is renamed, not removed.
+
 ### The web client
 
 The client in [web-client/](web-client/) is a Next.js app (App Router, static
@@ -98,37 +118,19 @@ npm run build     # web-client/out/
 npm run dev       # localhost:3334, with /api rewritten to the player on 3333
 ```
 
-The plugin looks for `wwwroot/` next to its binary, so link one at
-`web-client/out` instead of copying after every client build:
-
-```powershell
-New-Item -ItemType Junction -Path "$env:APPDATA\AIMP\Plugins\aimp_remote_control\wwwroot" -Target "$PWD\web-client\out"
-```
-
-```bash
-ln -s "$PWD/web-client/out" /opt/aimp/Plugins/aimp_remote_control/wwwroot
-```
-
-The link survives plugin rebuilds: the build scripts clear `dist/<platform>/`
-without touching junctions and symlinks.
+The plugin looks for `wwwroot/` next to its binary; the deploy scripts link
+`dist/<platform>/wwwroot` at `web-client/out`, so a client build shows up
+without copying. The link survives plugin rebuilds: the build scripts clear
+`dist/<platform>/` without touching junctions and symlinks.
 
 ## Debugging
 
-The binary cannot run on its own: you debug it inside AIMP. Point the player's
-`Plugins` folder at the build output once, and every rebuild is picked up
-without copying anything:
-
-```powershell
-New-Item -ItemType Junction -Path "$env:APPDATA\AIMP\Plugins\aimp_remote_control" -Target "$PWD\dist\windows-x64"
-```
-
-Then start AIMP under the debugger. Both IDEs carry the same two
-configurations, *AIMP (Windows)* and *AIMP (WSL)* — VS Code in
+The binary cannot run on its own: you debug it inside AIMP. Both IDEs carry
+the same two configurations, *AIMP (Windows)* and *AIMP (WSL)* — VS Code in
 [.vscode/launch.json](.vscode/launch.json), Visual Studio in
-[launch.vs.json](launch.vs.json). The VS Code ones build Debug first; the WSL
-one also stops a running player and copies the `.so` into `/opt/aimp/Plugins`,
-since a loaded `.so` cannot be replaced. Debugging in WSL needs `gdb` in the
-distro (`sudo apt-get install -y gdb`).
+[launch.vs.json](launch.vs.json). The VS Code ones run the deploy script for
+Debug first and leave AIMP stopped, for the debugger to start it. Debugging in
+WSL needs `gdb` in the distro (`sudo apt-get install -y gdb`).
 
 Breakpoints bind only against the symbols of the binary AIMP actually loaded:
 on Windows the `.pdb` has to sit next to the DLL — the build script copies it

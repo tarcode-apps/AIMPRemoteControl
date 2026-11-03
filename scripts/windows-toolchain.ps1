@@ -87,6 +87,10 @@ function Invoke-Native([string]$Description)
     if ($args.Count -gt 1) { $arguments = $args[1..($args.Count - 1)] }
 
     Write-Host "    $Description" -ForegroundColor DarkGray
+    # The tool's stderr is ordinary output: under 'Stop', Windows PowerShell would
+    # otherwise take a compiler warning for a failure when the output is
+    # redirected. The exit code tells.
+    $ErrorActionPreference = 'Continue'
     & $executable @arguments
     if ($LASTEXITCODE -ne 0)
     {

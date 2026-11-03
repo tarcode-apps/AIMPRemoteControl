@@ -57,12 +57,17 @@ Notes:
   removing a file needs no CMake edits. They compile once into an object
   library (`AIMPRemoteControlCode`) that the plugin and the unit tests link.
 - AIMP keeps the plugin binary loaded: **close the player before building** or
-  the copy to `dist/` fails.
-- To test, put the `dist/<platform>/` contents into
-  `<AIMP>/Plugins/aimp_remote_control/` (a junction/symlink to `dist/` saves
-  copying; on Windows the profile `%APPDATA%\AIMP\Plugins` works too) and
-  enable the plugin in AIMP options. Debug configs for VS Code (`.vscode/`)
-  and Visual Studio (`launch.vs.json`) exist for both Windows and WSL.
+  the copy to `dist/` fails. `.\deploy-windows.ps1` / `./deploy-linux.sh`
+  (`-Config Debug` / `--debug`, `-NoStart` / `--no-start`) do the whole round:
+  close AIMP, link its `Plugins` folder at `dist/<platform>/` and `wwwroot` at
+  `web-client/out` (once; anything else in their place stops them unless
+  `-Force` / `--force`, which replaces links and renames anything else), build for
+  the player's own architecture and start it again. The player is `AIMP_DIR`,
+  else the running or installed one on Windows and `/opt/aimp` on Linux;
+  enable the plugin in AIMP options once. `.\deploy-wsl.ps1` does the Linux
+  round for the AIMP in WSL from Windows.
+  The VS Code debug configs (`.vscode/`) run them first; Visual Studio's
+  (`launch.vs.json`) exist for both Windows and WSL.
 - The build scripts clear `dist/<platform>/` by deleting its entries **except
   reparse points**, so a developer's `wwwroot` link into `web-client/out`
   survives a rebuild. Do not simplify that back to `rm -rf` / `Remove-Item
@@ -77,8 +82,10 @@ Notes:
 
 Code that needs no player has unit tests in `tests/`: `.\test-windows.ps1`
 (same `-Arch`, `-Config`, `-Clean` as the build) or `./test-linux.sh`. They
-build in `out/build/<preset>-tests`, apart from the plugin build, and run the
-programs with CTest; CI runs them after the build. Every `tests/*Tests.cpp` is
+build the `unit_tests` target in the plugin's own build folder, so the plugin's
+objects compile once for both, and run the programs with CTest; CI runs them
+after the build. The build scripts build the plugin target alone, so a plugin
+build never compiles the tests. Every `tests/*Tests.cpp` is
 a program of its own (globbed, no CMake edit) that prints its checks through
 `tests/check.h` and exits non-zero on a failure; it links the plugin's code,
 of which the linker takes only what the test calls. Keep to code with no AIMP

@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 #
-# Builds and runs the unit tests (tests/) on Linux. The plugin's preset is
-# configured with the tests turned on in a build folder of its own
-# (out/build/<preset>-tests), so the plugin build stays as build-linux.sh
-# leaves it. Fails when a test does.
+# Builds and runs the unit tests (tests/) on Linux. The test programs are built
+# in the same build folder as the plugin (out/build/<preset>), so the plugin's
+# objects are compiled once for both. Fails when a test does.
 #
 # Usage:
 #   ./test-linux.sh              # Release
@@ -23,7 +22,7 @@ Builds and runs the unit tests on Linux (x86_64).
 Options:
   --release   Release build (default)
   --debug     Debug build
-  --clean     Delete the test build directory before configuring
+  --clean     Delete the build directory before configuring
 USAGE
 }
 
@@ -40,17 +39,19 @@ done
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PRESET="linux-$(echo "$CONFIG" | tr '[:upper:]' '[:lower:]')"
-TEST_DIR="$REPO_ROOT/out/build/$PRESET-tests"
+BUILD_DIR="$REPO_ROOT/out/build/$PRESET"
 
 . "$REPO_ROOT/scripts/linux-prerequisites.sh"
 check_prerequisites
 
 printf '\n==> Testing %s\n' "$PRESET"
 if [ "$CLEAN" -eq 1 ]; then
-    rm -rf "$TEST_DIR"
+    rm -rf "$BUILD_DIR"
 fi
 
 cd "$REPO_ROOT"
-cmake --preset "$PRESET" -B "$TEST_DIR" -DAIMP_BUILD_TESTS=ON
-cmake --build "$TEST_DIR" --target unit_tests
-ctest --test-dir "$TEST_DIR" --output-on-failure
+# Set outright: a build folder configured before the option existed keeps OFF
+# in its cache whatever the default is now.
+cmake --preset "$PRESET" -DAIMP_BUILD_TESTS=ON
+cmake --build --preset "$PRESET" --target unit_tests
+ctest --test-dir "$BUILD_DIR" --output-on-failure

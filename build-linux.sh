@@ -57,7 +57,7 @@ fi
 
 cd "$REPO_ROOT"
 cmake --preset "$PRESET"
-cmake --build --preset "$PRESET"
+cmake --build --preset "$PRESET" --target AIMPRemoteControlPlugin
 
 [ -f "$BUILD_DIR/$ARTIFACT" ] || { echo "error: build finished but $BUILD_DIR/$ARTIFACT is missing" >&2; exit 1; }
 

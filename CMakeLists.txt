@@ -14,8 +14,12 @@ project ("AIMPRemoteControlPlugin")
 # On Linux, stub out cairo.h so the SDK compiles without libcairo-dev.
 # HCANVAS becomes void* — sufficient for plugins that don't use canvas drawing.
 if (NOT WIN32)
-  file(WRITE "${CMAKE_BINARY_DIR}/cairo_stub/cairo.h" "typedef struct _cairo cairo_t;\n")
   set(CAIRO_STUB_DIR "${CMAKE_BINARY_DIR}/cairo_stub")
+  # Written once: rewritten on every configure, the stub would be a fresh input
+  # of every source that includes the SDK, and each run a full rebuild.
+  if (NOT EXISTS "${CAIRO_STUB_DIR}/cairo.h")
+    file(WRITE "${CAIRO_STUB_DIR}/cairo.h" "typedef struct _cairo cairo_t;\n")
+  endif()
 endif()
 
 # A plugin ships to machines we don't control, so a Release build must not
@@ -182,9 +186,10 @@ target_precompile_headers(AIMPRemoteControlCode PRIVATE
 # compiler over every source anyway (~8% of a clean build).
 set_property(TARGET AIMPRemoteControlCode PROPERTY CXX_SCAN_FOR_MODULES OFF)
 
-# Unit tests of the code that needs no player (tests/), built and run by the
-# test-* scripts in a build folder of their own.
-option(AIMP_BUILD_TESTS "Build the unit tests" OFF)
+# Unit tests of the code that needs no player (tests/). They share the plugin's
+# build folder and objects; the build-* scripts build the plugin target alone,
+# the test-* scripts the unit_tests target alone.
+option(AIMP_BUILD_TESTS "Build the unit tests" ON)
 if (AIMP_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)

@@ -85,7 +85,7 @@ foreach ($architecture in $Arch)
     try
     {
         Invoke-Native "cmake --preset $preset" cmake --preset $preset
-        Invoke-Native "cmake --build --preset $preset" cmake --build --preset $preset
+        Invoke-Native "cmake --build --preset $preset" cmake --build --preset $preset --target AIMPRemoteControlPlugin
     }
     finally
     {
@@ -102,9 +102,16 @@ foreach ($architecture in $Arch)
     # Clear what a previous build left, but step over junctions and symlinks: a
     # developer's wwwroot link into web-client/out lives here and has to survive.
     New-Item -ItemType Directory -Force -Path $distDir | Out-Null
-    Get-ChildItem $distDir -Force |
-        Where-Object { -not $_.Attributes.HasFlag([IO.FileAttributes]::ReparsePoint) } |
-        Remove-Item -Recurse -Force
+    try
+    {
+        Get-ChildItem $distDir -Force |
+            Where-Object { -not $_.Attributes.HasFlag([IO.FileAttributes]::ReparsePoint) } |
+            Remove-Item -Recurse -Force
+    }
+    catch [UnauthorizedAccessException], [IO.IOException]
+    {
+        throw "Cannot replace '$distDir': a running AIMP holds the plugin. Close it, or use deploy-windows.ps1. ($($_.Exception.Message))"
+    }
     Copy-Item $dll $distDir
     $pdb = Join-Path $buildDir 'aimp_remote_control.pdb'
     if (Test-Path $pdb) { Copy-Item $pdb $distDir }

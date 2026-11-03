@@ -3,10 +3,10 @@
     Builds and runs the unit tests (tests\) on Windows.
 
 .DESCRIPTION
-    Configures the plugin's CMake preset with the unit tests turned on, in a
-    build folder of its own (out\build\<preset>-tests), so the plugin build in
-    out\build\<preset> stays as build-windows.ps1 leaves it. Builds the test
-    programs and runs them with CTest; the script fails when a test does.
+    Configures the plugin's CMake preset, builds the test programs in the same
+    build folder as the plugin (out\build\<preset>, so the plugin's objects are
+    compiled once for both) and runs them with CTest. The script fails when a
+    test does.
 
 .PARAMETER Arch
     Architectures to test. Defaults to both x64 and x86.
@@ -15,7 +15,7 @@
     Release (default) or Debug.
 
 .PARAMETER Clean
-    Delete the test build directory before configuring.
+    Delete the build directory before configuring.
 
 .EXAMPLE
     .\test-windows.ps1 -Arch x64
@@ -42,23 +42,25 @@ Write-Host "Visual Studio: $vsPath"
 foreach ($architecture in $Arch)
 {
     $preset = "$architecture-" + $Config.ToLowerInvariant()
-    $testDir = Join-Path $RepoRoot "out\build\$preset-tests"
+    $buildDir = Join-Path $RepoRoot "out\build\$preset"
 
     Write-Step "Testing $preset"
 
     Use-Toolchain -VsPath $vsPath -Architecture $architecture
 
-    if ($Clean -and (Test-Path $testDir))
+    if ($Clean -and (Test-Path $buildDir))
     {
-        Remove-Item -Recurse -Force $testDir
+        Remove-Item -Recurse -Force $buildDir
     }
 
     Push-Location $RepoRoot
     try
     {
-        Invoke-Native "cmake --preset $preset (tests)" cmake --preset $preset -B $testDir -DAIMP_BUILD_TESTS=ON
-        Invoke-Native "cmake --build (tests)" cmake --build $testDir --target unit_tests
-        Invoke-Native "ctest" ctest --test-dir $testDir --output-on-failure
+        # Set outright: a build folder configured before the option existed keeps
+        # OFF in its cache whatever the default is now.
+        Invoke-Native "cmake --preset $preset" cmake --preset $preset -DAIMP_BUILD_TESTS=ON
+        Invoke-Native "cmake --build --preset $preset --target unit_tests" cmake --build --preset $preset --target unit_tests
+        Invoke-Native "ctest" ctest --test-dir $buildDir --output-on-failure
     }
     finally
     {

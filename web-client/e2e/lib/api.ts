@@ -170,6 +170,16 @@ export class Api {
         );
     }
 
+    // Every item of a playlist, a page of the largest size at a time.
+    async allItems(playlistId: string) {
+        const items: PlaylistItemsPage['items'] = [];
+        for (;;) {
+            const page = await this.items(playlistId, `?offset=${items.length}&limit=500`);
+            items.push(...page.items);
+            if (page.items.length < 500) return items;
+        }
+    }
+
     groups(playlistId: string, query = '') {
         return this.expectOk(
             this.get<PlaylistGroups>(`/playlists/${encode(playlistId)}/groups${query}`),

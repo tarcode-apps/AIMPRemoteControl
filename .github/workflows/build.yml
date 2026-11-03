@@ -25,6 +25,10 @@ jobs:
         shell: pwsh
         run: .\build-windows.ps1 -Arch ${{ matrix.arch }} -Config Release
 
+      - name: Unit tests
+        shell: pwsh
+        run: .\test-windows.ps1 -Arch ${{ matrix.arch }} -Config Release
+
       - uses: actions/upload-artifact@v6
         with:
           name: AIMPRemoteControlPlugin-windows-${{ matrix.arch }}
@@ -47,6 +51,9 @@ jobs:
 
       - name: Build
         run: bash build-linux.sh --release
+
+      - name: Unit tests
+        run: bash test-linux.sh --release
 
       - uses: actions/upload-artifact@v6
         with:

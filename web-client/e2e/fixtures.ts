@@ -103,7 +103,7 @@ export const test = base.extend<Fixtures, Options>({
                     await expect
                         .poll(
                             async () => {
-                                const items = (await api.items(id, '?limit=500')).items;
+                                const items = await api.allItems(id);
                                 return generated.every(file => {
                                     const item = items.find(i => i.fileUri === file);
                                     return item !== undefined && item.displayText !== path.parse(file).name;

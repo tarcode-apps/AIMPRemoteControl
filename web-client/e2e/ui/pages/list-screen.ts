@@ -33,6 +33,18 @@ export class ListScreen {
         return this.list.getByTestId('group-row').filter({ hasText: name }).getByRole('button');
     }
 
+    // Scrolls the list to a fraction of its length, as a fling would; the list is
+    // its own scroll container.
+    async scrollTo(fraction: number) {
+        await this.list.evaluate((list, to) => {
+            list.scrollTop = to * (list.scrollHeight - list.clientHeight);
+        }, fraction);
+    }
+
+    async scrollTop(): Promise<number> {
+        return this.list.evaluate(list => Math.round(list.scrollTop));
+    }
+
     toolbarButton(name: string): Locator {
         return this.toolbar.getByRole('button', { name, exact: true });
     }

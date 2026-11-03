@@ -18,6 +18,14 @@ if (NOT WIN32)
   set(CAIRO_STUB_DIR "${CMAKE_BINARY_DIR}/cairo_stub")
 endif()
 
+# A plugin ships to machines we don't control, so a Release build must not
+# depend on the Visual C++ Redistributable being installed there. Set before the
+# targets, so that the plugin's code and the tests built from it agree.
+option(AIMP_MSVC_STATIC_RUNTIME "Link the MSVC runtime statically" ON)
+if (MSVC AND AIMP_MSVC_STATIC_RUNTIME)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 # Auto-collect everything under src/ — adding/removing files no longer requires
 # editing this file. CONFIGURE_DEPENDS makes Ninja/MSBuild re-run CMake when the
 # set of matching files changes.
@@ -25,13 +33,17 @@ file(GLOB_RECURSE PLUGIN_SOURCES CONFIGURE_DEPENDS
   "${CMAKE_SOURCE_DIR}/src/*.cpp"
   "${CMAKE_SOURCE_DIR}/src/*.h")
 
-add_library(AIMPRemoteControlPlugin SHARED
+# The plugin's code is compiled once, as an object library: the plugin links
+# its objects, and the unit tests (tests/) link them too.
+add_library(AIMPRemoteControlCode OBJECT
   ${PLUGIN_SOURCES}
   "third_party/aimp-sdk/apiTypes.cpp")
+add_library(AIMPRemoteControlPlugin SHARED)
+target_link_libraries(AIMPRemoteControlPlugin PRIVATE AIMPRemoteControlCode)
 
 # Year for the copyright notice (pluginInfo.h), taken when the build is configured.
 string(TIMESTAMP PLUGIN_BUILD_YEAR "%Y")
-target_compile_definitions(AIMPRemoteControlPlugin PRIVATE PLUGIN_BUILD_YEAR=${PLUGIN_BUILD_YEAR})
+target_compile_definitions(AIMPRemoteControlCode PUBLIC PLUGIN_BUILD_YEAR=${PLUGIN_BUILD_YEAR})
 
 # Both platforms declare their export table in one file, so the plugin exposes
 # AIMPPluginGetHeader and nothing else. CMake turns a .def in the source list
@@ -112,7 +124,7 @@ MIT license. See the License section of the project's README.md.\n")
 file(WRITE "${CMAKE_BINARY_DIR}/THIRD-PARTY-NOTICES.txt" "${NOTICES}")
 
 find_package(Threads REQUIRED)
-target_link_libraries(AIMPRemoteControlPlugin PRIVATE
+target_link_libraries(AIMPRemoteControlCode PUBLIC
   Threads::Threads asio nlohmann_json cpp_httplib json_rpc_cxx digestpp
   # SHGetKnownFolderPath / CoTaskMemFree for the default upload folder.
   $<$<BOOL:${WIN32}>:shell32>
@@ -125,7 +137,7 @@ target_link_libraries(AIMPRemoteControlPlugin PRIVATE
   $<$<BOOL:${WIN32}>:iphlpapi>
   $<$<BOOL:${WIN32}>:ws2_32>)
 
-target_include_directories(AIMPRemoteControlPlugin PRIVATE
+target_include_directories(AIMPRemoteControlCode PUBLIC
   "${CMAKE_SOURCE_DIR}/src"
   "${CMAKE_SOURCE_DIR}/src/helpers"
   "${CMAKE_SOURCE_DIR}/third_party/aimp-sdk"
@@ -135,6 +147,8 @@ set_target_properties(AIMPRemoteControlPlugin PROPERTIES
   # AIMP loads Plugins/<Name>/<Name>.dll; "Plugin" in the file name would be redundant there.
   OUTPUT_NAME "aimp_remote_control"
   PREFIX ""
+)
+set_target_properties(AIMPRemoteControlCode PROPERTIES
   POSITION_INDEPENDENT_CODE ON
   # Only AIMPPluginGetHeader has to leave the shared object; hiding the rest
   # keeps the plugin from colliding with symbols of the host process.
@@ -143,35 +157,35 @@ set_target_properties(AIMPRemoteControlPlugin PROPERTIES
   VISIBILITY_INLINES_HIDDEN ON
 )
 
-# A plugin ships to machines we don't control, so a Release build must not
-# depend on the Visual C++ Redistributable being installed there.
-option(AIMP_MSVC_STATIC_RUNTIME "Link the MSVC runtime statically" ON)
-if (MSVC AND AIMP_MSVC_STATIC_RUNTIME)
-  set_property(TARGET AIMPRemoteControlPlugin PROPERTY
-    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-endif()
-
 # AIMP SDK uses wchar_t strings on Windows (typedef wchar_t TChar).
 # UNICODE must be defined so that TEXT() expands to L"..." instead of "...".
 if (WIN32)
-  target_compile_definitions(AIMPRemoteControlPlugin PRIVATE UNICODE _UNICODE NOMINMAX)
+  target_compile_definitions(AIMPRemoteControlCode PUBLIC UNICODE _UNICODE NOMINMAX)
 endif()
 
 # /EHsc is explicit: CMake 4.x no longer adds it to the MSVC defaults, and
 # httplib/json-rpc-cxx/nlohmann all need working stack unwinding.
 if (MSVC)
-  target_compile_options(AIMPRemoteControlPlugin PRIVATE /EHsc)
+  target_compile_options(AIMPRemoteControlCode PUBLIC /EHsc)
 endif()
 
-set_property(TARGET AIMPRemoteControlPlugin PROPERTY CXX_STANDARD 20)
-set_property(TARGET AIMPRemoteControlPlugin PROPERTY CXX_STANDARD_REQUIRED ON)
+set_property(TARGET AIMPRemoteControlCode PROPERTY CXX_STANDARD 20)
+set_property(TARGET AIMPRemoteControlCode PROPERTY CXX_STANDARD_REQUIRED ON)
 
 # The four heavy third-party headers dominate compile time of every TU that
 # touches networking or JSON. Precompiling them roughly halves an incremental
 # rebuild of such a TU (measured: 7.1s -> 3.1s) at no cost to clean builds.
-target_precompile_headers(AIMPRemoteControlPlugin PRIVATE
+target_precompile_headers(AIMPRemoteControlCode PRIVATE
   <asio.hpp> <httplib.h> <nlohmann/json.hpp> <cxx/jsonrpc/server.hpp>)
 
 # No C++20 modules here; without this CMake 4.x runs a scan pass of the
 # compiler over every source anyway (~8% of a clean build).
-set_property(TARGET AIMPRemoteControlPlugin PROPERTY CXX_SCAN_FOR_MODULES OFF)
+set_property(TARGET AIMPRemoteControlCode PROPERTY CXX_SCAN_FOR_MODULES OFF)
+
+# Unit tests of the code that needs no player (tests/), built and run by the
+# test-* scripts in a build folder of their own.
+option(AIMP_BUILD_TESTS "Build the unit tests" OFF)
+if (AIMP_BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(tests)
+endif()

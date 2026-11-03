@@ -33,16 +33,14 @@ namespace
 			diff |= static_cast<unsigned char>(a[i]) ^ static_cast<unsigned char>(b[i]);
 		return diff == 0;
 	}
-
-	std::int64_t NowSeconds()
-	{
-		return std::chrono::duration_cast<std::chrono::seconds>(
-				   std::chrono::system_clock::now().time_since_epoch())
-			.count();
-	}
 }
 
-DigestAuthenticator::DigestAuthenticator() = default;
+DigestAuthenticator::DigestAuthenticator(Clock now) : FNow(std::move(now)) {}
+
+std::int64_t DigestAuthenticator::NowSeconds() const
+{
+	return std::chrono::duration_cast<std::chrono::seconds>(FNow().time_since_epoch()).count();
+}
 
 std::string DigestAuthenticator::NonceSecret() const
 {

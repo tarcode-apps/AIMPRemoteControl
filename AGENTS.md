@@ -37,8 +37,8 @@ constraints and conventions that are not obvious from the code.
 
 ## Building
 
-Clone with `--recurse-submodules` (the build scripts check and tell you if you
-forgot). Then, from the repo root:
+Clone with `--recurse-submodules`; without the submodules the build fails on
+a missing header. Then, from the repo root:
 
 - Windows (needs Visual Studio 2022+ with the C++ workload; the script finds
   the toolchain itself via vswhere): `.\build-windows.ps1` — Release for
@@ -54,7 +54,8 @@ packages everything into an `.aimppack`.
 Notes:
 
 - Source files under `src/` are globbed (`CONFIGURE_DEPENDS`) — adding or
-  removing a file needs no CMake edits.
+  removing a file needs no CMake edits. They compile once into an object
+  library (`AIMPRemoteControlCode`) that the plugin and the unit tests link.
 - AIMP keeps the plugin binary loaded: **close the player before building** or
   the copy to `dist/` fails.
 - To test, put the `dist/<platform>/` contents into
@@ -73,6 +74,16 @@ Notes:
   Windows text editors. See `docs/catalog/README.md`.
 
 ## Verifying changes
+
+Code that needs no player has unit tests in `tests/`: `.\test-windows.ps1`
+(same `-Arch`, `-Config`, `-Clean` as the build) or `./test-linux.sh`. They
+build in `out/build/<preset>-tests`, apart from the plugin build, and run the
+programs with CTest; CI runs them after the build. Every `tests/*Tests.cpp` is
+a program of its own (globbed, no CMake edit) that prints its checks through
+`tests/check.h` and exits non-zero on a failure; it links the plugin's code,
+of which the linker takes only what the test calls. Keep to code with no AIMP
+SDK calls; what talks to the player is tested against a running one, as below.
+The toolchain discovery both script pairs share lives in `scripts/`.
 
 The test bench is a running AIMP: by hand, or through the end-to-end tests
 in `web-client/e2e/` (Playwright; `npm run e2e` in `web-client/`, `e2e:api`

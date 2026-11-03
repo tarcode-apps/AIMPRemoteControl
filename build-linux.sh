@@ -47,28 +47,8 @@ ARTIFACT=aimp_remote_control.so
 
 step() { printf '\n==> %s\n' "$1"; }
 
-# Header-only dependencies live in submodules; an incomplete checkout otherwise
-# fails much later with a confusing "no such file or directory".
-for probe in \
-    third_party/json/include/nlohmann/json.hpp \
-    third_party/json-rpc-cxx/include/cxx/jsonrpc/server.hpp \
-    third_party/cpp-httplib/httplib.h \
-    third_party/asio/include/asio.hpp
-do
-    if [ ! -f "$REPO_ROOT/$probe" ]; then
-        echo "error: missing dependency '$probe'." >&2
-        echo "       run: git submodule update --init --recursive" >&2
-        exit 1
-    fi
-done
-
-for tool in cmake ninja; do
-    if ! command -v "$tool" >/dev/null 2>&1; then
-        echo "error: '$tool' not found." >&2
-        echo "       run: sudo apt-get install -y cmake ninja-build build-essential" >&2
-        exit 1
-    fi
-done
+. "$REPO_ROOT/scripts/linux-prerequisites.sh"
+check_prerequisites
 
 step "Building $PRESET"
 if [ "$CLEAN" -eq 1 ]; then

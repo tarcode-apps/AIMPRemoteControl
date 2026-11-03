@@ -93,4 +93,83 @@ test.describe('adding tracks', () => {
         expect(await api.playlistItemCount(playlist.id)).toBe(1);
         expect(fs.readFileSync(path.join(uploadDir, name)).equals(fs.readFileSync(source))).toBe(true);
     });
+
+    // Every folder entered is an entry of the browser's history, so back walks up.
+    test('back goes up a folder at a time, and from the drives back to the playlist', async ({
+        app,
+        media,
+        page,
+        player,
+    }) => {
+        const inner = path.join(media.dir, 'inner');
+        const deeper = path.join(inner, 'deeper');
+        fs.mkdirSync(deeper);
+        await openAddMenu(screen, t('playlist.addFiles'));
+        const files = new FilesScreen(app);
+        // The folder last looked at, which counts as one step down from the drives.
+        await files.expectFolder(media.dir);
+        await files.folder('inner').click();
+        await files.expectFolder(inner);
+        await files.folder('deeper').click();
+        await files.expectFolder(deeper);
+
+        await page.goBack();
+        await files.expectFolder(inner);
+        await page.evaluate(() => {
+            history.back();
+            history.back();
+        });
+        await expect(app.heading).toHaveText(t('files.computer'));
+        await page.goForward();
+        await files.expectFolder(media.dir);
+        await files.folder('inner').click();
+        await app.main.getByRole('button', { name: t('files.home') }).click();
+        await expect(app.heading).toHaveText(t('files.computer'));
+
+        // Never to the player: it does not open over the screens it left.
+        await page.goBack();
+        await expect(screen.list).toBeInViewport();
+        if (!app.playerDocked) await expect(player.mini).toBeInViewport();
+    });
+
+    test('an upload in progress shows its notice and can be cancelled', async ({ api, app, media }) => {
+        const name = `rc-e2e cancelled ${test.info().project.name}.wav`;
+        const slow = media.track('Cancelled', { name, seconds: 60 });
+        const cdp = await app.page.context().newCDPSession(app.page);
+        await cdp.send('Network.emulateNetworkConditions', {
+            offline: false,
+            latency: 0,
+            downloadThroughput: -1,
+            uploadThroughput: 64 * 1024,
+        });
+        const chooser = app.page.waitForEvent('filechooser');
+        await openAddMenu(screen, t('playlist.upload'));
+        await (await chooser).setFiles(slow);
+        await expect(app.notice).toContainText(t('upload.progress', { current: 1, total: 1 }));
+        await expect(app.notice).toContainText(name);
+        // One upload at a time.
+        await screen.toolbarButton(t('playlist.add')).click();
+        await expect(app.menuItem(t('playlist.upload'))).toBeDisabled();
+        await app.page.keyboard.press('Escape');
+
+        await app.notice.getByRole('button', { name: t('actions.cancel') }).click();
+        await expect(app.notice).toBeHidden();
+        await cdp.send('Network.emulateNetworkConditions', {
+            offline: false,
+            latency: 0,
+            downloadThroughput: -1,
+            uploadThroughput: -1,
+        });
+
+        // A small upload after it goes through, and the cancelled one left nothing.
+        const next = media.track('Next', { name: `rc-e2e next ${test.info().project.name}.wav` });
+        const nextChooser = app.page.waitForEvent('filechooser');
+        await openAddMenu(screen, t('playlist.upload'));
+        await (await nextChooser).setFiles(next);
+        await expect(screen.row('Next')).toBeVisible();
+        expect((await api.items(playlist.id)).items.map(item => path.basename(item.fileUri))).toEqual([
+            path.basename(next),
+        ]);
+        expect(fs.existsSync(path.join(uploadDir, name))).toBe(false);
+    });
 });

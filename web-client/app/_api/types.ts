@@ -19,6 +19,9 @@ export type Playlist = {
     showThumbnails: boolean;
     // The player's name for showing the marks in the rows.
     showMarks: boolean;
+    // The check boxes that take tracks out of playback; hidden, the player
+    // plays every track whatever its switch says.
+    showSwitches: boolean;
     grouping: PlaylistGrouping;
 };
 
@@ -27,6 +30,18 @@ export type ItemMarkRequest = {
     index: number;
     // The user's stars, 0..5; 0 takes them away.
     mark: number;
+};
+
+export type ItemEnabledRequest = {
+    playlistId: string;
+    index: number;
+    enabled: boolean;
+};
+
+export type ItemsEnabledRequest = ItemSelection & {
+    playlistId: string;
+    revision?: number;
+    enabled: boolean;
 };
 
 export type CreatedPlaylist = {
@@ -103,6 +118,8 @@ export type PlaylistGroup = {
     index: number;
     name: string;
     count: number;
+    // Of `count`, the items whose switch is on.
+    enabledCount: number;
     duration: number;
     size: number;
     expanded: boolean;

@@ -24,25 +24,23 @@ export function t(key: TextKey, values: Record<string, string | number> = {}): s
     });
 }
 
-const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 // Matches the text of `key` whatever its placeholders hold.
 export function textPattern(key: TextKey): RegExp {
     return new RegExp(
         `^${template(key)
             .split(placeholder)
             .filter((_, i) => i % 2 === 0)
-            .map(escape)
+            .map(RegExp.escape)
             .join('.+')}$`,
     );
 }
 
 // Matches a name followed by its badge, as a drawer link with a count reads.
 export function withBadge(name: string, badge: string | number): RegExp {
-    return new RegExp(`^${escape(name)}\\s*${escape(String(badge))}$`);
+    return new RegExp(`^${RegExp.escape(name)}\\s*${RegExp.escape(String(badge))}$`);
 }
 
 // Matches a text that starts with `text`, such as a link's name followed by its badge.
 export function startsWith(text: string): RegExp {
-    return new RegExp(`^${escape(text)}(\\s|$)`);
+    return new RegExp(`^${RegExp.escape(text)}(\\s|$)`);
 }

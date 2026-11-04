@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import type { TestPlaylist } from '../fixtures';
-import { expect, test } from './fixtures';
+import { expect, test, withPluginSettings } from './fixtures';
 import { PlaylistScreen } from './pages/playlist-screen';
 import { t } from './strings';
 
@@ -107,6 +107,61 @@ test.describe('playlist', () => {
         await expect(screen.row('Charlie').getByTitle(t('playlist.inQueue'))).toHaveText('[2]');
     });
 
+    test('a switch takes a track out of playback', async ({ api, app }) => {
+        const enabled = async () => (await api.items(playlist.id)).items.map(item => item.enabled);
+        if (app.drawerDocked) {
+            await expect(screen.switch('Bravo')).toBeChecked();
+            await screen.switch('Bravo').click();
+            await expect.poll(enabled).toEqual([true, false, true]);
+            await expect(screen.switch('Bravo')).not.toBeChecked();
+            // Part of the group on: the group's switch turns all of it on, then off.
+            await expect(screen.groupSwitch('first')).toHaveJSProperty('indeterminate', true);
+            await screen.groupSwitch('first').click();
+            await expect.poll(enabled).toEqual([true, true, true]);
+            await expect(screen.groupSwitch('first')).toBeChecked();
+            await screen.groupSwitch('first').click();
+            await expect.poll(enabled).toEqual([false, false, true]);
+            await expect(screen.groupSwitch('first')).not.toBeChecked();
+        } else {
+            await screen.rowAction('Bravo', t('playlist.disable'));
+            await expect(screen.row('Bravo')).toHaveAttribute('data-enabled', 'false');
+            await expect(screen.row('Bravo').getByTitle(t('playlist.switchedOff'))).toBeVisible();
+            await expect.poll(enabled).toEqual([true, false, true]);
+            await screen.rowAction('Bravo', t('playlist.enable'));
+            await expect(screen.row('Bravo')).toHaveAttribute('data-enabled', 'true');
+            await expect(screen.row('Bravo').getByTitle(t('playlist.switchedOff'))).toHaveCount(0);
+            await expect.poll(enabled).toEqual([true, true, true]);
+        }
+
+        await screen.startSelecting();
+        await screen.row('Alpha').click();
+        await screen.row('Charlie').click();
+        await screen.selectedAction(t('playlist.disableSelected'));
+        await expect.poll(enabled).toEqual(app.drawerDocked ? [false, false, false] : [false, true, false]);
+        await expect(screen.row('Charlie')).toHaveAttribute('data-enabled', 'false');
+    });
+
+    test('the group menu folds, queues, switches and removes the group', async ({ api, app }) => {
+        await screen.groupAction('second', t('playlist.collapseGroup'));
+        await expect(screen.row('Charlie')).toBeHidden();
+        await screen.groupAction('first', t('playlist.expandAll'));
+        await expect(screen.row('Charlie')).toBeVisible();
+
+        await screen.groupAction('first', t('playlist.enqueue'));
+        await expect.poll(async () => (await api.queue()).items.map(item => item.index)).toEqual([0, 1]);
+
+        if (!app.drawerDocked) {
+            await screen.groupAction('first', t('playlist.disable'));
+            await expect
+                .poll(async () => (await api.items(playlist.id)).items.map(item => item.enabled))
+                .toEqual([false, false, true]);
+        }
+
+        await screen.groupAction('second', t('playlist.removeFromPlaylist'));
+        await expect(screen.row('Charlie')).toBeHidden();
+        expect(await api.playlistItemCount(playlist.id)).toBe(2);
+    });
+
     test('sorts by a mode chosen in the dialog', async ({ api, app }) => {
         await screen.toolbarButton(t('playlist.sort')).click();
         await screen.toolbarButton(t('playlist.sortBy')).click();
@@ -119,5 +174,35 @@ test.describe('playlist', () => {
             .toEqual([playlist.files[0], playlist.files[2], playlist.files[1]]);
         await screen.toolbarButton(t('playlist.closeSort')).click();
         await expect(screen.toolbarButton(t('playlist.sort'))).toBeVisible();
+    });
+});
+
+// With the column hidden the player plays every track, so the client shows
+// nothing of the switches.
+test.describe('without the switch column', () => {
+    withPluginSettings({}, { switchesColumn: false });
+
+    test('no switch, no dimming, no menu item', async ({ api, app, playlists }) => {
+        const playlist = await playlists.create({ tracks: 2 });
+        expect((await api.playlist(playlist.id))!.showSwitches).toBe(false);
+        const screen = new PlaylistScreen(app, playlist.name);
+        await screen.open();
+        await expect(screen.rows).toHaveCount(2);
+        await expect(screen.list.getByTestId('item-switch')).toHaveCount(0);
+        await expect(screen.list.getByTestId('group-switch')).toHaveCount(0);
+        await expect(screen.rows.first()).not.toHaveAttribute('data-enabled');
+
+        await screen.rows
+            .first()
+            .getByRole('button', { name: t('playlist.itemActions') })
+            .click();
+        await expect(app.menuItem(t('playlist.enqueue'))).toBeVisible();
+        await expect(app.menuItem(t('playlist.disable'))).toHaveCount(0);
+        await app.page.keyboard.press('Escape');
+
+        await screen.startSelecting();
+        await screen.toolbarButton(t('playlist.selectedActions')).click();
+        await expect(app.menuItem(t('playlist.enqueue'))).toBeVisible();
+        await expect(app.menuItem(t('playlist.disableSelected'))).toHaveCount(0);
     });
 });

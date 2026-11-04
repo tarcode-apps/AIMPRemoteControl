@@ -23,6 +23,11 @@
     --color-shadow: rgba(0, 0, 0, 0.25);
     --color-tooltip-bg: #ffffff;
     --color-tooltip-text: #202124;
+    // Popup menus, as the player's Android app draws them: white, with a
+    // firmer divider and paler disabled items than the dialogs have.
+    --color-menu: #ffffff;
+    --color-menu-divider: #c4c4c6;
+    --color-menu-disabled: #9e9fa1;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -48,5 +53,8 @@
         --color-shadow: rgba(0, 0, 0, 0.5);
         --color-tooltip-bg: #e9e9e9;
         --color-tooltip-text: #202124;
+        --color-menu: var(--color-dialog);
+        --color-menu-divider: var(--color-divider);
+        --color-menu-disabled: var(--color-text-secondary);
     }
 }

@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect, type Locator } from '@playwright/test';
 import type { App } from './app';
 import { ListScreen } from './list-screen';
 import { PlayerPanel } from './player-panel';
@@ -36,5 +36,16 @@ export class PlaylistScreen extends ListScreen {
 
     get tab() {
         return this.app.main.getByRole('tab', { name: this.name, exact: true });
+    }
+
+    // The playback switch in a track's row; docked only, a mobile switches from
+    // the row's menu.
+    switch(text: string | RegExp): Locator {
+        return this.row(text).getByTestId('item-switch');
+    }
+
+    // The three-state switch of a group's header.
+    groupSwitch(name: string): Locator {
+        return this.list.getByTestId('group-row').filter({ hasText: name }).getByTestId('group-switch');
     }
 }

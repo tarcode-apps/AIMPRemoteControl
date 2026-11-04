@@ -88,6 +88,7 @@ export function FavoritesModeProvider({ children }: { children: ReactNode }) {
             const last = groups.at(-1);
             if (last && keys.at(-1) === key) {
                 last.count++;
+                last.enabledCount++;
                 return;
             }
             keys.push(key);
@@ -95,6 +96,7 @@ export function FavoritesModeProvider({ children }: { children: ReactNode }) {
                 index: groups.length,
                 name,
                 count: 1,
+                enabledCount: 1,
                 duration: 0,
                 size: 0,
                 expanded: !collapsed.has(key),

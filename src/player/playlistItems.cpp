@@ -23,6 +23,12 @@ namespace
 						  { return std::tolower(x) == std::tolower(y); });
 	}
 
+	bool ItemEnabled(IAIMPPlaylistItem *item)
+	{
+		INT32 enabled = 1;
+		item->GetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_PLAYINGSWITCH, &enabled);
+		return enabled != 0;
+	}
 }
 
 player::SecondLineFormatter::SecondLineFormatter(IAIMPCore *core, IAIMPPlaylist *playlist, bool evenWhenHidden)
@@ -74,9 +80,7 @@ player::PlaylistItem player::ReadPlaylistItem(const PlaylistItemContext &ctx, st
 		item.Size = size;
 	}
 	item.Marks = ReadMarks(ctx.FileInfo);
-	INT32 enabled = 1;
-	ctx.Item->GetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_PLAYINGSWITCH, &enabled);
-	item.Enabled = enabled != 0;
+	item.Enabled = ItemEnabled(ctx.Item);
 	item.IsUrl = ItemIsUrl(ctx);
 	item.InContainer = ItemInContainer(ctx);
 	if (ctx.FileInfo)
@@ -296,7 +300,10 @@ std::optional<std::vector<player::PlaylistGroup>> player::GetPlaylistGroups(IAIM
 					continue;
 				const PlaylistItemContext ctx(fileUriService, item);
 				if (PlaylistItemMatches(ctx, searchString))
+				{
 					AddToSummary(ctx, matches);
+					info.EnabledCount += ItemEnabled(item);
+				}
 				item->Release();
 			}
 			info.Count = matches.Count;
@@ -317,6 +324,7 @@ std::optional<std::vector<player::PlaylistGroup>> player::GetPlaylistGroups(IAIM
 					continue;
 				if (j == 0)
 					item->GetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_INDEX, &info.FirstPosition);
+				info.EnabledCount += ItemEnabled(item);
 				IAIMPFileInfo *fileInfo = nullptr;
 				if (Succeeded(item->GetValueAsObject(AIMP_PLAYLISTITEM_PROPID_FILEINFO, IID_IAIMPFileInfo, reinterpret_cast<void **>(&fileInfo))) && fileInfo)
 				{
@@ -373,6 +381,33 @@ player::MutationResult player::SetItemMark(IAIMPCore *core, const std::string &p
 	const HRESULT hr = item->SetValueAsFloat(AIMP_PLAYLISTITEM_PROPID_MARK, mark);
 	item->Release();
 	return Succeeded(hr) ? MutationResult::Ok : MutationResult::Failed;
+}
+
+player::MutationResult player::SetItemEnabled(IAIMPCore *core, const std::string &playlistId, std::int32_t index, bool enabled)
+{
+	IAIMPPlaylistItem *item = nullptr;
+	const MutationResult found = FindPlaylistItem(core, playlistId, index, item);
+	if (found != MutationResult::Ok)
+		return found;
+	const HRESULT hr = item->SetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_PLAYINGSWITCH, enabled ? 1 : 0);
+	item->Release();
+	return Succeeded(hr) ? MutationResult::Ok : MutationResult::Failed;
+}
+
+player::MutationResult player::SetItemsEnabled(IAIMPCore *core, const std::string &playlistId, const ItemSelection &selection, bool enabled)
+{
+	IAIMPPlaylist *playlist = LoadedPlaylistByAIMPId(core, playlistId);
+	if (!playlist)
+		return MutationResult::PlaylistNotFound;
+	MutationResult result = MutationResult::Ok;
+	playlist->BeginUpdate();
+	const bool found = VisitSelectedItems(core, playlist, selection, [&](const PlaylistItemContext &ctx, std::int32_t)
+										  {
+		if (Failed(ctx.Item->SetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_PLAYINGSWITCH, enabled ? 1 : 0)))
+			result = MutationResult::Failed; });
+	playlist->EndUpdate();
+	playlist->Release();
+	return found ? result : MutationResult::ItemNotFound;
 }
 
 void player::AddToSummary(const PlaylistItemContext &ctx, ItemsSummary &summary)

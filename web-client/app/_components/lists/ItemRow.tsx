@@ -3,9 +3,9 @@
 import type { Playlist, PlaylistGroup, PlaylistItem } from '@/app/_api/types';
 import { formatDuration } from '@/app/_utils/format';
 import clsx from 'clsx';
-import type { CSSProperties, PointerEvent } from 'react';
+import { useEffect, useRef, type CSSProperties, type PointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IconButton } from '../buttons';
+import { IconButton, useHoldGesture } from '../buttons';
 import { ItemCover } from '../cover';
 import { Icon } from '../icons';
 import { ListCheckbox } from '../inputs';
@@ -22,8 +22,70 @@ export const thumbnailMargin = 6;
 // What a list shows of its items: a playlist's own view settings, or fixed ones.
 export type RowView = Pick<
     Playlist,
-    'showNumbers' | 'showThumbnails' | 'showSecondLine' | 'showDuration' | 'showMarks'
+    'showNumbers' | 'showThumbnails' | 'showSecondLine' | 'showDuration' | 'showMarks' | 'showSwitches'
 >;
+
+// The switch column is the player's own: a mobile has no room for it and
+// switches tracks from the menu. It shares its slot with the selection
+// checkbox and the drag handle, which take it over in their modes.
+const showsSwitch = (view: RowView, docked: boolean, selecting: boolean, sorting: boolean) =>
+    view.showSwitches && docked && !selecting && !sorting;
+
+export type SwitchProps = {
+    title: string;
+    checked: boolean;
+    // Partly on, as a group with some tracks off.
+    indeterminate?: boolean;
+    onChange(checked: boolean): void;
+    'data-testid'?: string;
+};
+
+// The playback switch of a track or a group, drawn small and dim as in the
+// player. Its clicks stay its own: the row's would select or play the track.
+export function Switch({ title, checked, indeterminate = false, onChange, ...rest }: SwitchProps) {
+    const ref = useRef<HTMLInputElement>(null);
+    useEffect(() => {
+        if (ref.current) ref.current.indeterminate = indeterminate;
+    }, [indeterminate]);
+    const held = useHoldGesture<HTMLInputElement>(title);
+    return (
+        <>
+            <input
+                {...rest}
+                ref={ref}
+                type="checkbox"
+                aria-label={title}
+                title={title}
+                tabIndex={-1}
+                className={styles.switch}
+                style={held.style()}
+                checked={checked}
+                // The click that ended a hold is cancelled before this fires.
+                onChange={event => {
+                    if (!event.nativeEvent.defaultPrevented) onChange(event.target.checked);
+                }}
+                {...held.handlers({ onClick: event => event.stopPropagation() })}
+                onDoubleClick={event => event.stopPropagation()}
+            />
+            {held.tooltip}
+        </>
+    );
+}
+
+// A switched-off track on a mobile, which has no switch column.
+function SwitchedOffMark() {
+    const { t } = useTranslation();
+    const title = t('playlist.switchedOff');
+    const held = useHoldGesture<HTMLSpanElement>(title);
+    return (
+        <>
+            <Icon className={styles.switchedOff} title={title} style={held.style()} {...held.handlers()}>
+                disabled_by_default
+            </Icon>
+            {held.tooltip}
+        </>
+    );
+}
 
 // A one-line row has no room for a thumbnail.
 const showsThumbnail = (view: RowView) => view.showThumbnails && view.showSecondLine;
@@ -53,6 +115,8 @@ export type ItemRowProps = RowProps & {
     menu?: RowMenuButton;
     // Lets the stars be set in the row; without it they are only shown.
     onRate?(item: PlaylistItem, mark: number): void;
+    // The row's switch, where the view shows one.
+    onSwitch?(item: PlaylistItem, enabled: boolean): void;
 };
 
 export function DragHandle({
@@ -91,6 +155,7 @@ export function ItemRow({
     onDragStart,
     menu,
     onRate,
+    onSwitch,
 }: ItemRowProps) {
     const { t } = useTranslation();
     const label = view.showNumbers && `${number}.`;
@@ -103,6 +168,9 @@ export function ItemRow({
             onChange={onRate && (mark => onRate(item, mark))}
         />
     );
+    // A mobile has no switch column, so a track switched off is marked beside
+    // the details, away from the numbers.
+    const switchedOff = view.showSwitches && !docked && !item.enabled;
     return (
         <>
             {selecting && (
@@ -117,6 +185,16 @@ export function ItemRow({
                 </span>
             )}
             {sorting && <DragHandle onDragStart={onDragStart} />}
+            {showsSwitch(view, docked, selecting, sorting) && (
+                <span className={styles.leading}>
+                    <Switch
+                        data-testid="item-switch"
+                        title={t('playlist.itemSwitch')}
+                        checked={item.enabled}
+                        onChange={enabled => onSwitch?.(item, enabled)}
+                    />
+                </span>
+            )}
             {label && docked && (
                 <div className={styles.number} data-widest={widestNumber}>
                     {label}
@@ -143,37 +221,44 @@ export function ItemRow({
                             {queueMark}
                         </div>
                     )}
+                    {switchedOff && !view.showSecondLine && <SwitchedOffMark />}
                     {view.showMarks && !view.showSecondLine && rating}
                     {view.showDuration && <div className={styles.duration}>{formatDuration(item.duration)}</div>}
                 </div>
                 {view.showSecondLine && (
                     <div className={styles.line}>
+                        {switchedOff && <SwitchedOffMark />}
                         <div className={styles.details}>{item.secondLine}</div>
                         {view.showMarks && rating}
                     </div>
                 )}
             </div>
-            {menu && (
-                <IconButton
-                    title={t('playlist.itemActions')}
-                    aria-haspopup="menu"
-                    aria-expanded={menu.open}
-                    tabIndex={-1}
-                    className={clsx(styles.menuButton, menu.open && styles.menuButtonOpen)}
-                    style={{ anchorName: menu.anchor } as CSSProperties}
-                    popoverTarget={menu.popoverTarget}
-                    popoverTargetAction={menu.popoverTargetAction}
-                    // The row's own clicks would play the track.
-                    onDoubleClick={event => event.stopPropagation()}
-                    onClick={event => {
-                        event.stopPropagation();
-                        menu.onClick(event);
-                    }}
-                >
-                    <Icon>more_vert</Icon>
-                </IconButton>
-            )}
+            {menu && <RowMenuIcon title={t('playlist.itemActions')} menu={menu} />}
         </>
+    );
+}
+
+// The ⋮ button of a row, which opens the list's shared menu at the row.
+export function RowMenuIcon({ title, menu }: { title: string; menu: RowMenuButton }) {
+    return (
+        <IconButton
+            title={title}
+            aria-haspopup="menu"
+            aria-expanded={menu.open}
+            tabIndex={-1}
+            className={clsx(styles.menuButton, menu.open && styles.menuButtonOpen)}
+            style={{ anchorName: menu.anchor } as CSSProperties}
+            popoverTarget={menu.popoverTarget}
+            popoverTargetAction={menu.popoverTargetAction}
+            // The row's own clicks would play the track.
+            onDoubleClick={event => event.stopPropagation()}
+            onClick={event => {
+                event.stopPropagation();
+                menu.onClick(event);
+            }}
+        >
+            <Icon>more_vert</Icon>
+        </IconButton>
     );
 }
 
@@ -198,6 +283,11 @@ export function SkeletonRow({
                 </span>
             )}
             {sorting && <DragHandle />}
+            {showsSwitch(view, docked, selecting, sorting) && (
+                <span className={styles.leading}>
+                    <Skeleton shape="rect" width={12} height={12} />
+                </span>
+            )}
             {view.showNumbers && docked && (
                 <div className={styles.number} data-widest={widestNumber}>
                     <Skeleton width="100%" />

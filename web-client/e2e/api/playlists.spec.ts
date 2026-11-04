@@ -160,7 +160,7 @@ test.describe('items', () => {
 
     test('marks an item with stars', async ({ api, playlists }) => {
         const playlist = await playlists.create({ tracks: 2 });
-        const route = `/playlists/${encode(playlist.id)}/items/1`;
+        const route = `/playlists/${encode(playlist.id)}/items/1/mark`;
         expect((await api.patch(route, { mark: 4 })).status).toBe(200);
         await expect.poll(async () => (await api.items(playlist.id)).items[1].mark).toBe(4);
         expect((await api.items(playlist.id)).items[1].displayingMark).toBe(4);
@@ -168,9 +168,39 @@ test.describe('items', () => {
         await expect.poll(async () => (await api.items(playlist.id)).items[1].mark).toBe(0);
 
         expect((await api.patch(route, { mark: 6 })).error?.code).toBe('invalidBody');
-        expect((await api.patch(`/playlists/${encode(playlist.id)}/items/9`, { mark: 1 })).error?.code).toBe(
+        expect((await api.patch(`/playlists/${encode(playlist.id)}/items/9/mark`, { mark: 1 })).error?.code).toBe(
             'itemNotFound',
         );
+    });
+
+    test('switches items out of playback, one at a time and by selection', async ({ api, playlists }) => {
+        const playlist = await playlists.create({
+            tracks: [{ folder: 'Album A' }, { folder: 'Album A' }, { folder: 'Album B' }],
+        });
+        expect((await api.playlist(playlist.id))!.showSwitches).toBe(true);
+        const enabled = async () => (await api.items(playlist.id)).items.map(item => item.enabled);
+        const enabledCounts = async () => (await api.groups(playlist.id)).groups.map(group => group.enabledCount);
+        const route = `/playlists/${encode(playlist.id)}/items`;
+
+        expect((await api.patch(`${route}/1/enabled`, { enabled: false })).status).toBe(200);
+        await expect.poll(enabled).toEqual([true, false, true]);
+        expect(await enabledCounts()).toEqual([1, 1]);
+        expect(
+            (await api.post(`${route}/enabled`, { search: '', groups: [0], except: [], enabled: false })).status,
+        ).toBe(200);
+        await expect.poll(enabled).toEqual([false, false, true]);
+        expect(await enabledCounts()).toEqual([0, 1]);
+        expect((await api.post(`${route}/enabled`, { indexes: [0, 2], enabled: true })).status).toBe(200);
+        await expect.poll(enabled).toEqual([true, false, true]);
+
+        expect((await api.patch(`${route}/1/enabled`, {})).error?.code).toBe('invalidBody');
+        expect((await api.patch(`${route}/9/enabled`, { enabled: true })).error?.code).toBe('itemNotFound');
+        expect((await api.post(`${route}/enabled`, { indexes: [9], enabled: true })).error?.code).toBe('itemNotFound');
+        const revision = (await api.playlist(playlist.id))!.revision;
+        expect(
+            (await api.post(`${route}/enabled`, { indexes: [0], enabled: false, revision: revision + 100 })).error
+                ?.code,
+        ).toBe('playlistChanged');
     });
 
     test('details the chosen items with their tags', async ({ api, playlists }) => {

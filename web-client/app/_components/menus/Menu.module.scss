@@ -9,15 +9,16 @@
     padding: 8px 0;
     border: 0;
     border-radius: 8px;
-    background: var(--color-dialog);
+    background: var(--color-menu);
     color: var(--color-text);
     box-shadow: 0 4px 16px var(--color-shadow);
 }
 
+// Inset to the items' content, from the icons' edge to the text's far edge.
 .separator {
-    margin: 8px 0;
+    margin: 8px 16px;
     border: 0;
-    border-top: 1px solid var(--color-divider);
+    border-top: 1px solid var(--color-menu-divider);
 }
 
 .item {
@@ -36,7 +37,7 @@
     }
 
     &:disabled {
-        color: var(--color-text-secondary);
+        color: var(--color-menu-disabled);
         cursor: default;
     }
 }

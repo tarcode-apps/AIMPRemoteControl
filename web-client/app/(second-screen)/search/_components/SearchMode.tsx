@@ -119,6 +119,7 @@ export function SearchModeProvider({ children }: { children: ReactNode }) {
                 index,
                 name: names.get(playlist.id) ?? '',
                 count: playlist.count,
+                enabledCount: playlist.count,
                 duration: playlist.duration,
                 size: playlist.size,
                 expanded: !collapsed.has(playlist.id),

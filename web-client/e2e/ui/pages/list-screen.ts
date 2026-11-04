@@ -28,9 +28,22 @@ export class ListScreen {
         return this.rows.filter({ hasText: text });
     }
 
-    // The header of a group, which folds and unfolds it.
+    groupRow(name: string): Locator {
+        return this.list.getByTestId('group-row').filter({ hasText: name });
+    }
+
+    // The header of a group, which folds and unfolds it; its name reads as the
+    // group's name followed by its count.
     groupButton(name: string): Locator {
-        return this.list.getByTestId('group-row').filter({ hasText: name }).getByRole('button');
+        return this.groupRow(name).getByRole('button', { name: new RegExp(`^${RegExp.escape(name)}`) });
+    }
+
+    // Picks an item from a group's ⋮ menu, where a list has one.
+    async groupAction(name: string, item: string) {
+        await this.app.chooseFromMenu(
+            this.groupRow(name).getByRole('button', { name: t('playlist.groupActions') }),
+            item,
+        );
     }
 
     // Scrolls the list to a fraction of its length, as a fling would; the list is
@@ -77,9 +90,10 @@ export class ListScreen {
         await expect(this.toolbarButton(t('playlist.closeSelection'))).toBeVisible();
     }
 
-    // A row's checkbox, shown while selecting or searching.
+    // A row's selection checkbox, shown while selecting or searching; a playlist
+    // row may carry its playback switch besides.
     checkbox(text: string | RegExp): Locator {
-        return this.row(text).getByRole('checkbox');
+        return this.row(text).getByRole('checkbox', { name: t('playlist.selectItem') });
     }
 
     async selectedAction(item: string) {

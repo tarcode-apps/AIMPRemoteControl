@@ -24,8 +24,8 @@ export function useHold(delay: number, onHold: () => void, repeat?: number) {
 
     return {
         pressed,
-        press(event: PointerEvent<HTMLButtonElement>) {
-            if (event.button !== 0 || event.currentTarget.disabled) return;
+        press(event: PointerEvent<HTMLElement>) {
+            if (event.button !== 0 || ('disabled' in event.currentTarget && event.currentTarget.disabled)) return;
             held.current = false;
             setPressed(true);
             timer.current = window.setTimeout(() => {

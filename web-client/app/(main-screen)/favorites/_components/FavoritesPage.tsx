@@ -39,6 +39,7 @@ const view: RowView = {
     showSecondLine: true,
     showDuration: true,
     showMarks: false,
+    showSwitches: false,
 };
 
 // What a row shows of a favorite that is not in its playlist: its snapshot.

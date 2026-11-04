@@ -2,8 +2,15 @@
 
 import { errorMessage } from '@/app/_api/helpers/errors';
 import { usePlayer, usePlayTrack } from '@/app/_api/player';
-import { useMovePlaylistItems, usePlaylistItems, useSetGroupExpanded, useSetItemMark } from '@/app/_api/playlists';
-import { queueMark, trackKey, useQueuePositions } from '@/app/_api/queue';
+import {
+    useMovePlaylistItems,
+    usePlaylistItems,
+    useSetGroupExpanded,
+    useSetItemEnabled,
+    useSetItemMark,
+    useSetItemsEnabled,
+} from '@/app/_api/playlists';
+import { queueMark, trackKey, useEnqueueSelections, useQueuePositions } from '@/app/_api/queue';
 import type { Playlist, PlaylistGroup, PlaylistItem } from '@/app/_api/types';
 import { ListCheckbox } from '@/app/_components/inputs';
 import type { PlaylistRow } from '@/app/_components/lists';
@@ -14,7 +21,9 @@ import {
     oneLineRowHeight,
     pagesAround,
     pageSize,
+    RowMenuIcon,
     SkeletonRow,
+    Switch,
     thumbnailMargin,
     twoLineRowHeight,
     useActiveRow,
@@ -224,6 +233,31 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
     const onRate = docked
         ? (item: PlaylistItem, mark: number) => setMark.mutate({ playlistId: playlist.id, index: item.index, mark })
         : undefined;
+    // The switches exist only while the playlist shows its column: hidden, the
+    // player plays every track. Docked, the column is in the rows; a mobile
+    // switches from the menu.
+    const switches = playlist.showSwitches;
+    const setItemEnabled = useSetItemEnabled();
+    const setItemsEnabled = useSetItemsEnabled();
+    const onSwitch = docked
+        ? (item: PlaylistItem, enabled: boolean) =>
+              setItemEnabled.mutate({ playlistId: playlist.id, index: item.index, enabled })
+        : undefined;
+    const switchMenuItem = (item: PlaylistItem) => ({
+        // The icon shows the switch as it is, the label what the item does to it.
+        label: t(item.enabled ? 'playlist.disable' : 'playlist.enable'),
+        icon: item.enabled ? 'check_box' : 'check_box_outline_blank',
+        onSelect: () => setItemEnabled.mutate({ playlistId: playlist.id, index: item.index, enabled: !item.enabled }),
+    });
+    const switchGroup = (group: PlaylistGroup, enabled: boolean) =>
+        setItemsEnabled.mutate({
+            playlistId: playlist.id,
+            revision: playlist.revision,
+            search: text,
+            groups: [group.index],
+            except: [],
+            enabled,
+        });
     const { data: player } = usePlayer();
     const playingTrack = player?.track;
     // The index is only valid for the revision it was read at, and the snapshot and
@@ -264,8 +298,71 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
         return [
             ...trackActions.enqueueItems(track),
             favoriteActions.favoriteMenuItem(track),
+            ...(switches && !docked ? [switchMenuItem(item)] : []),
             menuSeparator,
             ...removal.trackItems({ ...track, name: item.displayText }),
+        ];
+    });
+    // A group's items as a selection: in a search, the matches among them.
+    const groupSelection = (group: PlaylistGroup) => ({
+        playlistId: playlist.id,
+        revision: playlist.revision,
+        selection: { search: text, groups: [group.index], except: [] },
+    });
+    const enqueueSelections = useEnqueueSelections();
+    const foldable = !searching && !sorting;
+    const groupMenu = useRowMenu((group: PlaylistGroup) => {
+        const allOn = group.enabledCount === group.count;
+        return [
+            {
+                label: t('playlist.enqueue'),
+                icon: 'playlist_add',
+                onSelect: () => void enqueueSelections([groupSelection(group)], false),
+            },
+            {
+                label: t('playlist.enqueueFirst'),
+                icon: 'playlist_play',
+                onSelect: () => void enqueueSelections([groupSelection(group)], true),
+            },
+            {
+                label: t('favorites.add'),
+                icon: 'heart_plus',
+                onSelect: () => void favoriteActions.addSelections([groupSelection(group)]),
+            },
+            ...(switches && !docked
+                ? [
+                      {
+                          label: t(allOn ? 'playlist.disable' : 'playlist.enable'),
+                          icon: allOn
+                              ? 'check_box'
+                              : group.enabledCount
+                                ? 'indeterminate_check_box'
+                                : 'check_box_outline_blank',
+                          onSelect: () => switchGroup(group, !allOn),
+                      },
+                  ]
+                : []),
+            menuSeparator,
+            {
+                label: t(group.expanded ? 'playlist.collapseGroup' : 'playlist.expandGroup'),
+                icon: group.expanded ? 'expand_less' : 'expand_more',
+                disabled: !foldable,
+                onSelect: () => toggleGroup(group),
+            },
+            {
+                label: t('playlist.collapseAll'),
+                icon: 'unfold_less',
+                disabled: !foldable,
+                onSelect: () => setExpanded.mutate({ expanded: false, revision: playlist.revision }),
+            },
+            {
+                label: t('playlist.expandAll'),
+                icon: 'unfold_more',
+                disabled: !foldable,
+                onSelect: () => setExpanded.mutate({ expanded: true, revision: playlist.revision }),
+            },
+            menuSeparator,
+            ...removal.selectionItems(() => ({ parts: [groupSelection(group)] }), playlist.readOnly),
         ];
     });
 
@@ -332,7 +429,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
         ghost =
             row.kind === 'group' ? (
                 <div className={clsx(styles.groupRow, styles.ghost)} style={style}>
-                    <DragHandle className={styles.groupHandle} />
+                    <DragHandle />
                     <GroupRow group={row.group} />
                 </div>
             ) : (
@@ -423,16 +520,37 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                                             }
                                         />
                                     )}
-                                    {sortable && rows.spanAt(index)?.rowCount !== rows.count && (
-                                        <DragHandle
-                                            className={styles.groupHandle}
-                                            onDragStart={event => drag.start(index, event)}
-                                        />
+                                    {sortable &&
+                                        (rows.spanAt(index)?.rowCount !== rows.count ? (
+                                            <DragHandle onDragStart={event => drag.start(index, event)} />
+                                        ) : (
+                                            // The only group has nowhere to go; its name stays put all the same.
+                                            <span className={styles.leading} />
+                                        ))}
+                                    {switches && docked && !selecting && !sorting && (
+                                        <span className={styles.leading}>
+                                            <Switch
+                                                data-testid="group-switch"
+                                                title={t('playlist.groupSwitch')}
+                                                checked={row.group.enabledCount === row.group.count}
+                                                indeterminate={
+                                                    row.group.enabledCount > 0 &&
+                                                    row.group.enabledCount < row.group.count
+                                                }
+                                                onChange={enabled => switchGroup(row.group, enabled)}
+                                            />
+                                        </span>
                                     )}
                                     <GroupRow
                                         group={row.group}
                                         onToggle={searching || sorting ? undefined : () => toggleGroup(row.group)}
                                     />
+                                    {hasMenu && (
+                                        <RowMenuIcon
+                                            title={t('playlist.groupActions')}
+                                            menu={groupMenu.button(index, row.group)}
+                                        />
+                                    )}
                                 </div>
                             );
                         const item = itemAt(row.position);
@@ -451,6 +569,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                                     hidden && styles.hidden,
                                 )}
                                 style={{ height: itemRowHeight, transform }}
+                                data-enabled={item && switches ? item.enabled : undefined}
                                 onClick={event => item && onItemClick(event, index, item)}
                                 onDoubleClick={() => item && mode.mode === null && play(item)}
                             >
@@ -468,6 +587,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                                         }}
                                         menu={hasMenu ? rowMenu.button(index, item) : undefined}
                                         onRate={onRate}
+                                        onSwitch={onSwitch}
                                     />
                                 ) : (
                                     <SkeletonRow {...rowProps} index={index} />
@@ -479,6 +599,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                 </div>
             )}
             {rowMenu.popover}
+            {groupMenu.popover}
             {removal.dialogs}
         </section>
     );

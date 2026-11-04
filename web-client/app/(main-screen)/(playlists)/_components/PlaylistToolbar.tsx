@@ -2,7 +2,7 @@
 
 import { useFormats } from '@/app/_api/files';
 import { usePlayer } from '@/app/_api/player';
-import { useSetGroupExpanded } from '@/app/_api/playlists';
+import { useSetItemsEnabled } from '@/app/_api/playlists';
 import { useEnqueue } from '@/app/_api/queue';
 import { useSettings } from '@/app/_api/settings';
 import type { FileType } from '@/app/_api/types';
@@ -35,7 +35,6 @@ export function PlaylistToolbar() {
     const { selected, showTrack } = usePlaylistSelection();
     const playing = usePlayer().data?.track;
     const mode = usePlaylistMode();
-    const setExpanded = useSetGroupExpanded(selected?.id ?? '');
     const enqueue = useEnqueue();
     const favoriteActions = useFavoriteActions();
     const playlistActions = usePlaylistActions();
@@ -46,10 +45,6 @@ export function PlaylistToolbar() {
     const fileInput = useRef<HTMLInputElement>(null);
     const [sortDialog, setSortDialog] = useState(false);
     const [urlDialog, setUrlDialog] = useState(false);
-    const grouped = selected?.grouping.enabled ?? false;
-    const expandAll = (expanded: boolean) => {
-        if (selected) setExpanded.mutate({ expanded, revision: selected.revision });
-    };
     const enqueueSelected = (atBeginning: boolean) => {
         const selection = mode.itemSelection();
         if (selected && selection)
@@ -66,6 +61,30 @@ export function PlaylistToolbar() {
             ? { parts: [{ playlistId: selected.id, revision: selected.revision, selection }] }
             : undefined;
     };
+    const setItemsEnabled = useSetItemsEnabled();
+    const switchSelected = (enabled: boolean) => {
+        const selection = mode.itemSelection();
+        if (selected && selection)
+            setItemsEnabled.mutate({ playlistId: selected.id, revision: selected.revision, enabled, ...selection });
+    };
+    // Only while the playlist shows its switch column: hidden, the player plays
+    // every track.
+    const switchEntries: MenuEntry[] = selected?.showSwitches
+        ? [
+              {
+                  label: t('playlist.enableSelected'),
+                  icon: 'check_box',
+                  disabled: mode.nothingSelected,
+                  onSelect: () => switchSelected(true),
+              },
+              {
+                  label: t('playlist.disableSelected'),
+                  icon: 'check_box_outline_blank',
+                  disabled: mode.nothingSelected,
+                  onSelect: () => switchSelected(false),
+              },
+          ]
+        : [];
     // The extended search takes the text a search here was typed with; coming back
     // finds the plain playlist.
     const extendedSearch = {
@@ -139,18 +158,6 @@ export function PlaylistToolbar() {
                 }
                 moreActions={[
                     {
-                        label: t('playlist.collapseAll'),
-                        icon: 'unfold_less',
-                        disabled: !grouped,
-                        onSelect: () => expandAll(false),
-                    },
-                    {
-                        label: t('playlist.expandAll'),
-                        icon: 'unfold_more',
-                        disabled: !grouped,
-                        onSelect: () => expandAll(true),
-                    },
-                    {
                         label: t('playlist.goToPlaying'),
                         icon: 'my_location',
                         disabled: !playing,
@@ -180,6 +187,7 @@ export function PlaylistToolbar() {
                         disabled: mode.nothingSelected,
                         onSelect: addSelectedToFavorites,
                     },
+                    ...switchEntries,
                     ...removal.selectionItems(selectedRemoval, mode.nothingSelected || !selected || selected.readOnly),
                     ...(mode.mode === 'search' ? [extendedSearch] : []),
                 ]}

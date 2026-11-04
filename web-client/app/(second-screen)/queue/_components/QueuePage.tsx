@@ -34,6 +34,7 @@ const view: RowView = {
     showSecondLine: true,
     showDuration: true,
     showMarks: false,
+    showSwitches: false,
 };
 
 export function QueuePage() {

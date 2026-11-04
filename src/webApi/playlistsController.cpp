@@ -46,6 +46,13 @@ namespace
 						   { return std::isalnum(c) || c == '+' || c == '-' || c == '.'; });
 	}
 
+	bool EnabledBody(const nlohmann::json &body)
+	{
+		if (!body.is_object() || !body.contains("enabled") || !body["enabled"].is_boolean())
+			throw ApiError(400, "invalidBody");
+		return body["enabled"].get<bool>();
+	}
+
 	nlohmann::json ToJson(const player::PlaylistInfo &playlist, std::uint64_t revision)
 	{
 		return {
@@ -62,6 +69,7 @@ namespace
 			{"showSecondLine", playlist.ShowSecondLine},
 			{"showThumbnails", playlist.ShowThumbnails},
 			{"showMarks", playlist.ShowMarks},
+			{"showSwitches", playlist.ShowSwitches},
 			{"grouping", {{"enabled", playlist.Grouped}, {"template", playlist.GroupingTemplate}, {"autoMerge", playlist.GroupAutoMerge}}},
 		};
 	}
@@ -72,6 +80,7 @@ namespace
 			{"index", group.Index},
 			{"name", group.Name},
 			{"count", group.Count},
+			{"enabledCount", group.EnabledCount},
 			{"duration", group.Duration},
 			{"size", group.Size},
 			{"expanded", group.Expanded},
@@ -253,9 +262,9 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 		}
 		return result; });
 
-	// No revision check: marks given in quick succession must all count, and each
-	// of them changes the playlist.
-	endpoints.MapApi(HttpMethod::Patch, R"(/api/v1/playlists/([^/]+)/items/(\d+))", [core = FCore](const ApiRequest &request) -> nlohmann::json
+	// No revision check on an item's own properties: changes made in quick
+	// succession must all count, and each of them changes the playlist.
+	endpoints.MapApi(HttpMethod::Patch, R"(/api/v1/playlists/([^/]+)/items/(\d+)/mark)", [core = FCore](const ApiRequest &request) -> nlohmann::json
 			   {
 		const std::string playlistId = request.PathMatches.at(0);
 		const std::int32_t index = std::stoi(request.PathMatches.at(1));
@@ -265,6 +274,25 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 		const std::int32_t mark = body["mark"].get<std::int32_t>();
 		ThrowUnlessOk(RunOnMainThread(core, [&]
 									  { return player::SetItemMark(core, playlistId, index, mark); }));
+		return nlohmann::json::object(); });
+
+	endpoints.MapApi(HttpMethod::Patch, R"(/api/v1/playlists/([^/]+)/items/(\d+)/enabled)", [core = FCore](const ApiRequest &request) -> nlohmann::json
+			   {
+		const std::string playlistId = request.PathMatches.at(0);
+		const std::int32_t index = std::stoi(request.PathMatches.at(1));
+		const bool enabled = EnabledBody(request.Body);
+		ThrowUnlessOk(RunOnMainThread(core, [&]
+									  { return player::SetItemEnabled(core, playlistId, index, enabled); }));
+		return nlohmann::json::object(); });
+
+	endpoints.MapApi(HttpMethod::Post, R"(/api/v1/playlists/([^/]+)/items/enabled)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
+			   {
+		const std::string playlistId = request.PathMatches.at(0);
+		const player::ItemSelection selection = SelectionBody(request.Body);
+		const bool enabled = EnabledBody(request.Body);
+		CheckRevision(request.Body, events, playlistId);
+		ThrowUnlessOk(RunOnMainThread(core, [&]
+									  { return player::SetItemsEnabled(core, playlistId, selection, enabled); }));
 		return nlohmann::json::object(); });
 
 	endpoints.MapApi(HttpMethod::Post, R"(/api/v1/playlists/([^/]+)/items/details)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json

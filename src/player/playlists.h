@@ -26,6 +26,7 @@ namespace player
 		bool ShowSecondLine = true;
 		bool ShowThumbnails = true;
 		bool ShowMarks = false;
+		bool ShowSwitches = false; // the check boxes that take tracks out of playback
 		bool Grouped = false;
 		std::string GroupingTemplate;
 		bool GroupAutoMerge = false;

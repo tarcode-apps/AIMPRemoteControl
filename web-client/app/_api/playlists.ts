@@ -13,8 +13,10 @@ import { trackKey } from './queue';
 import type {
     CreatedPlaylist,
     ItemDetailsResponse,
+    ItemEnabledRequest,
     ItemMarkRequest,
     ItemSelection,
+    ItemsEnabledRequest,
     MoveRequest,
     Playlist,
     PlaylistGroups,
@@ -216,7 +218,7 @@ function sendMark({ playlistId, index, mark }: ItemMarkRequest): Promise<void> {
     wantedMarks.set(key, mark);
     const turn = async () => {
         if (wantedMarks.get(key) !== mark) return;
-        await request<unknown>('PATCH', `/playlists/${encodeURIComponent(playlistId)}/items/${index}`, {
+        await request<unknown>('PATCH', `/playlists/${encodeURIComponent(playlistId)}/items/${index}/mark`, {
             body: { mark },
         });
     };
@@ -247,6 +249,99 @@ export function useSetItemMark() {
             if (wantedMarks.get(key) === mark) wantedMarks.delete(key);
             revert(client, predictions ?? []);
         },
+    });
+}
+
+// Shown at once in the row and in its group's switch; the `playlists` event
+// brings the player's own word.
+export function useSetItemEnabled() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: ({ playlistId, index, enabled }: ItemEnabledRequest) =>
+            request<unknown>('PATCH', `/playlists/${encodeURIComponent(playlistId)}/items/${index}/enabled`, {
+                body: { enabled },
+            }),
+        onMutate: async ({ playlistId, index, enabled }) => {
+            await client.cancelQueries({ queryKey: playlistKeys.playlist(playlistId) });
+            const predictions: Prediction[] = [];
+            for (const [queryKey, page] of client.getQueriesData<PlaylistItemsPage>({
+                queryKey: playlistKeys.itemPages(playlistId),
+            })) {
+                if (!page?.items.some(item => item.index === index && item.enabled !== enabled)) continue;
+                predictions.push(
+                    predict(client, queryKey, page, {
+                        ...page,
+                        items: page.items.map(item => (item.index === index ? { ...item, enabled } : item)),
+                    }),
+                );
+            }
+            // The plain groups alone: a search's groups count its matches by position.
+            const groups = client.getQueryData<PlaylistGroups>(playlistKeys.groupsView(playlistId, ''));
+            if (predictions.length && groups)
+                predictions.push(
+                    predict(client, playlistKeys.groupsView(playlistId, ''), groups, {
+                        ...groups,
+                        groups: groups.groups.map(group =>
+                            group.firstPosition <= index && index < group.firstPosition + group.count
+                                ? { ...group, enabledCount: group.enabledCount + (enabled ? 1 : -1) }
+                                : group,
+                        ),
+                    }),
+                );
+            return predictions;
+        },
+        onError: (_error, _variables, predictions) => revert(client, predictions ?? []),
+    });
+}
+
+// Whole groups are predicted, or their switch would show up empty until the
+// player reports the change; any other selection is the player's to resolve,
+// and the `playlists` event reloads the rows and the groups.
+export function useSetItemsEnabled() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: ({ playlistId, ...body }: ItemsEnabledRequest) =>
+            request<unknown>('POST', `/playlists/${encodeURIComponent(playlistId)}/items/enabled`, { body }),
+        onMutate: async variables => {
+            if (
+                !('search' in variables) ||
+                !variables.groups?.length ||
+                variables.except.length ||
+                variables.indexes?.length
+            )
+                return [];
+            const { playlistId, search, groups: chosen, enabled } = variables;
+            const groupsKey = playlistKeys.groupsView(playlistId, search);
+            await client.cancelQueries({ queryKey: playlistKeys.playlist(playlistId) });
+            const groups = client.getQueryData<PlaylistGroups>(groupsKey);
+            if (!groups) return [];
+            const predictions: Prediction[] = [
+                predict(client, groupsKey, groups, {
+                    ...groups,
+                    groups: groups.groups.map(group =>
+                        chosen.includes(group.index) ? { ...group, enabledCount: enabled ? group.count : 0 } : group,
+                    ),
+                }),
+            ];
+            // In a search the groups count matches by position, not by index.
+            if (search !== '') return predictions;
+            const ranges = groups.groups
+                .filter(group => chosen.includes(group.index))
+                .map(group => [group.firstPosition, group.firstPosition + group.count]);
+            const inRange = (index: number) => ranges.some(([first, end]) => index >= first && index < end);
+            for (const [queryKey, page] of client.getQueriesData<PlaylistItemsPage>({
+                queryKey: playlistKeys.itemPages(playlistId),
+            })) {
+                if (!page || (queryKey[3] as ItemsRange).search) continue;
+                const items = page.items.map(item =>
+                    item.enabled !== enabled && inRange(item.index) ? { ...item, enabled } : item,
+                );
+                if (items.some((item, i) => item !== page.items[i]))
+                    predictions.push(predict(client, queryKey, page, { ...page, items }));
+            }
+            return predictions;
+        },
+        onError: (_error, _variables, predictions) => revert(client, predictions ?? []),
     });
 }
 

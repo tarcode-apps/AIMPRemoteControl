@@ -1,6 +1,12 @@
 import { test as base, expect } from '@playwright/test';
 import path from 'node:path';
-import { defaultPluginSettings, restartThrowawayPlayer, type PluginSettings } from './lib/aimp';
+import {
+    defaultPlayerProfile,
+    defaultPluginSettings,
+    restartThrowawayPlayer,
+    type PlayerProfile,
+    type PluginSettings,
+} from './lib/aimp';
 import { Api } from './lib/api';
 import { EventStream } from './lib/events';
 import { MediaFolder, type TrackOptions } from './lib/media';
@@ -178,13 +184,18 @@ export const test = base.extend<Fixtures, Options>({
 });
 
 // Runs the tests of the enclosing describe against the throwaway player
-// restarted with other plugin settings, and restores the usual ones afterwards.
-// A player the tests did not start cannot be restarted, so they are skipped.
-export function withPluginSettings(settings: Partial<PluginSettings>) {
+// restarted with other settings of the plugin, or of the player itself, and
+// restores the usual ones afterwards. A player the tests did not start cannot
+// be restarted, so they are skipped.
+export function withPluginSettings(settings: Partial<PluginSettings>, profile: Partial<PlayerProfile> = {}) {
     test.describe.configure({ mode: 'serial' });
     test.skip(!!process.env.E2E_PLAYER_URL, 'needs the throwaway player, which E2E_PLAYER_URL replaces');
     test.beforeAll(async ({ playerUrl }) => {
-        await restartThrowawayPlayer(playerUrl, { ...defaultPluginSettings, ...settings });
+        await restartThrowawayPlayer(
+            playerUrl,
+            { ...defaultPluginSettings, ...settings },
+            { ...defaultPlayerProfile, ...profile },
+        );
     });
     test.afterAll(async ({ playerUrl }) => {
         await restartThrowawayPlayer(playerUrl, defaultPluginSettings);

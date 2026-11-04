@@ -66,6 +66,7 @@ All loaded playlists in the player's order.
     "showSecondLine": true,
     "showThumbnails": true,
     "showMarks": true,
+    "showSwitches": true,
     "grouping": { "enabled": true, "template": "%Album", "autoMerge": false }
   }
 ]
@@ -88,7 +89,10 @@ out item rows by them. A player older than v6.00 build 3090 has no thumbnail
 setting of its own, so there `showThumbnails` follows `showSecondLine`.
 Whether and how the thumbnails are drawn is up to the client.
 With `absoluteNumbers` off, numbering restarts in every group. `showMarks` is
-the player's own name for showing the marks in the rows. `grouping` is the
+the player's own name for showing the marks in the rows, `showSwitches` for
+the check boxes in front of the tracks: with the column hidden the player
+plays every track, whatever its [`enabled`](#patch-apiv1playlistsiditemsindexenabled)
+says, so a client shows nothing of the switches then. `grouping` is the
 playlist's own grouping: whether it is on, the template that names the
 groups, and whether same-named groups are merged. Items are always returned in
 the player's order; sorting and grouping happen in the player itself, not in
@@ -224,7 +228,7 @@ Errors: `400 invalidBody` (no file parts), `403 uploadDisabled`,
 `404 playlistNotFound`, `403 playlistReadOnly`, `507 uploadNoSpace`,
 `500 uploadFailed`, `500 playlistUpdateFailed`.
 
-### `PATCH /api/v1/playlists/{id}/items/{index}`
+### `PATCH /api/v1/playlists/{id}/items/{index}/mark`
 
 Marks one item:
 
@@ -240,6 +244,38 @@ event.
 
 Errors: `400 invalidBody`, `404 playlistNotFound`, `404 itemNotFound`,
 `500 playlistUpdateFailed`.
+
+### `PATCH /api/v1/playlists/{id}/items/{index}/enabled`
+
+Sets the switch in front of one item, `false` taking the track out of
+playback:
+
+```json
+{ "enabled": false }
+```
+
+As with the mark, there is no `revision` to send, the response is an empty
+object and the change comes back through the `playlists` event. The player
+honours the switches only while the playlist shows them
+([`showSwitches`](#get-apiv1playlists)).
+
+Errors: `400 invalidBody`, `404 playlistNotFound`, `404 itemNotFound`,
+`500 playlistUpdateFailed`.
+
+### `POST /api/v1/playlists/{id}/items/enabled`
+
+The same for a selection, as one change of the playlist. The body names the
+items as [`POST /api/v1/queue/items`](#post-apiv1queueitems) does, `playlistId`
+aside, plus `enabled` and an optional `revision`; a whole group is
+`{ "search": "", "groups": [2] }`.
+
+```json
+{ "indexes": [12, 13], "enabled": true, "revision": 7 }
+{ "search": "", "groups": [2], "enabled": false, "revision": 7 }
+```
+
+Errors: `400 invalidBody`, `404 playlistNotFound`, `404 itemNotFound`,
+`409 playlistChanged`, `500 playlistUpdateFailed`.
 
 ### `POST /api/v1/playlists/{id}/items/details`
 
@@ -329,7 +365,7 @@ The playlist's groups as the player shows them, in order. Empty when the
 playlist is not grouped.
 
 With the same `search` parameter as `items`, the groups describe the matches
-only: `count`, `duration`, `size` and `firstPosition` count matching items, positions
+only: `count`, `enabledCount`, `duration`, `size` and `firstPosition` count matching items, positions
 run through the matches like `offset` does, and groups without matches are left
 out. `index` stays the group's real index, so it can still be collapsed.
 
@@ -337,15 +373,16 @@ out. `index` stays the group's real index, so it can still be collapsed.
 {
   "revision": 7,
   "groups": [
-    { "index": 0, "name": "Album X", "count": 12, "duration": 2870.4, "size": 114819072, "expanded": true, "firstPosition": 0 },
-    { "index": 1, "name": "Album Y", "count": 9, "duration": 2011.0, "size": 80445440, "expanded": false, "firstPosition": 12 }
+    { "index": 0, "name": "Album X", "count": 12, "enabledCount": 12, "duration": 2870.4, "size": 114819072, "expanded": true, "firstPosition": 0 },
+    { "index": 1, "name": "Album Y", "count": 9, "enabledCount": 7, "duration": 2011.0, "size": 80445440, "expanded": false, "firstPosition": 12 }
   ]
 }
 ```
 
 Groups are contiguous runs of the playlist: `firstPosition` is the index of the
 group's first item and the group covers the next `count` items, `size` being
-their total in bytes. `expanded` is
+their total in bytes and `enabledCount` how many of them have their
+[switch](#patch-apiv1playlistsiditemsindexenabled) on. `expanded` is
 the player's own collapsed state. `name` is what the player shows: with the
 `%FileDir` grouping template that is the folder name alone, not the full path.
 

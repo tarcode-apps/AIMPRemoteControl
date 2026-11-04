@@ -84,8 +84,9 @@ namespace player
 		std::int32_t Index = 0;
 		std::string Name;
 		std::int32_t Count = 0;
-		double Duration = 0;   // seconds
-		std::int64_t Size = 0; // bytes
+		std::int32_t EnabledCount = 0; // of Count, the items whose switch is on
+		double Duration = 0;		   // seconds
+		std::int64_t Size = 0;		   // bytes
 		bool Expanded = true;
 		std::int32_t FirstPosition = 0; // playlist index of the group's first item
 	};
@@ -171,6 +172,12 @@ namespace player
 
 	// The user's stars, 0 for none.
 	MutationResult SetItemMark(IAIMPCore *core, const std::string &playlistId, std::int32_t index, std::int32_t mark);
+
+	// The switch in front of the track: off takes it out of playback.
+	MutationResult SetItemEnabled(IAIMPCore *core, const std::string &playlistId, std::int32_t index, bool enabled);
+
+	// The same for the selected items, as one change of the playlist.
+	MutationResult SetItemsEnabled(IAIMPCore *core, const std::string &playlistId, const ItemSelection &selection, bool enabled);
 
 	// Collapses or expands one group, or every group when `index` is nullopt.
 	MutationResult SetGroupExpanded(IAIMPCore *core, const std::string &playlistId, std::optional<std::int32_t> index, bool expanded);

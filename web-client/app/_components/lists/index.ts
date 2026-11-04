@@ -3,13 +3,16 @@ export {
     DragHandle,
     GroupRow,
     ItemRow,
+    RowMenuIcon,
     SkeletonRow,
+    Switch,
     oneLineRowHeight,
     thumbnailMargin,
     twoLineRowHeight,
     type ItemRowProps,
     type RowProps,
     type RowView,
+    type SwitchProps,
 } from './ItemRow';
 export { useListMode, type ListModeValue } from './ListMode';
 export { ListToolbar, type ListToolbarProps } from './ListToolbar';

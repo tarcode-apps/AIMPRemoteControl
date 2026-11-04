@@ -36,6 +36,20 @@ export const defaultPluginSettings: PluginSettings = {
     auth: null,
 };
 
+// Settings of the player itself that the tests seed.
+export type PlayerProfile = {
+    // The switch column of the playlists; the player honours the switches only
+    // while it is shown.
+    switchesColumn: boolean;
+};
+
+export const defaultPlayerProfile: PlayerProfile = { switchesColumn: true };
+
+// `[Playlist.Manager] Flags` is a bit set of the view settings new playlists
+// take; the player writes every bit on when the profile has none.
+const switchesColumnFlag = 16;
+const defaultPlaylistFlags = 2047;
+
 export const authRealm = 'AIMP Remote Control';
 
 const md5 = (text: string) => crypto.createHash('md5').update(text).digest('hex');
@@ -103,6 +117,24 @@ function setProfileSection(section: string, values: Record<string, string>) {
     writeProfile(lines);
 }
 
+function readProfileValue(section: string, key: string): string | undefined {
+    const lines = readProfile();
+    const start = lines.indexOf(`[${section}]`);
+    if (start < 0) return undefined;
+    for (const line of lines.slice(start + 1)) {
+        if (line.startsWith('[')) break;
+        if (line.startsWith(`${key}=`)) return line.slice(key.length + 1);
+    }
+    return undefined;
+}
+
+function writePlayerProfile(profile: PlayerProfile) {
+    const flags = Number(readProfileValue('Playlist.Manager', 'Flags') ?? defaultPlaylistFlags);
+    setProfileSection('Playlist.Manager', {
+        Flags: String(profile.switchesColumn ? flags | switchesColumnFlag : flags & ~switchesColumnFlag),
+    });
+}
+
 function writePluginSettings(settings: PluginSettings) {
     const flag = (on: boolean) => (on ? '1' : '0');
     setProfileSection('AIMPRemoteControl', {
@@ -158,6 +190,7 @@ function preparePlayerDir() {
 
     fs.symlinkSync(pluginDistDir, pluginLink, 'junction');
     writePluginSettings(defaultPluginSettings);
+    writePlayerProfile(defaultPlayerProfile);
     // A run stays silent.
     setProfileSection('AIMPSoundOut', { Mute: '1' });
 }
@@ -204,11 +237,17 @@ export async function launchThrowawayPlayer(url: string): Promise<string> {
     return playerDir;
 }
 
-// Restarts the throwaway player with other settings of the plugin, which it
-// reads when it starts; the rest of its profile, playlists included, is kept.
-export async function restartThrowawayPlayer(url: string, settings: PluginSettings): Promise<void> {
+// Restarts the throwaway player with other settings of the plugin and of the
+// player, which they read when it starts; the rest of its profile, playlists
+// included, is kept.
+export async function restartThrowawayPlayer(
+    url: string,
+    settings: PluginSettings,
+    profile: PlayerProfile = defaultPlayerProfile,
+): Promise<void> {
     await stopThrowawayPlayer();
     writePluginSettings(settings);
+    writePlayerProfile(profile);
     await start(url);
 }
 

@@ -17,6 +17,7 @@
 #include "delphiDateTime.h"
 #include "mainThreadRunner.h"
 #include "player/locate.h"
+#include "player/lyrics.h"
 #include "player/playlistItems.h"
 #include "player/playlists.h"
 #include "player/trackInfo.h"
@@ -38,6 +39,32 @@ namespace
 	using webapi::SelectionBody;
 	using webapi::StringArray;
 	using webapi::ThrowUnlessOk;
+
+	const char *LyricsTypeName(player::LyricsType type)
+	{
+		switch (type)
+		{
+		case player::LyricsType::Unsynced:
+			return "unsynced";
+		case player::LyricsType::Synced:
+			return "synced";
+		default:
+			return "none";
+		}
+	}
+
+	nlohmann::json ToJson(const player::Lyrics &lyrics)
+	{
+		nlohmann::json lines = nlohmann::json::array();
+		for (const player::LyricsLine &line : lyrics.Lines)
+		{
+			nlohmann::json json{{"text", line.Text}};
+			if (lyrics.Type == player::LyricsType::Synced)
+				json["time"] = line.Time;
+			lines.push_back(std::move(json));
+		}
+		return {{"type", LyricsTypeName(lyrics.Type)}, {"lines", std::move(lines)}};
+	}
 
 	// A scheme and "://", which no path has.
 	bool IsUrl(const std::string &text)
@@ -111,7 +138,6 @@ namespace
 			{"year", info.Year},
 			{"trackNumber", info.TrackNumber},
 			{"lyricist", info.Lyricist},
-			{"lyrics", info.Lyrics},
 			{"format", info.Format},
 			{"sampleRate", info.SampleRate},
 			{"bitrate", info.Bitrate},
@@ -357,6 +383,16 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 		ThrowUnlessOk(RunOnMainThread(core, [&]
 									  { return player::ReadTrackInfo(core, playlistId, fileUri, info); }));
 		return ToJson(info, playlistId, revision); });
+
+	// The lookup waits for the player's providers, so it stays on the request's thread.
+	endpoints.MapApi(HttpMethod::Get, R"(/api/v1/playlists/([^/]+)/items/lyrics)", [core = FCore](const ApiRequest &request) -> nlohmann::json
+			   {
+		const std::string fileUri = QueryString(request, "uri");
+		if (fileUri.empty())
+			throw ApiError(400, "invalidQuery");
+		player::Lyrics lyrics;
+		ThrowUnlessOk(player::ReadLyrics(core, request.PathMatches.at(0), fileUri, lyrics));
+		return ToJson(lyrics); });
 
 	endpoints.MapApi(HttpMethod::Post, "/api/v1/playlists/locate", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {

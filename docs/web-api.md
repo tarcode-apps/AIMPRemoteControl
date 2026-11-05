@@ -344,7 +344,6 @@ file and a screen showing it outlives the revision it was opened at.
   "year": "2008",
   "trackNumber": "07",
   "lyricist": "",
-  "lyrics": "First line\nSecond line",
   "format": "FLAC",
   "sampleRate": 48000,
   "bitrate": 1704,
@@ -360,7 +359,9 @@ file and a screen showing it outlives the revision it was opened at.
 The tags are read from the file itself, since the playlist keeps only the
 fields it shows, and fall back to the playlist's copy where the file gives
 none; a stream has only the playlist's copy. Every tag is a string, empty when
-missing. `format` is the codec the tags name, or the extension of the audio
+missing. The lyrics are not among them: they are
+[`GET …/items/lyrics`](#get-apiv1playlistsiditemslyricsuri)'s, which finds them
+in the files beside the track as well. `format` is the codec the tags name, or the extension of the audio
 file, upper-case, when they name none; for a part of a CUE sheet that is the
 file the sheet plays. `sampleRate` is in Hz, `bitrate` in kbps, `duration` in seconds,
 `size` in bytes; a parameter the player does not know is `0`. `lastPlayed` is
@@ -368,6 +369,35 @@ the moment in UTC, ISO 8601, `null` for a track that has not played yet.
 `index` and `revision` tell where the item is right now, for its
 [cover](#get-apiv1playlistsiditemsindexcoverkeysize); the request is one pass
 over the playlist's URIs and one read of the file.
+
+Errors: `400 invalidQuery`, `404 playlistNotFound`, `404 itemNotFound`.
+
+### `GET /api/v1/playlists/{id}/items/lyrics?uri=…`
+
+The lyrics of one item as the player's own lyrics window shows them, by the
+item's `fileUri` like the [information](#get-apiv1playlistsiditemsinfouri).
+
+```json
+{
+  "type": "synced",
+  "lines": [
+    { "time": 13.5, "text": "I am in a rush" },
+    { "time": 15.19, "text": "I should quickly pack my bag" }
+  ]
+}
+```
+
+`type` is `synced` when every line has `time`, the second from the track's
+start at which it is sung; `unsynced` for plain text, whose lines have no
+`time`; `none` when nothing was found, with no lines. As in the player, the
+file's lyrics tag comes first, even with a file of lyrics beside the track: it
+is synced when the tag has the times (an ID3 `SYLT` frame, which the player
+reads as LRC), plain otherwise, without its trailing empty lines. Without a
+tag, the lines come from the player's lyrics providers, which read the files
+beside the track (`.lrc`, `.srt`, `.txt` named like it) and ask the internet
+when the player's settings let them; the request then waits for them to answer.
+When they find nothing either, the player shows the file's comment tag in
+their place, whatever it holds, and so does the API.
 
 Errors: `400 invalidQuery`, `404 playlistNotFound`, `404 itemNotFound`.
 

@@ -3,6 +3,16 @@ import { useRef, type RefObject } from 'react';
 
 const flingVelocity = 0.5;
 
+// Whether `target` lies in an element below `panel` that has something to scroll.
+function insideScrollable(target: Element | null, panel: HTMLElement | null): boolean {
+    for (let element = target; element && element !== panel; element = element.parentElement) {
+        const { overflowY } = getComputedStyle(element);
+        if ((overflowY === 'auto' || overflowY === 'scroll') && element.scrollHeight > element.clientHeight)
+            return true;
+    }
+    return false;
+}
+
 export type SheetDragOptions = {
     panelRef: RefObject<HTMLElement | null>;
     handleRef: RefObject<HTMLElement | null>;
@@ -37,7 +47,9 @@ export function useSheetDrag({
     return usePointerDrag({
         axis: 'y',
         enabled,
-        onStart: () => {
+        onStart: event => {
+            // A pull on something that scrolls, such as the lyrics, scrolls it.
+            if (insideScrollable(event.target as Element, panelRef.current)) return false;
             const max = panelRange();
             if (max === null) return false;
             range.current = { base: expanded ? 0 : max, max, pulled: false };

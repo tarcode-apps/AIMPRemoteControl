@@ -17,6 +17,14 @@ export class PlayerPanel {
     readonly nextButton: Locator;
     readonly favoriteButton: Locator;
     readonly trackMenuButton: Locator;
+    // The title lines and the lyrics as pages of the title block, on a screen
+    // without room for the lyrics under the cover.
+    readonly titlePages: Locator;
+    readonly lyrics: Locator;
+    readonly lyricsLines: Locator;
+    // The current line, the one being sung, marked by an arrow.
+    readonly currentLine: Locator;
+    readonly noLyrics: Locator;
 
     constructor(readonly app: App) {
         const { page } = app;
@@ -34,6 +42,58 @@ export class PlayerPanel {
             .getByRole('button', { name: t('favorites.add'), exact: true })
             .or(button(t('favorites.remove')));
         this.trackMenuButton = button(t('player.trackMenu'));
+        this.titlePages = this.full.getByRole('group', { name: t('player.lyricsPages') });
+        this.lyrics = this.full.getByTestId('lyrics');
+        this.lyricsLines = this.full.getByTestId('lyrics-line');
+        this.currentLine = this.lyricsLines.and(page.locator('[aria-current="true"]'));
+        this.noLyrics = this.full.getByText(t('player.noLyrics'), { exact: true });
+    }
+
+    // Whether the lyrics have room under the cover, where the menu shows and hides
+    // them; without it they are a page in the title block's place, which the menu
+    // or a swipe turns to.
+    async lyricsHaveRoom(): Promise<boolean> {
+        await expect(this.trackMenuButton).toBeVisible();
+        return (await this.titlePages.count()) === 0;
+    }
+
+    async showLyrics() {
+        await this.trackMenuButton.click();
+        await this.app
+            .menuItem(t('player.showLyrics'))
+            .or(this.app.menuItem(t('player.lyrics')))
+            .click();
+    }
+
+    async hideLyrics() {
+        await this.trackMenuButton.click();
+        await this.app
+            .menuItem(t('player.hideLyrics'))
+            .or(this.app.menuItem(t('player.trackTitle')))
+            .click();
+    }
+
+    // A swipe across the title block by `dx` pixels; a touch is pointer events too.
+    async swipeTitleBlock(dx: number) {
+        const box = (await this.titlePages.boundingBox())!;
+        const { mouse } = this.app.page;
+        const y = box.y + box.height / 2;
+        const x = box.x + box.width / 2 - dx / 2;
+        await mouse.move(x, y);
+        await mouse.down();
+        await mouse.move(x + dx / 2, y, { steps: 5 });
+        await mouse.move(x + dx, y, { steps: 5 });
+        await mouse.up();
+    }
+
+    // A press held on a lyrics line, which seeks to it.
+    async holdLine(index: number) {
+        const box = (await this.lyricsLines.nth(index).boundingBox())!;
+        const { mouse } = this.app.page;
+        await mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await mouse.down();
+        await this.app.page.waitForTimeout(700);
+        await mouse.up();
     }
 
     // Play, or pause while playing: one button on a sheet, which a hold turns

@@ -13,6 +13,10 @@ export type TrackTags = {
     trackNumber?: string;
     lyricist?: string;
     lyrics?: string;
+    // Synced lyrics in the tag, as seconds and lines: the frame AIMP's tag
+    // editor writes, beside the plain `lyrics`, for pasted LRC.
+    syncedLyrics?: [number, string][];
+    comment?: string;
 };
 
 export type TrackOptions = Partial<TrackTags> & {
@@ -22,6 +26,8 @@ export type TrackOptions = Partial<TrackTags> & {
     folder?: string;
     // The file name; track-NN.wav by default.
     name?: string;
+    // Synced lyrics, written as an .lrc file named like the track beside it.
+    lrc?: string;
 };
 
 const sampleRate = 22050;
@@ -49,11 +55,31 @@ function id3Frame(id: string, data: Buffer): Buffer {
 
 const id3Text = (id: string, value: string) => id3Frame(id, Buffer.concat([Buffer.from([1]), utf16(value)]));
 
-// Unsynchronised lyrics: the language, an empty descriptor, then the text.
-const id3Lyrics = (value: string) =>
+// Unsynchronised lyrics or a comment, which are laid out alike: the language,
+// an empty descriptor, then the text.
+const id3LanguageText = (id: 'USLT' | 'COMM', value: string) =>
     id3Frame(
-        'USLT',
+        id,
         Buffer.concat([Buffer.from([1]), Buffer.from('eng', 'ascii'), utf16(''), Buffer.alloc(2), utf16(value)]),
+    );
+
+// Synchronised lyrics as AIMP's tag editor writes them: UTF-8 (an ID3v2.4
+// encoding, which AIMP takes in v2.3 too), the language, times in
+// milliseconds, content "lyrics", an empty descriptor, then each line ended by
+// a null and followed by its time.
+const id3SyncedLyrics = (lines: [number, string][]) =>
+    id3Frame(
+        'SYLT',
+        Buffer.concat([
+            Buffer.from([3]),
+            Buffer.from('eng', 'ascii'),
+            Buffer.from([2, 1, 0]),
+            ...lines.flatMap(([seconds, line]) => {
+                const time = Buffer.alloc(4);
+                time.writeUInt32BE(Math.round(seconds * 1000));
+                return [Buffer.from(line, 'utf8'), Buffer.alloc(1), time];
+            }),
+        ]),
     );
 
 function id3Tag(frames: Buffer[]): Buffer {
@@ -83,6 +109,8 @@ export function writeWav(
         trackNumber,
         lyricist,
         lyrics,
+        syncedLyrics,
+        comment,
     }: TrackTags,
 ) {
     const samples = Math.round(sampleRate * seconds);
@@ -110,7 +138,12 @@ export function writeWav(
         ['TRCK', trackNumber],
         ['TEXT', lyricist],
     ];
-    if (extra.some(([, value]) => value !== undefined) || lyrics !== undefined) {
+    if (
+        extra.some(([, value]) => value !== undefined) ||
+        lyrics !== undefined ||
+        syncedLyrics ||
+        comment !== undefined
+    ) {
         const frames = [
             id3Text('TIT2', title),
             id3Text('TPE1', artist),
@@ -118,7 +151,9 @@ export function writeWav(
             id3Text('TCON', genre),
         ];
         for (const [id, value] of extra) if (value !== undefined) frames.push(id3Text(id, value));
-        if (lyrics !== undefined) frames.push(id3Lyrics(lyrics));
+        if (lyrics !== undefined) frames.push(id3LanguageText('USLT', lyrics));
+        if (syncedLyrics) frames.push(id3SyncedLyrics(syncedLyrics));
+        if (comment !== undefined) frames.push(id3LanguageText('COMM', comment));
         chunks.push(chunk('id3 ', id3Tag(frames)));
     }
     fs.writeFileSync(file, chunk('RIFF', Buffer.concat(chunks)));
@@ -187,11 +222,12 @@ export class MediaFolder {
     }
 
     // One track, a few seconds long so that its end is quick to reach.
-    track(title: string, { seconds = 3, folder, name, ...tags }: TrackOptions = {}): string {
+    track(title: string, { seconds = 3, folder, name, lrc, ...tags }: TrackOptions = {}): string {
         const dir = folder ? path.join(this.dir, folder) : this.dir;
         fs.mkdirSync(dir, { recursive: true });
         const file = path.join(dir, name ?? `track-${String(this.files.length + 1).padStart(2, '0')}.wav`);
         writeWav(file, seconds, { title, ...tags });
+        if (lrc !== undefined) fs.writeFileSync(file.replace(/\.[^.]+$/, '.lrc'), lrc);
         this.files.push(file);
         return file;
     }

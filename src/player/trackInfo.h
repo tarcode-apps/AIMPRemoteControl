@@ -27,8 +27,7 @@ namespace player
 		std::string Genre;
 		std::string Year;
 		std::string TrackNumber;
-		std::string Lyricist;
-		std::string Lyrics;
+		std::string Lyricist; // the lyrics themselves are ReadLyrics', from the player's providers too
 		std::string Format;			 // the codec, or the file's extension when the player names none
 		std::int32_t SampleRate = 0; // Hz
 		std::int32_t Bitrate = 0;	 // kbps

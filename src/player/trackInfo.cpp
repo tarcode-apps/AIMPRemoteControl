@@ -11,25 +11,6 @@
 
 namespace
 {
-	// The item at the URI, for the caller to release; null when there is none.
-	IAIMPPlaylistItem *FindItemByUri(IAIMPPlaylist *playlist, const std::string &fileUri, std::int32_t &index)
-	{
-		const INT32 count = playlist->GetItemCount();
-		for (INT32 i = 0; i < count; ++i)
-		{
-			IAIMPPlaylistItem *item = nullptr;
-			if (Failed(playlist->GetItem(i, IID_IAIMPPlaylistItem, reinterpret_cast<void **>(&item))) || !item)
-				continue;
-			if (GetPropertyAsString(item, AIMP_PLAYLISTITEM_PROPID_FILENAME) == fileUri)
-			{
-				index = i;
-				return item;
-			}
-			item->Release();
-		}
-		return nullptr;
-	}
-
 	// The extension of the file the tags name, upper-case without the dot, as the
 	// player labels a format its tags do not name.
 	std::string FileExtension(IAIMPCore *core, IAIMPServiceFileURI *fileUriService, const std::string &fileName)
@@ -147,7 +128,6 @@ player::MutationResult player::ReadTrackInfo(IAIMPCore *core, const std::string 
 		info.Year = fields.Text(AIMP_FILEINFO_PROPID_DATE);
 		info.TrackNumber = fields.Text(AIMP_FILEINFO_PROPID_TRACKNUMBER);
 		info.Lyricist = fields.Text(AIMP_FILEINFO_PROPID_LYRICIST);
-		info.Lyrics = fields.Text(AIMP_FILEINFO_PROPID_LYRICS);
 		info.Format = fields.Text(AIMP_FILEINFO_PROPID_CODEC);
 		// A stream's address has no extension worth the name.
 		if (info.Format.empty() && !info.IsUrl)

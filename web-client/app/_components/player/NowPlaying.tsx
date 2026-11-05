@@ -3,6 +3,9 @@
 import { usePlayer, usePlayerCommand, usePlayerPosition, useSetPlayer } from '@/app/_api/player';
 import { usePlaylists, useSetItemMark } from '@/app/_api/playlists';
 import type { RepeatMode } from '@/app/_api/types';
+import { useElementSize } from '@/app/_hooks/useElementSize';
+import { usePersistedState } from '@/app/_hooks/usePersistedState';
+import { usePointerDrag } from '@/app/_hooks/usePointerDrag';
 import { useFavorites } from '@/app/_state/Favorites';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
@@ -19,6 +22,7 @@ import { Menu, menuSeparator, type MenuEntry } from '../menus';
 import { useItemRemoval } from '../playlists';
 import { Rating } from '../rating';
 import { useDrawer } from '../sidenav';
+import { Lyrics } from './Lyrics';
 import { Marquee } from './Marquee';
 import styles from './NowPlaying.module.scss';
 import { PlayButton } from './PlayButton';
@@ -31,6 +35,15 @@ const blank = '\u00A0';
 const volumeInterval = 100;
 const adjustingLabelTime = 2000;
 const repeatCycle: Record<RepeatMode, RepeatMode> = { off: 'playlist', playlist: 'track', track: 'off' };
+// The lyrics get the room under the cover when it holds the six lines of 22px a
+// small screen shows them on, in the title block's place, and the gap above them.
+const lyricsRoom = 6 * 22 + 16;
+const flingVelocity = 0.5;
+// The pages slide the rest of the way at this pace, in px per ms, and for no
+// less than the minimum: the further they have to go, the longer it takes.
+const slideSpeed = 0.6;
+const minSlideTime = 200;
+const parseLyricsShown = (stored: unknown) => (typeof stored === 'boolean' ? stored : undefined);
 
 function volumeIcon(volume: number, mute: boolean) {
     if (mute) return 'volume_off';
@@ -60,11 +73,69 @@ export function NowPlaying() {
     const isFavorite = !!playing && favorites.has(playing.fileUri);
     const favoriteItem = playingRef && favoriteActions.favoriteMenuItem(playingRef);
     const removal = useItemRemoval();
+
+    // The lyrics are shown under the cover where there is room for them, and in
+    // the title block's place, a swipe away, where there is not.
+    const [lyricsShown, setLyricsShown] = usePersistedState('player.lyricsShown', false, parseLyricsShown);
+    const coverArea = useRef<HTMLDivElement>(null);
+    const area = useElementSize(coverArea);
+    // The cover is a square of the area's shorter side.
+    const roomy = area.height - Math.min(area.width, area.height) >= lyricsRoom;
+    // The pages go round: a swipe either way brings the other page in from the
+    // side the finger moves to. Both pages stay mounted and only move; the drag
+    // and the side of the page out of view are written to the pager's style as
+    // the pointer moves, so that the page coming in is there from the first frame.
+    const pagerBox = useRef<HTMLDivElement>(null);
+    const pageWidth = useRef(0);
+    const dragOffset = (delta: number) => Math.min(Math.max(delta, -pageWidth.current), pageWidth.current);
+    const pager = usePointerDrag({
+        axis: 'x',
+        enabled: !roomy && !!playing,
+        onStart: () => {
+            if (!pagerBox.current) return false;
+            pageWidth.current = pagerBox.current.clientWidth;
+        },
+        onMove: delta => {
+            const style = pagerBox.current?.style;
+            style?.setProperty('--other-side', delta < 0 ? '1' : '-1');
+            style?.setProperty('--drag-x', `${dragOffset(delta)}px`);
+        },
+        onRelease: ({ delta, velocity, cancelled }) => {
+            const style = pagerBox.current?.style;
+            if (!style) return;
+            const width = pageWidth.current;
+            const offset = Math.abs(dragOffset(delta));
+            const flip = !cancelled && (Math.abs(velocity) > flingVelocity || Math.abs(delta) > width / 3);
+            // The pages slide on from where the finger left them.
+            const left = flip ? width - offset : offset;
+            style.setProperty('--slide-time', `${Math.max(minSlideTime, left / slideSpeed)}ms`);
+            style.removeProperty('--drag-x');
+            if (!flip) return;
+            // The page on its way out goes to the side opposite the one the new page came from.
+            style.setProperty('--other-side', delta < 0 ? '-1' : '1');
+            setLyricsShown(!lyricsShown);
+        },
+    });
+    const lyricsItem: MenuEntry = {
+        label: t(
+            roomy
+                ? lyricsShown
+                    ? 'player.hideLyrics'
+                    : 'player.showLyrics'
+                : lyricsShown
+                  ? 'player.trackTitle'
+                  : 'player.lyrics',
+        ),
+        icon: !roomy && lyricsShown ? 'title' : 'article',
+        onSelect: () => setLyricsShown(!lyricsShown),
+    };
+
     const trackMenu: MenuEntry[] =
         playingRef && favoriteItem
             ? [
                   trackActions.infoItem(playingRef),
                   favoriteItem,
+                  lyricsItem,
                   menuSeparator,
                   {
                       label: t('player.goToPlaylist'),
@@ -140,6 +211,18 @@ export function NowPlaying() {
         return t(number ? 'player.trackNumbers' : 'player.trackPosition', values);
     };
 
+    const titleLines = (
+        <>
+            <h2 className={styles.title}>
+                <Marquee>{adjusting ? volumeLabel : (track?.title ?? blank)}</Marquee>
+            </h2>
+            <p className={styles.details} data-testid="track-artist">
+                {track?.artist || blank}
+            </p>
+            <p className={styles.details}>{track?.album || blank}</p>
+        </>
+    );
+
     return (
         <div className={styles.nowPlaying}>
             <header className={styles.header}>
@@ -192,9 +275,17 @@ export function NowPlaying() {
                     <Icon>expand_more</Icon>
                 </IconButton>
             </header>
-            <div className={styles.cover}>
+            <div ref={coverArea} className={styles.cover}>
                 {/* Loaded while the sheet is closed too, so that it opens on the image rather than the placeholder. */}
                 <TrackCover hash={track?.coverHash} className={styles.coverBox} />
+                {roomy && lyricsShown && track && (
+                    <Lyrics
+                        className={styles.coverLyrics}
+                        playlistId={track.playlistId}
+                        fileUri={track.fileUri}
+                        enabled
+                    />
+                )}
             </div>
             <div className={styles.track}>
                 {favoriteItem ? (
@@ -209,13 +300,36 @@ export function NowPlaying() {
                     <span />
                 )}
                 <div className={styles.lines}>
-                    <h2 className={styles.title}>
-                        <Marquee>{adjusting ? volumeLabel : (track?.title ?? blank)}</Marquee>
-                    </h2>
-                    <p className={styles.details} data-testid="track-artist">
-                        {track?.artist || blank}
-                    </p>
-                    <p className={styles.details}>{track?.album || blank}</p>
+                    {roomy ? (
+                        titleLines
+                    ) : (
+                        <div
+                            ref={pagerBox}
+                            className={clsx(styles.pager, pager.dragging && styles.dragging)}
+                            role="group"
+                            aria-label={t('player.lyricsPages')}
+                            {...pager.handlers}
+                        >
+                            <div
+                                className={clsx(styles.page, lyricsShown ? styles.otherPage : styles.pageInView)}
+                                aria-hidden={lyricsShown}
+                            >
+                                {titleLines}
+                            </div>
+                            <div
+                                className={clsx(styles.page, lyricsShown ? styles.pageInView : styles.otherPage)}
+                                aria-hidden={!lyricsShown}
+                            >
+                                {track && (
+                                    <Lyrics
+                                        playlistId={track.playlistId}
+                                        fileUri={track.fileUri}
+                                        enabled={lyricsShown || pager.dragging}
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
                 {playing ? (
                     <Menu

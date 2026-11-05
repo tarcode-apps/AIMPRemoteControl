@@ -527,9 +527,10 @@ the track has no cover.
 
 #### `Lyrics`
 
-`{"track_id": int} → {"text": string}` — lyrics from the file tag, a sidecar
-file or AIMP's lyrics providers; lines are separated by CRLF. Error `35` when
-nothing is found, `21` for an unknown track.
+`{"track_id": int} → {"text": string}` — lyrics from the file tag, or else
+from a sidecar file or AIMP's lyrics providers, or else the comment tag, in the
+player's own order; synced lyrics come without their times. Lines are separated by CRLF. Error
+`35` when nothing is found, `21` for an unknown track.
 
 ### 7.5 Files
 

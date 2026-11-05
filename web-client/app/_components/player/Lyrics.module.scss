@@ -1,0 +1,80 @@
+// Six of these lines make the page a small screen gives the lyrics in the
+// title block's place; NowPlaying.module.scss counts on the same height.
+// Lyrics shorter than the box stand in its middle; longer ones scroll from
+// their first line, which centring the column itself would cut off.
+.lines {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow-y: auto;
+    scrollbar-width: none;
+    font-size: var(--font-size-subtitle);
+    line-height: 22px;
+    text-align: center;
+
+    // Lines wrap at spaces; a word too long for the box is cut with an ellipsis
+    // rather than broken. They keep their height however many there are.
+    p {
+        flex: none;
+        margin: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: color 0.4s;
+    }
+
+    > :first-child {
+        margin-top: auto;
+    }
+
+    > :last-child {
+        margin-bottom: auto;
+    }
+}
+
+// A hold on a line seeks; no selection or callout meanwhile. The side padding
+// leaves room for the arrow beside a line as wide as the box.
+.synced {
+    padding: 0 28px;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+// Drawn before the current line's first word, out of the text's flow, so that the
+// line does not move when it is reached: the icon font's arrow, the same on
+// every platform, centred on the line. Inline-level, so that its place is
+// where the text starts rather than the box's edge.
+.arrow {
+    position: absolute;
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    transform: translateX(calc(-100% - 4px));
+
+    &::before {
+        content: "arrow_right_alt";
+        font-family: var(--font-family-icon);
+        font-size: 24px;
+        font-weight: var(--font-weight-regular);
+        font-style: normal;
+        line-height: 1;
+        font-variation-settings: "FILL" 1;
+        font-feature-settings: "liga";
+        white-space: nowrap;
+    }
+}
+
+// The lines past the highlighted ones, sung later.
+.dimmed {
+    color: var(--color-text-secondary);
+}
+
+.note {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    margin: 0;
+    font-size: var(--font-size-subtitle);
+    color: var(--color-text-dim);
+}

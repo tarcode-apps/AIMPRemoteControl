@@ -2,8 +2,8 @@
 
 import { itemCoverUrl } from '@/app/_api/covers';
 import { ApiError, errorMessage } from '@/app/_api/helpers/errors';
-import { useTrackInfo } from '@/app/_api/playlists';
-import type { TrackInfo } from '@/app/_api/types';
+import { useLyrics, useTrackInfo } from '@/app/_api/playlists';
+import type { Lyrics, TrackInfo } from '@/app/_api/types';
 import { ToolbarButton, useHoldGesture } from '@/app/_components/buttons';
 import { ItemCover } from '@/app/_components/cover';
 import { Icon } from '@/app/_components/icons';
@@ -40,10 +40,11 @@ type FieldKey =
     | 'lyrics'
     | 'file';
 
-// One line of the information: what it is and its value, empty when not set.
+// One line of the information: what it is and its value, empty when not set
+// and undefined while it is still being looked for.
 type Line = {
     key: FieldKey;
-    value: string;
+    value: string | undefined;
     icon?: string;
     multiline?: boolean;
 };
@@ -87,22 +88,24 @@ function tagLines(info: TrackInfo): Line[] {
     ];
 }
 
-function lyricsLines(info: TrackInfo): Line[] {
+// The lyrics as the player finds them, in the tag or the files beside the
+// track, as plain lines; undefined while they are being looked for.
+function lyricsLines(info: TrackInfo, lyrics: string | undefined): Line[] {
     return [
         { key: 'lyricist', value: info.lyricist, icon: 'person_edit' },
-        { key: 'lyrics', value: info.lyrics, icon: 'article', multiline: true },
+        { key: 'lyrics', value: lyrics, icon: 'article', multiline: true },
     ];
 }
 
+const lyricsText = (lyrics: Lyrics) => lyrics.lines.map(line => line.text).join('\n');
+
 // Everything the screen shows as text, a line per field, the lyrics last.
-function informationText(info: TrackInfo, t: TFunction, locale: string): string {
+function informationText(info: TrackInfo, lyrics: string | undefined, t: TFunction, locale: string): string {
     const label = (line: Line) => t(`trackInfo.fields.${line.key}`);
-    const lines = [...summaryLines(info, t, locale), ...tagLines(info), ...lyricsLines(info)]
-        .filter(line => line.value && !line.multiline)
-        .map(line => `${label(line)}: ${line.value}`);
+    const all = [...summaryLines(info, t, locale), ...tagLines(info), ...lyricsLines(info, lyrics)];
+    const lines = all.filter(line => line.value && !line.multiline).map(line => `${label(line)}: ${line.value}`);
     lines.push(`${t('trackInfo.fields.file')}: ${info.fileUri}`);
-    for (const line of lyricsLines(info))
-        if (line.multiline && line.value) lines.push('', `${label(line)}:`, line.value);
+    for (const line of all) if (line.multiline && line.value) lines.push('', `${label(line)}:`, line.value);
     return lines.join('\n');
 }
 
@@ -156,7 +159,7 @@ function InfoLine({ line, labelled, onCopy, className }: InfoLineProps) {
         <div className={clsx(styles.line, className)} data-testid="track-info-line">
             {line.icon && <Icon className={styles.icon}>{line.icon}</Icon>}
             <dt className={clsx(styles.label, !labelled && styles.heldLabel)}>{label}</dt>
-            <dd className={clsx(styles.value, !line.value && styles.empty, line.multiline && styles.multiline)}>
+            <dd className={clsx(styles.value, line.value === '' && styles.empty, line.multiline && styles.multiline)}>
                 <button
                     type="button"
                     className={styles.valueButton}
@@ -164,7 +167,8 @@ function InfoLine({ line, labelled, onCopy, className }: InfoLineProps) {
                     style={labelled ? undefined : hold.style()}
                     {...(labelled ? { onClick: copy } : hold.handlers({ onClick: copy }))}
                 >
-                    {line.value || t('trackInfo.notSet')}
+                    {line.value ?? '\u00A0'}
+                    {line.value === '' && t('trackInfo.notSet')}
                 </button>
             </dd>
             {!labelled && hold.tooltip}
@@ -178,6 +182,12 @@ export function TrackInfoScreen() {
     const playlistId = params.get('playlist') ?? '';
     const fileUri = params.get('uri') ?? '';
     const { data: info, error } = useTrackInfo(playlistId, fileUri);
+    // Looked for with the information, as the player's own screen does, so that
+    // the copy has them too; the request fails like the information's when the
+    // track is gone, which the notice already says.
+    const { data: lyricsFound, error: lyricsError } = useLyrics(playlistId, fileUri, true);
+    const foundText = lyricsFound && lyricsText(lyricsFound);
+    const lyricsValue = foundText ?? (lyricsError ? errorMessage(lyricsError, t) : undefined);
     const docked = useMediaQuery(media.drawerDocked);
     const [page, setPage] = useState<Page>('tags');
     const toast = useToast();
@@ -191,7 +201,7 @@ export function TrackInfoScreen() {
         toast.show(t(done ? 'trackInfo.copied' : 'trackInfo.copyFailed'));
     };
     const copyAll = () => {
-        if (info) void copy(informationText(info, t, i18n.language));
+        if (info) void copy(informationText(info, foundText, t, i18n.language));
     };
 
     const toolbar = (
@@ -262,18 +272,20 @@ export function TrackInfoScreen() {
                         </dl>
                     </section>
                     <dl className={styles.fields}>
-                        {(page === 'tags' ? tagLines(info) : lyricsLines(info)).map(line => (
+                        {(page === 'tags' ? tagLines(info) : lyricsLines(info, lyricsValue)).map(line => (
                             <InfoLine key={line.key} line={line} labelled={docked} onCopy={copy} />
                         ))}
                     </dl>
-                    <dl className={clsx(styles.fields, styles.fileSection)}>
-                        <InfoLine
-                            line={{ key: 'file', value: info.fileUri }}
-                            labelled={docked}
-                            onCopy={copy}
-                            className={styles.file}
-                        />
-                    </dl>
+                    {page === 'tags' && (
+                        <dl className={clsx(styles.fields, styles.fileSection)}>
+                            <InfoLine
+                                line={{ key: 'file', value: info.fileUri }}
+                                labelled={docked}
+                                onCopy={copy}
+                                className={styles.file}
+                            />
+                        </dl>
+                    )}
                 </div>
             ) : (
                 error && !gone && <p className={styles.message}>{errorMessage(error, t)}</p>

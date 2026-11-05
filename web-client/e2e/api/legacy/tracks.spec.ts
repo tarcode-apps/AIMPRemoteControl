@@ -83,6 +83,24 @@ test.describe('frozen protocol: tracks', () => {
         expect((await api.rpc('Lyrics', { track_id: without })).error?.code).toBe(35);
     });
 
+    test('Lyrics gives the plain text, the tag first, lines joined with CRLF', async ({ api, playlists }) => {
+        const lrc = '[00:01.00] From the file\n[00:02.00] Second file line\n';
+        const playlist = await playlists.create({
+            tracks: [{ lrc }, { lyrics: 'From the tag\nSecond tag line', lrc }, {}],
+        });
+        const legacyId = await legacyPlaylistId(api, playlist.name);
+        const [fileOnly, tagAndFile, without] = await legacyTrackIds(api, legacyId);
+
+        expect(await api.rpcResult('Lyrics', { track_id: fileOnly })).toEqual({
+            text: 'From the file\r\nSecond file line',
+        });
+        expect(await api.rpcResult('Lyrics', { track_id: tagAndFile })).toEqual({
+            text: 'From the tag\r\nSecond tag line',
+        });
+        expect((await api.rpc('Lyrics', { track_id: without })).error?.code).toBe(35);
+        expect((await api.rpc('Lyrics', { track_id: 77 })).error?.code).toBe(21);
+    });
+
     test('downloadTrack sends the file with its raw UTF-8 name', async ({ api, media, playlists }) => {
         const name = 'Трек один.wav';
         const playlist = await playlists.create({ tracks: [{ name }] });

@@ -30,6 +30,10 @@ namespace player
 
 	TrackMarks ReadMarks(IAIMPFileInfo *info);
 
+	// The item whose URI is `fileUri`, byte for byte, for the caller to release;
+	// null when there is none.
+	IAIMPPlaylistItem *FindItemByUri(IAIMPPlaylist *playlist, const std::string &fileUri, std::int32_t &index);
+
 	struct PlaylistItem
 	{
 		std::int32_t Index = 0;

@@ -1,4 +1,5 @@
 import {
+    keepPreviousData,
     queryOptions,
     useMutation,
     useQueries,
@@ -17,6 +18,7 @@ import type {
     ItemMarkRequest,
     ItemSelection,
     ItemsEnabledRequest,
+    Lyrics,
     MoveRequest,
     Playlist,
     PlaylistGroups,
@@ -44,6 +46,7 @@ export const playlistKeys = {
     groups: (id: string) => ['playlists', id, 'groups'] as const,
     groupsView: (id: string, search: string) => ['playlists', id, 'groups', search] as const,
     trackInfo: (id: string, fileUri: string) => ['playlists', id, 'info', fileUri] as const,
+    lyrics: (id: string, fileUri: string) => ['playlists', id, 'lyrics', fileUri] as const,
 };
 
 function searchParam(search: string | undefined) {
@@ -404,6 +407,24 @@ export function useTrackInfo(playlistId: string, fileUri: string) {
                 { signal },
             ),
         enabled: playlistId !== '' && fileUri !== '',
+    });
+}
+
+// Asked only where the lyrics are to be shown: the player may go to the
+// internet for them. Read again with the playlist, as the information is.
+// With `keepPrevious` the last track's lyrics stay until the new ones come,
+// for a view that follows the playing track and should not go blank between.
+export function useLyrics(playlistId: string, fileUri: string, enabled: boolean, keepPrevious = false) {
+    return useQuery({
+        placeholderData: keepPrevious ? keepPreviousData : undefined,
+        queryKey: playlistKeys.lyrics(playlistId, fileUri),
+        queryFn: ({ signal }) =>
+            request<Lyrics>(
+                'GET',
+                `/playlists/${encodeURIComponent(playlistId)}/items/lyrics?uri=${encodeURIComponent(fileUri)}`,
+                { signal },
+            ),
+        enabled: enabled && playlistId !== '' && fileUri !== '',
     });
 }
 

@@ -73,7 +73,7 @@ e2e/
     events.ts            the Server-Sent Events stream, with `next(name, predicate)`
     digest.ts            Digest authentication headers
     http.ts              requests Playwright cannot make, such as headers without a body
-    media.ts             generated WAV tracks with tags (RIFF INFO, plus ID3 for the rest), CUE sheets, covers
+    media.ts             generated WAV tracks with tags (RIFF INFO, plus ID3 for the rest), CUE sheets, covers, .lrc lyrics
     paths.ts             where things are
   api/*.spec.ts          one file per resource of the web API, plus the server,
                          authentication and permissions

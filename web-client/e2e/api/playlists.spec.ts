@@ -1,4 +1,4 @@
-import type { ItemDetailsResponse, LocateResponse, PlaylistItemsPage, TrackInfo } from '@/app/_api/types';
+import type { ItemDetailsResponse, LocateResponse, Lyrics, PlaylistItemsPage, TrackInfo } from '@/app/_api/types';
 import path from 'node:path';
 import { expect, test } from '../fixtures';
 
@@ -240,7 +240,6 @@ test.describe('items', () => {
                     year: '1999',
                     trackNumber: '3',
                     lyricist: 'A Poet',
-                    lyrics: 'One\nTwo',
                     seconds: 2,
                 },
             ],
@@ -270,7 +269,6 @@ test.describe('items', () => {
             playCount: 0,
             lastPlayed: null,
         });
-        expect(described.body!.lyrics).toMatch(/^One\r?\nTwo$/);
         expect(described.body!.duration).toBeCloseTo(2, 1);
         expect(described.body!.size).toBeGreaterThan(0);
         expect(described.body!.revision).toBe((await api.playlist(playlist.id))!.revision);
@@ -278,6 +276,71 @@ test.describe('items', () => {
         expect((await api.get(route('C:\\no\\such\\file.wav'))).error?.code).toBe('itemNotFound');
         expect((await api.get(`/playlists/${encode(playlist.id)}/items/info`)).error?.code).toBe('invalidQuery');
         expect((await api.get(`/playlists/${encode(unknownId)}/items/info?uri=x`)).error?.code).toBe(
+            'playlistNotFound',
+        );
+    });
+
+    test('gives the lyrics: the tag first, synced or plain, then a file beside the track, then the comment, or none', async ({
+        api,
+        playlists,
+    }) => {
+        const lrc = '[00:01.50] First line\n[00:03.00] Second line\n';
+        const playlist = await playlists.create({
+            tracks: [
+                { title: 'Synced', lrc },
+                { title: 'Plain', lyrics: 'One\nTwo\n\n' },
+                { title: 'Silent' },
+                // What AIMP's tag editor writes for pasted LRC: plain and synced frames.
+                {
+                    title: 'Synced tag',
+                    lyrics: 'Tag one\nTag two',
+                    syncedLyrics: [
+                        [2, 'Tag one'],
+                        [4.25, 'Tag two'],
+                    ],
+                },
+                { title: 'Tag and file', lyrics: 'From the tag', lrc },
+                // The comment stands in for lyrics only where there are none at all.
+                { title: 'Comment only', comment: 'Just a comment' },
+                { title: 'Comment and file', comment: 'Just a comment', lrc },
+            ],
+        });
+        const route = (uri: string) => `/playlists/${encode(playlist.id)}/items/lyrics?uri=${encode(uri)}`;
+        const synced = await api.get<Lyrics>(route(playlist.files[0]));
+        expect(synced.status).toBe(200);
+        expect(synced.body).toEqual({
+            type: 'synced',
+            lines: [
+                { time: 1.5, text: 'First line' },
+                { time: 3, text: 'Second line' },
+            ],
+        });
+        expect((await api.get<Lyrics>(route(playlist.files[1]))).body).toEqual({
+            type: 'unsynced',
+            lines: [{ text: 'One' }, { text: 'Two' }],
+        });
+        expect((await api.get<Lyrics>(route(playlist.files[2]))).body).toEqual({ type: 'none', lines: [] });
+        expect((await api.get<Lyrics>(route(playlist.files[3]))).body).toEqual({
+            type: 'synced',
+            lines: [
+                { time: 2, text: 'Tag one' },
+                { time: 4.25, text: 'Tag two' },
+            ],
+        });
+        // The tag outweighs the file beside the track, as in the player.
+        expect((await api.get<Lyrics>(route(playlist.files[4]))).body).toEqual({
+            type: 'unsynced',
+            lines: [{ text: 'From the tag' }],
+        });
+        expect((await api.get<Lyrics>(route(playlist.files[5]))).body).toEqual({
+            type: 'unsynced',
+            lines: [{ text: 'Just a comment' }],
+        });
+        expect((await api.get<Lyrics>(route(playlist.files[6]))).body).toMatchObject({ type: 'synced' });
+
+        expect((await api.get(route('C:\\no\\such\\file.wav'))).error?.code).toBe('itemNotFound');
+        expect((await api.get(`/playlists/${encode(playlist.id)}/items/lyrics`)).error?.code).toBe('invalidQuery');
+        expect((await api.get(`/playlists/${encode(unknownId)}/items/lyrics?uri=x`)).error?.code).toBe(
             'playlistNotFound',
         );
     });

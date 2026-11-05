@@ -98,21 +98,29 @@
     }
 }
 
-// Top-aligned; the free space goes below it, before the track.
+// Top-aligned; the free space goes below it, before the track, or to the lyrics.
 .cover {
     flex: 1;
     min-height: 0;
     display: flex;
-    align-items: flex-start;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
     padding: 24px 0;
     container-type: size;
+}
+
+.coverLyrics {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    margin-top: 16px;
 }
 
 .coverBox {
     // A share of the square, which the window may make small.
     --icon-size: min(96px, 40cqw, 40cqh);
 
+    flex: none;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -150,8 +158,62 @@
     margin-right: calc((var(--icon-size) - 40px) / 2);
 }
 
+// Six lyrics lines tall, see Lyrics.module.scss, whether the lyrics are on their
+// page or under the cover, so that nothing moves when they come and go; the
+// title lines sit in the middle of that height.
+$lyrics-page-height: 6 * 22px;
+
 .lines {
     min-width: 0;
+    min-height: $lyrics-page-height;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+// The title lines and the lyrics, one page in view and the other beside it, on
+// the side `--other-side` names (1 right, -1 left). NowPlaying.tsx writes that
+// side, the drag and the slide's time to the pager's style.
+.pager {
+    position: relative;
+    height: $lyrics-page-height;
+    overflow: hidden;
+    touch-action: pan-y;
+}
+
+.page {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    transform: translateX(calc(var(--page-place) * 100% + var(--drag-x, 0px)));
+    transition: transform var(--slide-time, 0.3s) cubic-bezier(0.4, 0, 0.2, 1);
+
+    .dragging & {
+        transition: none;
+    }
+}
+
+.pageInView {
+    --page-place: 0;
+}
+
+// Hidden once it has slid out; shown while a finger holds the pages. It moves
+// from side to side only during a drag, where nothing slides.
+.otherPage {
+    --page-place: var(--other-side, 1);
+
+    visibility: hidden;
+    transition:
+        transform var(--slide-time, 0.3s) cubic-bezier(0.4, 0, 0.2, 1),
+        visibility 0s var(--slide-time, 0.3s);
+
+    .dragging & {
+        visibility: visible;
+        transition: none;
+    }
 }
 
 .unfilled {

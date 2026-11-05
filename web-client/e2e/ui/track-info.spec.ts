@@ -31,7 +31,7 @@ test.describe('track information', () => {
                     lyrics,
                     seconds,
                 },
-                { title: 'Bravo', seconds },
+                { title: 'Bravo', seconds, lrc: '[00:01.00] Sung line\n[00:03.00] Second sung line\n' },
             ],
         });
         screen = new PlaylistScreen(app, playlist.name);
@@ -67,7 +67,9 @@ test.describe('track information', () => {
         await expect(info.value('lyricist')).toHaveText('The Lyricist');
         await expect(info.value('lyrics')).toHaveText(lyrics);
         await expect(info.value('title')).toBeHidden();
+        await expect(info.value('file')).toBeHidden();
         await info.showTags();
+        await expect(info.value('file')).toHaveText(playlist.files[0]);
 
         await info.copy();
         const copied = await page.evaluate(() => navigator.clipboard.readText());
@@ -143,12 +145,21 @@ test.describe('track information', () => {
         await expect(app.heading).toHaveText(t('trackInfo.title'));
     });
 
-    test('a track without tags says so, and one that leaves its playlist too', async ({ api, app, page }) => {
+    test('a track without tags says so but has the lyrics beside it, and one that leaves its playlist says so too', async ({
+        api,
+        app,
+        page,
+    }) => {
         await screen.open();
         await screen.rowAction('Bravo', t('trackInfo.open'));
         await info.expectOpen(path.basename(playlist.files[1]));
         await expect(info.value('albumArtist')).toHaveText(t('trackInfo.notSet'));
         await expect(info.value('year')).toHaveText(t('trackInfo.notSet'));
+        // The lyrics are the ones the player finds, here in an .lrc file, without the times.
+        await info.showLyrics();
+        await expect(info.value('lyricist')).toHaveText(t('trackInfo.notSet'));
+        await expect(info.value('lyrics')).toHaveText('Sung line\nSecond sung line');
+        await info.showTags();
 
         await api.post(`/playlists/${encodeURIComponent(playlist.id)}/items/remove`, { indexes: [1] });
         await expect(app.notice).toHaveText(t('trackInfo.gone'));

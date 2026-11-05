@@ -125,7 +125,6 @@ export type TrackInfo = {
     year: string;
     trackNumber: string;
     lyricist: string;
-    lyrics: string;
     // The codec, or the audio file's extension when the tags name none.
     format: string;
     sampleRate: number; // Hz
@@ -137,6 +136,17 @@ export type TrackInfo = {
     playCount: number;
     // ISO 8601 in UTC; null for a track that has not played yet.
     lastPlayed: string | null;
+};
+
+export type LyricsLine = {
+    text: string;
+    // The second from the track's start at which the line is sung; synced lyrics only.
+    time?: number;
+};
+
+export type Lyrics = {
+    type: 'none' | 'unsynced' | 'synced';
+    lines: LyricsLine[];
 };
 
 export type PlaylistItemsPage = {

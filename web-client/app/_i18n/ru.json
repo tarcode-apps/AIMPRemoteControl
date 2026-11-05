@@ -58,7 +58,13 @@
     "trackNumbers": "#{{number}} - {{position}}/{{count}}",
     "trackPosition": "{{position}}/{{count}}",
     "trackMenu": "Меню трека",
-    "goToPlaylist": "Перейти к плейлисту"
+    "goToPlaylist": "Перейти к плейлисту",
+    "lyrics": "Текст песни",
+    "trackTitle": "Название трека",
+    "showLyrics": "Показать текст песни",
+    "hideLyrics": "Скрыть текст песни",
+    "noLyrics": "(нет текста)",
+    "lyricsPages": "Название трека и текст песни"
   },
   "playlists": {
     "summary": "{{count}} / {{duration}} / {{size}}",

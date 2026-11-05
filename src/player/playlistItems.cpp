@@ -372,6 +372,24 @@ player::TrackMarks player::ReadMarks(IAIMPFileInfo *info)
 	return marks;
 }
 
+IAIMPPlaylistItem *player::FindItemByUri(IAIMPPlaylist *playlist, const std::string &fileUri, std::int32_t &index)
+{
+	const INT32 count = playlist->GetItemCount();
+	for (INT32 i = 0; i < count; ++i)
+	{
+		IAIMPPlaylistItem *item = nullptr;
+		if (Failed(playlist->GetItem(i, IID_IAIMPPlaylistItem, reinterpret_cast<void **>(&item))) || !item)
+			continue;
+		if (GetPropertyAsString(item, AIMP_PLAYLISTITEM_PROPID_FILENAME) == fileUri)
+		{
+			index = i;
+			return item;
+		}
+		item->Release();
+	}
+	return nullptr;
+}
+
 player::MutationResult player::SetItemMark(IAIMPCore *core, const std::string &playlistId, std::int32_t index, std::int32_t mark)
 {
 	IAIMPPlaylistItem *item = nullptr;

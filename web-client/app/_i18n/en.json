@@ -58,7 +58,13 @@
     "trackNumbers": "#{{number}} - {{position}}/{{count}}",
     "trackPosition": "{{position}}/{{count}}",
     "trackMenu": "Track menu",
-    "goToPlaylist": "Go to playlist"
+    "goToPlaylist": "Go to playlist",
+    "lyrics": "Lyrics",
+    "trackTitle": "Track title",
+    "showLyrics": "Show the lyrics",
+    "hideLyrics": "Hide the lyrics",
+    "noLyrics": "(no lyrics)",
+    "lyricsPages": "Track title and lyrics"
   },
   "playlists": {
     "summary": "{{count}} / {{duration}} / {{size}}",

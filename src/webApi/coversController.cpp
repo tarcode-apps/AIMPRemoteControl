@@ -8,6 +8,7 @@
 
 #include "albumArt.h"
 #include "apiFileManager.h"
+#include "helpers/contentDisposition.h"
 #include "helpers/coverIndex.h"
 #include "helpers/requestHelpers.h"
 #include "mainThreadRunner.h"
@@ -29,14 +30,24 @@ namespace
 	{
 		int Size = 0; // 0 for the player's copy
 		bool Original = false;
-
-		std::string Query() const
-		{
-			if (Original)
-				return "?size=original";
-			return Size ? "?size=" + std::to_string(Size) : "";
-		}
 	};
+
+	// The query of the image's URL: its variant and the name it is saved under.
+	std::string ImageQuery(const Variant &variant, const std::string &name)
+	{
+		std::string query = variant.Original ? "size=original" : variant.Size ? "size=" + std::to_string(variant.Size) : "";
+		if (!name.empty())
+			query += (query.empty() ? "name=" : "&name=") + webapi::PercentEncode(name);
+		return query.empty() ? query : "?" + query;
+	}
+
+	std::string FileExtension(const std::string &contentType)
+	{
+		if (contentType == "image/jpeg")
+			return "jpg";
+		const std::size_t slash = contentType.find('/');
+		return slash == std::string::npos ? contentType : contentType.substr(slash + 1);
+	}
 
 	Variant CoverVariant(const ApiRequest &request)
 	{
@@ -85,7 +96,7 @@ HttpContent webapi::CoversController::ItemCover(const ApiRequest &request)
 
 	HttpContent redirect;
 	redirect.Status = 302;
-	redirect.Headers["Location"] = "/api/v1/covers/" + hash + variant.Query();
+	redirect.Headers["Location"] = "/api/v1/covers/" + hash + ImageQuery(variant, QueryString(request, "name"));
 	redirect.Headers["Cache-Control"] = NoStore;
 	return redirect;
 }
@@ -157,6 +168,9 @@ HttpContent webapi::CoversController::CoverByHash(const ApiRequest &request)
 		throw NotFound();
 
 	HttpContent image;
+	const std::string disposition = InlineContentDisposition(QueryString(request, "name"), FileExtension(cover->ContentType));
+	if (!disposition.empty())
+		image.Headers["Content-Disposition"] = disposition;
 	image.ContentType = cover->ContentType;
 	image.Body = std::move(cover->Body);
 	image.Headers["Cache-Control"] = ImageCaching;

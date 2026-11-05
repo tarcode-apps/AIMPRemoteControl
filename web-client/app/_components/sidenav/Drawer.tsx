@@ -2,7 +2,7 @@
 
 import { useBackGesture } from '@/app/_hooks/useBackGesture';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
-import { secondScreenSegment } from '@/app/_state/Navigation';
+import { detailScreenSegment, isSecondarySegment } from '@/app/_state/Navigation';
 import { media } from '@/app/_styles/media';
 import clsx from 'clsx';
 import { usePathname, useSelectedLayoutSegment } from 'next/navigation';
@@ -12,7 +12,10 @@ import { useDrawerGestures } from './useDrawerGestures';
 
 export type DrawerContextValue = {
     opened: boolean;
+    // A screen with a back arrow rather than the drawer's menu button.
     secondary: boolean;
+    // A detail screen, left by its arrow even beside the docked drawer.
+    detail: boolean;
     open(): void;
     close(): void;
     // Closes the drawer, then does `after`: a navigation from the drawer must not
@@ -37,7 +40,10 @@ export function useDrawer(): DrawerContextValue {
 
 export function DrawerContainer({ children }: { children: ReactNode }) {
     const pathname = usePathname();
-    const secondary = useSelectedLayoutSegment() === secondScreenSegment;
+    // Read here, under the root layout: a page sees no segment of its own.
+    const segment = useSelectedLayoutSegment();
+    const secondary = isSecondarySegment(segment);
+    const detail = segment === detailScreenSegment;
     const modal = useMediaQuery(media.drawerModal);
     const containerRef = useRef<HTMLDivElement>(null);
     const drawerRef = useRef<HTMLElement>(null);
@@ -75,6 +81,7 @@ export function DrawerContainer({ children }: { children: ReactNode }) {
     const drawer: DrawerContextValue = {
         opened,
         secondary,
+        detail,
         open: () => {
             if (!secondary) setOpened(true);
         },

@@ -27,6 +27,8 @@ export class App {
     // The strip under the app bar for a state the whole list is in.
     readonly notice: Locator;
     readonly backButton: Locator;
+    // The short message at the bottom of the screen, which goes away by itself.
+    readonly toast: Locator;
 
     constructor(
         readonly page: Page,
@@ -41,6 +43,7 @@ export class App {
         this.dialog = page.getByRole('dialog');
         this.notice = this.main.getByRole('status');
         this.backButton = this.main.getByRole('button', { name: t('nav.back'), exact: true });
+        this.toast = page.getByTestId('toast');
     }
 
     get width(): number {

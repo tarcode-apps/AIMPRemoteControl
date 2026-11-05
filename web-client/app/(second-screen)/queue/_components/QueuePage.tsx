@@ -19,6 +19,7 @@ import styles from '@/app/_components/lists/ListPage.module.scss';
 import { useRowMenu } from '@/app/_components/menus';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
+import { useTrackActions } from '@/app/_state/useTrackActions';
 import { media } from '@/app/_styles/media';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import clsx from 'clsx';
@@ -68,7 +69,9 @@ export function QueuePage() {
     const move = useMoveQueueItems();
     const remove = useRemoveFromQueue();
     const favoriteActions = useFavoriteActions();
+    const trackActions = useTrackActions();
     const rowMenu = useRowMenu((item: QueueItem) => [
+        trackActions.infoItem(item),
         favoriteActions.favoriteMenuItem({ ...item, revision: revisions.get(item.playlistId) }),
         {
             label: t('queue.remove'),

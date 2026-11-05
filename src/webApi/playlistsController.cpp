@@ -14,10 +14,12 @@
 #include "apiPlaylists.h"
 #include "helpers/itemJson.h"
 #include "helpers/requestHelpers.h"
+#include "delphiDateTime.h"
 #include "mainThreadRunner.h"
 #include "player/locate.h"
 #include "player/playlistItems.h"
 #include "player/playlists.h"
+#include "player/trackInfo.h"
 #include "player/uploads.h"
 #include "settings.h"
 #include "stateUpdateEvents.h"
@@ -30,6 +32,7 @@ namespace
 	using webapi::MoveBody;
 	using webapi::OptionalField;
 	using webapi::QueryInt;
+	using webapi::QueryString;
 	using webapi::RevisionOf;
 	using webapi::SearchText;
 	using webapi::SelectionBody;
@@ -85,6 +88,39 @@ namespace
 			{"size", group.Size},
 			{"expanded", group.Expanded},
 			{"firstPosition", group.FirstPosition},
+		};
+	}
+
+	nlohmann::json ToJson(const player::TrackInfo &info, const std::string &playlistId, std::uint64_t revision)
+	{
+		const std::string lastPlayed = DelphiDateTimeToIso8601(info.LastPlayed);
+		return {
+			{"playlistId", playlistId},
+			{"revision", revision},
+			{"index", info.Index},
+			{"fileUri", info.FileUri},
+			{"fileName", info.FileName},
+			{"isUrl", info.IsUrl},
+			{"inContainer", info.InContainer},
+			{"cover", player::CoverKey(info.Cover)},
+			{"title", info.Title},
+			{"artist", info.Artist},
+			{"album", info.Album},
+			{"albumArtist", info.AlbumArtist},
+			{"genre", info.Genre},
+			{"year", info.Year},
+			{"trackNumber", info.TrackNumber},
+			{"lyricist", info.Lyricist},
+			{"lyrics", info.Lyrics},
+			{"format", info.Format},
+			{"sampleRate", info.SampleRate},
+			{"bitrate", info.Bitrate},
+			{"bitDepth", info.BitDepth},
+			{"channels", info.Channels},
+			{"duration", info.Duration},
+			{"size", info.Size},
+			{"playCount", info.PlayCount},
+			{"lastPlayed", lastPlayed.empty() ? nlohmann::json() : nlohmann::json(lastPlayed)},
 		};
 	}
 
@@ -307,6 +343,20 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 		for (const player::ItemDetails &item : details)
 			items.push_back(DetailsJson(item));
 		return {{"items", std::move(items)}}; });
+
+	// By the URI rather than the index: the information belongs to the file, and a
+	// screen that shows it outlives the revision it was opened at.
+	endpoints.MapApi(HttpMethod::Get, R"(/api/v1/playlists/([^/]+)/items/info)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
+			   {
+		const std::string playlistId = request.PathMatches.at(0);
+		const std::string fileUri = QueryString(request, "uri");
+		if (fileUri.empty())
+			throw ApiError(400, "invalidQuery");
+		const std::uint64_t revision = events.PlaylistRevision(playlistId);
+		player::TrackInfo info;
+		ThrowUnlessOk(RunOnMainThread(core, [&]
+									  { return player::ReadTrackInfo(core, playlistId, fileUri, info); }));
+		return ToJson(info, playlistId, revision); });
 
 	endpoints.MapApi(HttpMethod::Post, "/api/v1/playlists/locate", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {

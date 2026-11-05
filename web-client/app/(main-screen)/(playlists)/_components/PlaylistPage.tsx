@@ -296,6 +296,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
     const rowMenu = useRowMenu((item: PlaylistItem) => {
         const track = { ...item, playlistId: playlist.id, revision: playlist.revision };
         return [
+            trackActions.infoItem({ playlistId: playlist.id, fileUri: item.fileUri }),
             ...trackActions.enqueueItems(track),
             favoriteActions.favoriteMenuItem(track),
             ...(switches && !docked ? [switchMenuItem(item)] : []),

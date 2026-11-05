@@ -21,6 +21,24 @@ std::string GetPropertyAsString(IAIMPPropertyList *props, INT32 propertyId)
 	return result;
 }
 
+IAIMPFileInfo *ReadFileInfo(IAIMPCore *core, const std::string &fileUri)
+{
+	IAIMPServiceFileInfo *service = AcquireService<IAIMPServiceFileInfo>(core, IID_IAIMPServiceFileInfo);
+	IAIMPString *uri = StringToIAIMPString(core, fileUri);
+	IAIMPFileInfo *info = nullptr;
+	if (service && uri && Succeeded(core->CreateObject(IID_IAIMPFileInfo, reinterpret_cast<void **>(&info))) && info &&
+		Failed(service->GetFileInfoFromFileURI(uri, 0, info)))
+	{
+		info->Release();
+		info = nullptr;
+	}
+	if (uri)
+		uri->Release();
+	if (service)
+		service->Release();
+	return info;
+}
+
 std::string IAIMPStringToString(IAIMPString *s)
 {
 	if (!s)

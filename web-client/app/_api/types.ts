@@ -104,6 +104,41 @@ export type LocateResponse = {
     found: LocatedItem[];
 };
 
+// What the player's own track information window shows: the tags, read from
+// the file itself, the stream's parameters and the player's statistics. Every
+// tag is a string, empty when missing; a parameter the player does not know is 0.
+export type TrackInfo = {
+    playlistId: string;
+    // Where the item is right now, for its cover.
+    revision: number;
+    index: number;
+    fileUri: string;
+    fileName: string;
+    isUrl: boolean;
+    inContainer: boolean;
+    cover: string;
+    title: string;
+    artist: string;
+    album: string;
+    albumArtist: string;
+    genre: string;
+    year: string;
+    trackNumber: string;
+    lyricist: string;
+    lyrics: string;
+    // The codec, or the audio file's extension when the tags name none.
+    format: string;
+    sampleRate: number; // Hz
+    bitrate: number; // kbps
+    bitDepth: number;
+    channels: number;
+    duration: number; // seconds
+    size: number; // bytes
+    playCount: number;
+    // ISO 8601 in UTC; null for a track that has not played yet.
+    lastPlayed: string | null;
+};
+
 export type PlaylistItemsPage = {
     total: number;
     revision: number;

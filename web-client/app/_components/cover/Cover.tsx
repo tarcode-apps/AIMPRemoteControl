@@ -2,7 +2,7 @@
 
 import { coverPixels, coverStep, type CoverSize } from '@/app/_api/covers';
 import clsx from 'clsx';
-import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Icon } from '../icons';
 import styles from './Cover.module.scss';
 import { useCoverLoad } from './useCoverLoad';
@@ -18,13 +18,15 @@ export type CoverProps = {
     size?: number;
     className?: string;
     style?: CSSProperties;
+    // Told when a load ends: whether the server had an image.
+    onLoaded?(hasImage: boolean): void;
 };
 
 type Shown = { url: string; objectUrl?: string };
 
 // The image on screen stays until the next one has loaded, which then fades in
 // over it, so a track switch does not blink through the placeholder.
-export function Cover({ id, urlFor, size, className, style }: CoverProps) {
+export function Cover({ id, urlFor, size, className, style, onLoaded }: CoverProps) {
     const box = useRef<HTMLDivElement>(null);
     const [measured, setMeasured] = useState(0);
     useLayoutEffect(() => {
@@ -45,6 +47,11 @@ export function Cover({ id, urlFor, size, className, style }: CoverProps) {
     const url = id && urlFor && chosen && chosen.id === id ? urlFor(chosen.step) : undefined;
 
     const load = useCoverLoad(url, url && `${id}/${chosen?.step}`);
+    const hasImage = load && load.objectUrl !== undefined;
+    const tellLoaded = useEffectEvent((loaded: boolean) => onLoaded?.(loaded));
+    useEffect(() => {
+        if (hasImage !== undefined) tellLoaded(hasImage);
+    }, [hasImage]);
     const [current, setCurrent] = useState<Shown>();
     const [previous, setPrevious] = useState<string>();
     if (load && url && (current?.url !== url || current.objectUrl !== load.objectUrl)) {

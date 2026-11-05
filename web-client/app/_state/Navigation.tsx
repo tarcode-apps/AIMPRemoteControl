@@ -16,11 +16,20 @@ import {
 
 // The route group of the screens that sit over a main one and show a back arrow.
 export const secondScreenSegment = '(second-screen)';
+// The route group of the screens about one thing, such as a track, which open
+// over any screen, the player included, and go back to it.
+export const detailScreenSegment = '(detail-screen)';
+
+// A screen with a back arrow rather than the drawer's menu button.
+export function isSecondarySegment(segment: string | null): boolean {
+    return segment === secondScreenSegment || segment === detailScreenSegment;
+}
 
 const depthKey = 'screenDepth';
 const playerDepth = 0;
 const mainDepth = 1;
 const secondDepth = 2;
+const detailDepth = 3;
 
 // For a second screen that keeps entries of its own in the history, to tell
 // an entry of its own from the screen it is left for.
@@ -97,6 +106,8 @@ export type NavigationContextValue = {
     openScreen(href: string): void;
     // A screen with a back arrow, over the main one, which back returns to.
     openSecondScreen(href: string): void;
+    // A screen over whatever is on screen, the player included, which back returns to.
+    openDetailScreen(href: string): void;
     goBack(): void;
 };
 
@@ -110,14 +121,17 @@ export function useNavigation(): NavigationContextValue {
 
 // As in the native player for Android: the app opens on the player, back goes down
 // a second screen to its main one, from a main screen to the player, and from the
-// player out of the app. The history holds no more than those three entries, and
-// the marks the layers such as a search or the drawer add on top. The player's
-// entry shows the main screen last left, under the sheet or beside a docked player.
+// player out of the app. The history holds no more than those three entries, a
+// detail screen over any of them, and the marks the layers such as a search or the
+// drawer add on top. The player's entry shows the main screen last left, under the
+// sheet or beside a docked player.
 export function NavigationProvider({ children }: { children: ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
     const docked = useMediaQuery(media.playerDocked);
-    const secondScreen = useSelectedLayoutSegment() === secondScreenSegment;
+    const segment = useSelectedLayoutSegment();
+    const secondScreen = segment === secondScreenSegment;
+    const detailScreen = segment === detailScreenSegment;
     // The depth of the entry a navigation of the app is about to make: the router
     // writes the entry with a state of its own, which gets the depth only after the
     // render that shows it.
@@ -130,8 +144,9 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     const [returning, setReturning] = useState(false);
     // Going back entry by entry, layer marks included, down to `depth`.
     const walk = useRef<{ depth: number; then(): void } | null>(null);
-    // A page opened on a second screen gets the player and a main screen put under it.
-    const reopen = useRef<string | null>(null);
+    // A page opened on a second or a detail screen gets the player and a main
+    // screen put under it.
+    const reopen = useRef<{ href: string; depth: number } | null>(null);
     const started = useRef(false);
     const sheet = useRef(!docked);
     useEffect(() => {
@@ -150,8 +165,11 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         if (!started.current) {
             started.current = true;
-            if (storedDepth() === undefined && secondScreen) {
-                reopen.current = window.location.pathname + window.location.search;
+            if (storedDepth() === undefined && (secondScreen || detailScreen)) {
+                reopen.current = {
+                    href: window.location.pathname + window.location.search,
+                    depth: detailScreen ? detailDepth : secondDepth,
+                };
                 navigateTo(router, pending, '/', playerDepth, true);
                 return;
             }
@@ -162,12 +180,12 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
         } else if (storedDepth() === undefined) writeDepth(playerDepth);
         remember();
         const target = reopen.current;
-        if (target && !secondScreen) {
+        if (target && !secondScreen && !detailScreen) {
             reopen.current = null;
             if (!docked) pushMain();
-            navigateTo(router, pending, target, secondDepth, false);
+            navigateTo(router, pending, target.href, target.depth, false);
         }
-    }, [pathname, router, secondScreen, docked]);
+    }, [pathname, router, secondScreen, detailScreen, docked]);
 
     useEffect(() => {
         // Before the router's own listener, which would show the entry's screen.
@@ -205,26 +223,44 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
         walkTo(playerDepth, () => setReturning(false));
     };
 
+    const entryDepth = () => storedDepth() ?? playerDepth;
+    // From the player's entry: the main screen is shown under the sheet, or
+    // pushed in place of it when it is another.
+    const openMainFromPlayer = (href: string) => {
+        if (new URL(href, window.location.href).pathname === window.location.pathname) {
+            if (!docked) pushMain();
+        } else navigate(href, mainDepth, false);
+    };
+    // A walk back from a detail screen lands wherever it was opened from.
+    const openMainAfterWalk = (href: string) => {
+        if (entryDepth() === playerDepth) openMainFromPlayer(href);
+        else navigate(href, mainDepth, true);
+    };
+    const openSecondAfterWalk = (href: string) => {
+        const at = entryDepth();
+        if (at === playerDepth && !docked) pushMain();
+        navigate(href, secondDepth, at === secondDepth);
+    };
+
     const value: NavigationContextValue = {
         depth,
         returning,
         walking: () => walk.current !== null,
-        entryDepth: () => storedDepth() ?? playerDepth,
+        entryDepth,
         goToPlayer,
         leavePlayer,
         openScreen: href => {
-            if (depth === playerDepth) {
-                if (href === pathname) leavePlayer();
-                else navigate(href, mainDepth, false);
-            } else if (depth === mainDepth) navigate(href, mainDepth, true);
-            else walkTo(mainDepth, () => navigate(href, mainDepth, true));
+            if (depth === playerDepth) openMainFromPlayer(href);
+            else if (depth === mainDepth) navigate(href, mainDepth, true);
+            else walkTo(mainDepth, () => openMainAfterWalk(href));
         },
         openSecondScreen: href => {
             if (depth === playerDepth) leavePlayer();
             if (depth < secondDepth) navigate(href, secondDepth, false);
             else if (depth === secondDepth) navigate(href, secondDepth, true);
-            else walkTo(secondDepth, () => navigate(href, secondDepth, true));
+            else walkTo(secondDepth, () => openSecondAfterWalk(href));
         },
+        openDetailScreen: href => navigate(href, detailDepth, depth === detailDepth),
         // A screen down, past the marks of any layers open on this one.
         goBack: () => {
             if (depth === mainDepth) goToPlayer();

@@ -162,6 +162,7 @@ export function FavoritesPage() {
         // Sorting keeps a history entry, which has to go before the playlist shows.
         const showItem = trackActions.showItem(located);
         return [
+            trackActions.infoItem(located),
             ...trackActions.enqueueItems(located),
             { ...showItem, onSelect: () => mode.leaveThen(showItem.onSelect) },
             remove,

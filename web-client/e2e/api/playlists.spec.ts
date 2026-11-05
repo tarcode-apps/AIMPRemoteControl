@@ -1,4 +1,5 @@
-import type { ItemDetailsResponse, LocateResponse, PlaylistItemsPage } from '@/app/_api/types';
+import type { ItemDetailsResponse, LocateResponse, PlaylistItemsPage, TrackInfo } from '@/app/_api/types';
+import path from 'node:path';
 import { expect, test } from '../fixtures';
 
 const encode = encodeURIComponent;
@@ -227,6 +228,58 @@ test.describe('items', () => {
         expect((await api.post(route, { indexes: [5] })).error?.code).toBe('itemNotFound');
         const revision = (await api.playlist(playlist.id))!.revision;
         expect((await api.post(route, { indexes: [0], revision: revision + 100 })).error?.code).toBe('playlistChanged');
+    });
+
+    test('describes a track by its file: tags, stream, statistics', async ({ api, playlists }) => {
+        const playlist = await playlists.create({
+            tracks: [
+                {
+                    title: 'Described',
+                    artist: 'An Artist',
+                    albumArtist: 'The Band',
+                    year: '1999',
+                    trackNumber: '3',
+                    lyricist: 'A Poet',
+                    lyrics: 'One\nTwo',
+                    seconds: 2,
+                },
+            ],
+        });
+        const route = (uri: string) => `/playlists/${encode(playlist.id)}/items/info?uri=${encode(uri)}`;
+        const described = await api.get<TrackInfo>(route(playlist.files[0]));
+        expect(described.status).toBe(200);
+        expect(described.body).toMatchObject({
+            playlistId: playlist.id,
+            index: 0,
+            fileUri: playlist.files[0],
+            fileName: path.basename(playlist.files[0]),
+            isUrl: false,
+            inContainer: false,
+            title: 'Described',
+            artist: 'An Artist',
+            album: 'Test Album',
+            albumArtist: 'The Band',
+            genre: 'Test Genre',
+            year: '1999',
+            trackNumber: '3',
+            lyricist: 'A Poet',
+            format: 'WAVE (PCM)',
+            sampleRate: 22050,
+            bitDepth: 16,
+            channels: 1,
+            playCount: 0,
+            lastPlayed: null,
+        });
+        expect(described.body!.lyrics).toMatch(/^One\r?\nTwo$/);
+        expect(described.body!.duration).toBeCloseTo(2, 1);
+        expect(described.body!.size).toBeGreaterThan(0);
+        expect(described.body!.revision).toBe((await api.playlist(playlist.id))!.revision);
+
+        expect((await api.get(route('C:\\no\\such\\file.wav'))).error?.code).toBe('itemNotFound');
+        expect((await api.get(`/playlists/${encode(playlist.id)}/items/info`)).error?.code).toBe('invalidQuery');
+        expect((await api.get(`/playlists/${encode(unknownId)}/items/info?uri=x`)).error?.code).toBe(
+            'playlistNotFound',
+        );
     });
 
     test('locates remembered files in their own playlists only', async ({ api, playlists }) => {

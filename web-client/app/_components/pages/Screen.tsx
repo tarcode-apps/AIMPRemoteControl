@@ -44,7 +44,7 @@ export function Screen({
     player,
     children,
 }: ScreenProps) {
-    const { secondary, open } = useDrawer();
+    const { secondary, detail, open } = useDrawer();
     const { goBack } = useNavigation();
     const { t } = useTranslation();
     const hasToolbar = toolbar != null;
@@ -67,7 +67,13 @@ export function Screen({
         <div className={clsx(styles.screen, withPlayer && styles.withPlayer)}>
             <header className={clsx(styles.appBar, tabs && styles.withTabs, search && styles.withSearch)}>
                 {secondary || onBack ? (
-                    <IconButton title={backTitle ?? t('nav.back')} className={styles.nav} onClick={onBack ?? goBack}>
+                    <IconButton
+                        title={backTitle ?? t('nav.back')}
+                        // A detail screen is left by its arrow even beside the docked
+                        // drawer, whose links lead elsewhere; a second screen is one of those.
+                        className={clsx(styles.nav, detail && styles.navDocked)}
+                        onClick={onBack ?? goBack}
+                    >
                         <Icon>{backIcon}</Icon>
                     </IconButton>
                 ) : (

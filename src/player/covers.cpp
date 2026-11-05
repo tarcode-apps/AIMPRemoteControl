@@ -27,24 +27,6 @@ namespace
 		return info;
 	}
 
-	IAIMPFileInfo *ReadFileInfo(IAIMPCore *core, const std::string &fileName)
-	{
-		IAIMPServiceFileInfo *service = AcquireService<IAIMPServiceFileInfo>(core, IID_IAIMPServiceFileInfo);
-		IAIMPString *uri = StringToIAIMPString(core, fileName);
-		IAIMPFileInfo *info = nullptr;
-		if (service && uri && Succeeded(core->CreateObject(IID_IAIMPFileInfo, reinterpret_cast<void **>(&info))) && info &&
-			Failed(service->GetFileInfoFromFileURI(uri, 0, info)))
-		{
-			info->Release();
-			info = nullptr;
-		}
-		if (uri)
-			uri->Release();
-		if (service)
-			service->Release();
-		return info;
-	}
-
 	IAIMPFileInfo *StreamFileInfo(IAIMPCore *core, const player::CoverSource &source)
 	{
 		IAIMPFileInfo *info = nullptr;

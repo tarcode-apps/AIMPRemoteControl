@@ -23,6 +23,7 @@ import type {
     PlaylistItemsPage,
     PlaylistRename,
     SortRequest,
+    TrackInfo,
 } from './types';
 
 export type ItemsRange = {
@@ -42,6 +43,7 @@ export const playlistKeys = {
     items: (id: string, range: ItemsRange) => ['playlists', id, 'items', range] as const,
     groups: (id: string) => ['playlists', id, 'groups'] as const,
     groupsView: (id: string, search: string) => ['playlists', id, 'groups', search] as const,
+    trackInfo: (id: string, fileUri: string) => ['playlists', id, 'info', fileUri] as const,
 };
 
 function searchParam(search: string | undefined) {
@@ -386,6 +388,22 @@ export function useItemDetails() {
             request<ItemDetailsResponse>('POST', `/playlists/${encodeURIComponent(playlistId)}/items/details`, {
                 body,
             }),
+    });
+}
+
+// Under the playlist's key, so that a change of the playlist, tags written
+// included, reads it again. A track gone from the playlist leaves the last
+// answer in place with an `itemNotFound` error beside it.
+export function useTrackInfo(playlistId: string, fileUri: string) {
+    return useQuery({
+        queryKey: playlistKeys.trackInfo(playlistId, fileUri),
+        queryFn: ({ signal }) =>
+            request<TrackInfo>(
+                'GET',
+                `/playlists/${encodeURIComponent(playlistId)}/items/info?uri=${encodeURIComponent(fileUri)}`,
+                { signal },
+            ),
+        enabled: playlistId !== '' && fileUri !== '',
     });
 }
 

@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "apiCore.h"
+#include "apiFileManager.h"
 #include "apiObjects.h"
 #include "apiPlaylists.h"
 
@@ -23,6 +24,9 @@ std::string IAIMPStringToString(IAIMPString *s);
 IAIMPString *StringToIAIMPString(IAIMPCore *core, const std::string &utf8);
 
 std::string GetPropertyAsString(IAIMPPropertyList *props, INT32 propertyId);
+// The tags of a file read anew, rather than the copy a playlist holds; null when
+// the file cannot be read. Released by the caller.
+IAIMPFileInfo *ReadFileInfo(IAIMPCore *core, const std::string &fileUri);
 std::string Localize(IAIMPCore *core, const std::string &keyPath, const std::string &fallback);
 std::string GetPlaylistAIMPId(IAIMPPlaylist *playlist);
 IAIMPPlaylist *LoadedPlaylistByAIMPId(IAIMPCore *core, const std::string &aimpId);

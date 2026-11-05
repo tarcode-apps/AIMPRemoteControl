@@ -94,6 +94,9 @@ void rpcapi::DownloadTrackCommand::Register(IEndpointRouteBuilder &endpoints)
 				   HttpContent content;
 				   content.ContentType = ContentTypeFor(path);
 				   content.FilePath = fileName;
+				   // Raw UTF-8 in the quotes and no filename*, as the original plugin sent it: the
+				   // app's download manager crashes on a percent-encoded name. Not the web API's
+				   // header, which is built to the standard.
 				   content.Headers["Content-Disposition"] = "attachment; filename=\"" + name + "\"";
 				   return content;
 			   });

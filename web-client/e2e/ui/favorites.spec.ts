@@ -44,6 +44,13 @@ test.describe('favorites', () => {
         await api.post(`/playlists/${encodeURIComponent(playlist.id)}/items/remove`, { indexes: [1] });
         const favorites = await openFavorites(app);
         await expect(favorites.row('Bravo')).toHaveAttribute('title', t('favorites.missing'));
+        // Nothing is known about it beyond its name: its menu offers to find it, not to describe it.
+        await favorites
+            .row('Bravo')
+            .getByRole('button', { name: t('playlist.itemActions') })
+            .click();
+        await expect(app.menuItem(t('favorites.find'))).toBeVisible();
+        await expect(app.menuItem(t('trackInfo.open'))).toBeHidden();
     });
 
     test('a favorite is removed from its menu, and Clear removes them all', async ({ app }) => {

@@ -6,6 +6,7 @@ import type { RepeatMode } from '@/app/_api/types';
 import { useFavorites } from '@/app/_state/Favorites';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
+import { useTrackActions } from '@/app/_state/useTrackActions';
 import { formatDuration } from '@/app/_utils/format';
 import clsx from 'clsx';
 import { useEffect, useRef, useState } from 'react';
@@ -51,6 +52,7 @@ export function NowPlaying() {
 
     const favorites = useFavorites();
     const favoriteActions = useFavoriteActions();
+    const trackActions = useTrackActions();
     const { showTrack } = usePlaylistSelection();
     // The favorite button and the track menu, only while a track is loaded.
     const playing = player?.track;
@@ -61,6 +63,7 @@ export function NowPlaying() {
     const trackMenu: MenuEntry[] =
         playingRef && favoriteItem
             ? [
+                  trackActions.infoItem(playingRef),
                   favoriteItem,
                   menuSeparator,
                   {

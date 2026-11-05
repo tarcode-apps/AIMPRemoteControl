@@ -7,6 +7,12 @@ export type TrackTags = {
     artist?: string;
     album?: string;
     genre?: string;
+    // Only in an ID3 tag, which the file gets when any of these is given.
+    albumArtist?: string;
+    year?: string;
+    trackNumber?: string;
+    lyricist?: string;
+    lyrics?: string;
 };
 
 export type TrackOptions = Partial<TrackTags> & {
@@ -31,12 +37,53 @@ function chunk(id: string, data: Buffer): Buffer {
 
 const text = (value: string) => Buffer.concat([Buffer.from(value, 'utf8'), Buffer.alloc(1)]);
 
+// ID3v2.3, the texts in UTF-16 with a byte order mark.
+const utf16 = (value: string) => Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(value, 'utf16le')]);
+
+function id3Frame(id: string, data: Buffer): Buffer {
+    const header = Buffer.alloc(10);
+    header.write(id, 0, 'ascii');
+    header.writeUInt32BE(data.length, 4);
+    return Buffer.concat([header, data]);
+}
+
+const id3Text = (id: string, value: string) => id3Frame(id, Buffer.concat([Buffer.from([1]), utf16(value)]));
+
+// Unsynchronised lyrics: the language, an empty descriptor, then the text.
+const id3Lyrics = (value: string) =>
+    id3Frame(
+        'USLT',
+        Buffer.concat([Buffer.from([1]), Buffer.from('eng', 'ascii'), utf16(''), Buffer.alloc(2), utf16(value)]),
+    );
+
+function id3Tag(frames: Buffer[]): Buffer {
+    const body = Buffer.concat(frames);
+    const header = Buffer.from([0x49, 0x44, 0x33, 3, 0, 0, 0, 0, 0, 0]);
+    // The size is "synchsafe": seven bits per byte.
+    header[6] = (body.length >>> 21) & 0x7f;
+    header[7] = (body.length >>> 14) & 0x7f;
+    header[8] = (body.length >>> 7) & 0x7f;
+    header[9] = body.length & 0x7f;
+    return Buffer.concat([header, body]);
+}
+
 // A sine tone as a 16-bit mono WAV with RIFF INFO tags, which the player reads
-// as the title, artist, album and genre like any other tags.
+// as the title, artist, album and genre like any other tags. The tags INFO has
+// no field for go into an ID3 tag chunk beside it, along with those four again.
 export function writeWav(
     file: string,
     seconds: number,
-    { title, artist = 'Test Artist', album = 'Test Album', genre = 'Test Genre' }: TrackTags,
+    {
+        title,
+        artist = 'Test Artist',
+        album = 'Test Album',
+        genre = 'Test Genre',
+        albumArtist,
+        year,
+        trackNumber,
+        lyricist,
+        lyrics,
+    }: TrackTags,
 ) {
     const samples = Math.round(sampleRate * seconds);
     const pcm = Buffer.alloc(samples * 2);
@@ -56,8 +103,25 @@ export function writeWav(
         chunk('IPRD', text(album)),
         chunk('IGNR', text(genre)),
     ]);
-    const body = Buffer.concat([Buffer.from('WAVE'), chunk('fmt ', format), chunk('data', pcm), chunk('LIST', info)]);
-    fs.writeFileSync(file, chunk('RIFF', body));
+    const chunks = [Buffer.from('WAVE'), chunk('fmt ', format), chunk('data', pcm), chunk('LIST', info)];
+    const extra: [string, string | undefined][] = [
+        ['TPE2', albumArtist],
+        ['TYER', year],
+        ['TRCK', trackNumber],
+        ['TEXT', lyricist],
+    ];
+    if (extra.some(([, value]) => value !== undefined) || lyrics !== undefined) {
+        const frames = [
+            id3Text('TIT2', title),
+            id3Text('TPE1', artist),
+            id3Text('TALB', album),
+            id3Text('TCON', genre),
+        ];
+        for (const [id, value] of extra) if (value !== undefined) frames.push(id3Text(id, value));
+        if (lyrics !== undefined) frames.push(id3Lyrics(lyrics));
+        chunks.push(chunk('id3 ', id3Tag(frames)));
+    }
+    fs.writeFileSync(file, chunk('RIFF', Buffer.concat(chunks)));
 }
 
 const crcTable = Array.from({ length: 256 }, (_, n) => {

@@ -289,5 +289,37 @@
   "upload": {
     "progress": "Uploading {{current}} of {{total}}:",
     "failed": "Could not upload {{name}}: {{message}}"
+  },
+  "trackInfo": {
+    "title": "Track information",
+    "open": "Track information",
+    "notSet": "(not set)",
+    "neverPlayed": "Not played yet",
+    "gone": "The track is no longer in the playlist",
+    "showLyrics": "Lyrics",
+    "showTags": "Tags",
+    "copy": "Copy the information",
+    "copied": "Copied to the clipboard",
+    "copyFailed": "Could not copy",
+    "copyValue": "Copy",
+    "cover": "Cover",
+    "fields": {
+      "duration": "Duration",
+      "stream": "Stream",
+      "size": "Size",
+      "format": "Format",
+      "playCount": "Times played",
+      "lastPlayed": "Last played",
+      "title": "Title",
+      "artist": "Artist",
+      "album": "Album",
+      "albumArtist": "Album artist",
+      "genre": "Genre",
+      "year": "Year",
+      "trackNumber": "Track number",
+      "lyricist": "Lyricist",
+      "lyrics": "Lyrics",
+      "file": "File"
+    }
   }
 }

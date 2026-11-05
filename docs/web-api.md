@@ -319,6 +319,58 @@ folder.
 Errors: `400 invalidBody`, `404 playlistNotFound`, `404 itemNotFound`,
 `409 playlistChanged`.
 
+### `GET /api/v1/playlists/{id}/items/info?uri=…`
+
+What the player's own track information window shows for one item: its tags,
+the stream's parameters and the player's statistics of it. The item is named
+by its `fileUri` rather than its index, since the information belongs to the
+file and a screen showing it outlives the revision it was opened at.
+
+```json
+{
+  "playlistId": "{A1B2C3D4-...}",
+  "revision": 7,
+  "index": 12,
+  "fileUri": "C:\\Music\\Artist A\\Track One.flac",
+  "fileName": "Track One.flac",
+  "isUrl": false,
+  "inContainer": false,
+  "cover": "7068c7442182d15a",
+  "title": "Track One",
+  "artist": "Artist A",
+  "album": "Album",
+  "albumArtist": "Artist A",
+  "genre": "Rock",
+  "year": "2008",
+  "trackNumber": "07",
+  "lyricist": "",
+  "lyrics": "First line\nSecond line",
+  "format": "FLAC",
+  "sampleRate": 48000,
+  "bitrate": 1704,
+  "bitDepth": 24,
+  "channels": 2,
+  "duration": 139.005,
+  "size": 29624320,
+  "playCount": 0,
+  "lastPlayed": null
+}
+```
+
+The tags are read from the file itself, since the playlist keeps only the
+fields it shows, and fall back to the playlist's copy where the file gives
+none; a stream has only the playlist's copy. Every tag is a string, empty when
+missing. `format` is the codec the tags name, or the extension of the audio
+file, upper-case, when they name none; for a part of a CUE sheet that is the
+file the sheet plays. `sampleRate` is in Hz, `bitrate` in kbps, `duration` in seconds,
+`size` in bytes; a parameter the player does not know is `0`. `lastPlayed` is
+the moment in UTC, ISO 8601, `null` for a track that has not played yet.
+`index` and `revision` tell where the item is right now, for its
+[cover](#get-apiv1playlistsiditemsindexcoverkeysize); the request is one pass
+over the playlist's URIs and one read of the file.
+
+Errors: `400 invalidQuery`, `404 playlistNotFound`, `404 itemNotFound`.
+
 ### `POST /api/v1/playlists/locate`
 
 Finds remembered files in the playlists they were remembered from:
@@ -878,6 +930,7 @@ an item's own URL only redirects to the hash. Both URLs take the same `size`.
 | Query | Default | |
 |---|---|---|
 | `size` | | the longer side in pixels; the server only scales down, so an image that already fits is served as it is. Without it the image is the copy the player holds, which the player itself has scaled down to its own limit. `original` is the image as found in the tags or the folder, read from the file on every request, for saving it. The web client asks for `64`, `128`, `256` or `512`, so that one image serves the screens of one density |
+| `name` | | the file name a browser offers when the image is saved, without the extension: the image comes with `Content-Disposition: inline` naming it, with the extension of its type. Characters a file system refuses become `_`. The item's URL passes it on to the image's |
 
 ### `GET /api/v1/playlists/{id}/items/{index}/cover?key=…&size=…`
 

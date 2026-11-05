@@ -42,16 +42,63 @@
     }
 }
 
+// The buttons at the end of the header, kept there whichever of them show;
+// the open volume slider stretches the block over the rating's room.
+.actions {
+    flex: 0 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+
+    &.volumeOpen {
+        flex: 1;
+    }
+}
+
 .volumeArea {
     flex: 0 1 auto;
     min-width: 0;
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    margin-left: auto;
 
     &.volumeOpen {
         flex: 1;
+    }
+}
+
+// Beside the volume; while the volume is open the slider takes its place, as
+// it takes the rating's. Out of reach without a stream: greyed on a wide
+// screen, gone from a mobile's.
+.capture {
+    &:disabled {
+        @include mixins.drawer-modal {
+            display: none;
+        }
+    }
+}
+
+// Recording: the glyph beats in the accent colour, as the player's own button
+// does: it rests lit and unlit, and the change between them is quick.
+.capturing {
+    color: var(--color-accent);
+    animation: capture-beat 1.5s ease-in-out infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+}
+
+@keyframes capture-beat {
+    0%,
+    30% {
+        color: var(--color-accent);
+    }
+
+    50%,
+    80% {
+        color: var(--color-text);
     }
 }
 

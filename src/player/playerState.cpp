@@ -263,7 +263,7 @@ bool player::ApplyPlayerPatch(IAIMPCore *core, const PlayerPatch &patch)
 	}
 	else
 		ok = false;
-	if (patch.Repeat || patch.Shuffle)
+	if (patch.Repeat || patch.Shuffle || patch.RadioCapture)
 	{
 		IAIMPServiceMessageDispatcher *dispatcher = DispatcherService(core);
 		if (!dispatcher)
@@ -282,6 +282,8 @@ bool player::ApplyPlayerPatch(IAIMPCore *core, const PlayerPatch &patch)
 		}
 		if (patch.Shuffle)
 			ok = SetBoolProperty(dispatcher, AIMP_MSG_PROPERTY_SHUFFLE, *patch.Shuffle) && ok;
+		if (patch.RadioCapture)
+			ok = SetBoolProperty(dispatcher, AIMP_MSG_PROPERTY_RADIOCAP, *patch.RadioCapture) && ok;
 		dispatcher->Release();
 	}
 	return ok;

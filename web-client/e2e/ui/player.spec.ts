@@ -1,5 +1,6 @@
 import type { TestPlaylist } from '../fixtures';
 import { expect, test } from './fixtures';
+import { radioCaptureName } from './pages/player-panel';
 import { PlaylistScreen } from './pages/playlist-screen';
 import { t } from './strings';
 
@@ -60,6 +61,36 @@ test.describe('player', () => {
                 await player.repeatButton.click();
                 await expect.poll(async () => (await api.player()).repeat, { timeout: 2000 }).toBe(mode);
             }).toPass();
+        }
+    });
+
+    test('a stream can be captured but not seeked, a file the other way round', async ({
+        api,
+        app,
+        player,
+        playlists,
+        streams,
+    }) => {
+        // A file plays: a wide screen greys the button out, a mobile has no room to waste on it.
+        if (app.drawerDocked) {
+            await expect(player.radioCaptureButton).toBeDisabled();
+            await expect(player.radioCaptureButton).toHaveAccessibleName(t('player.radioCapture'));
+        } else await expect(player.radioCaptureButton).toBeHidden();
+        await expect(player.positionSlider).toBeEnabled();
+        const radio = await playlists.create({ urls: [streams.station()] });
+        await api.play(radio.id, 0);
+        await expect(player.radioCaptureButton).toBeEnabled();
+        // A stream has no length: the position cannot be set.
+        await expect(player.positionSlider).toBeDisabled();
+        await expect(player.radioCaptureButton).toHaveAccessibleName(radioCaptureName(false));
+        try {
+            await player.radioCaptureButton.click();
+            await expect.poll(async () => (await api.player()).radioCapture).toBe(true);
+            await expect(player.radioCaptureButton).toHaveAccessibleName(radioCaptureName(true));
+            await player.radioCaptureButton.click();
+            await expect.poll(async () => (await api.player()).radioCapture).toBe(false);
+        } finally {
+            await api.patch('/player', { radioCapture: false });
         }
     });
 

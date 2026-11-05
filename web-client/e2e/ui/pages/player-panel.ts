@@ -2,6 +2,10 @@ import { expect, type Locator } from '@playwright/test';
 import { t } from '../strings';
 import type { App } from './app';
 
+// The radio capture button's name while a stream plays, with its state.
+export const radioCaptureName = (on: boolean) =>
+    `${t('player.radioCapture')} ${t(on ? 'player.stateOn' : 'player.stateOff')}`;
+
 // The player: docked beside the screens on a large screen, otherwise a sheet
 // that is either the mini player at the bottom or expanded over everything.
 export class PlayerPanel {
@@ -13,6 +17,8 @@ export class PlayerPanel {
     readonly trackPosition: Locator;
     readonly shuffleButton: Locator;
     readonly repeatButton: Locator;
+    readonly radioCaptureButton: Locator;
+    readonly positionSlider: Locator;
     readonly previousButton: Locator;
     readonly nextButton: Locator;
     readonly favoriteButton: Locator;
@@ -36,6 +42,11 @@ export class PlayerPanel {
         const button = (name: string) => this.full.getByRole('button', { name, exact: true });
         this.shuffleButton = button(t('player.shuffle'));
         this.repeatButton = button(t('player.repeat'));
+        // Named by its state while it can be used, plainly while it cannot.
+        this.radioCaptureButton = button(t('player.radioCapture'))
+            .or(button(radioCaptureName(false)))
+            .or(button(radioCaptureName(true)));
+        this.positionSlider = this.full.getByRole('slider', { name: t('player.position'), exact: true });
         this.previousButton = button(t('player.holdToSeek', { action: t('player.previous') }));
         this.nextButton = button(t('player.holdToSeek', { action: t('player.next') }));
         this.favoriteButton = this.full

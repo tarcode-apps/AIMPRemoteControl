@@ -14,6 +14,8 @@ export type SliderProps = {
     origin?: number;
     // Stands upright, as tall as its parent, with the maximum at the top.
     vertical?: boolean;
+    // Shows the value without a thumb, as nothing can be set.
+    disabled?: boolean;
     className?: string;
     // Every change while the user moves the thumb.
     onChange?(value: number): void;
@@ -35,6 +37,7 @@ export function Slider({
     step = 1,
     origin = min,
     vertical = false,
+    disabled = false,
     className,
     onChange,
     onCommit,
@@ -95,6 +98,7 @@ export function Slider({
             max={max}
             step={step}
             value={shown}
+            disabled={disabled}
             aria-label={title}
             aria-orientation={vertical ? 'vertical' : undefined}
             title={title}

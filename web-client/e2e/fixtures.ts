@@ -11,6 +11,7 @@ import { Api } from './lib/api';
 import { EventStream } from './lib/events';
 import { MediaFolder, type TrackOptions } from './lib/media';
 import { runtimeDir } from './lib/paths';
+import { StreamServer } from './lib/streams';
 
 // Set in playwright.config.ts.
 export type Options = {
@@ -30,6 +31,8 @@ export type PlaylistOptions = {
     tracks?: number | TrackOptions[];
     // Files already made, such as a CUE sheet, added after the tracks.
     files?: string[];
+    // Streams, added after the files.
+    urls?: string[];
     // The item count to wait for when `files` hold containers or folders.
     expectItems?: number;
 };
@@ -40,6 +43,8 @@ type Fixtures = {
     events: EventStream;
     // Generated files for this test alone.
     media: MediaFolder;
+    // Radio stations of the test's own, broadcasting silence.
+    streams: StreamServer;
     // Playlists of the test's own, filled with generated tracks; removed afterwards.
     playlists: {
         create(options?: PlaylistOptions): Promise<TestPlaylist>;
@@ -85,11 +90,18 @@ export const test = base.extend<Fixtures, Options>({
         if (testInfo.status === testInfo.expectedStatus) media.remove();
     },
 
+    streams: async ({}, use) => {
+        const streams = new StreamServer();
+        await streams.start();
+        await use(streams);
+        streams.close();
+    },
+
     playlists: async ({ api, media }, use, testInfo) => {
         const created: string[] = [];
         const adopted: string[] = [];
         await use({
-            async create({ name = `rc-e2e ${testInfo.title}`, tracks = 0, files = [], expectItems } = {}) {
+            async create({ name = `rc-e2e ${testInfo.title}`, tracks = 0, files = [], urls = [], expectItems } = {}) {
                 const id = await api.createPlaylist(name);
                 created.push(id);
                 const generated =
@@ -97,9 +109,9 @@ export const test = base.extend<Fixtures, Options>({
                         ? media.tracks(tracks)
                         : tracks.map((options, i) => media.track(options.title ?? `Track ${i + 1}`, options));
                 const all = [...generated, ...files];
-                if (all.length) {
-                    await api.addFiles(id, all);
-                    const count = expectItems ?? all.length;
+                if (all.length || urls.length) {
+                    await api.addItems(id, all, urls);
+                    const count = expectItems ?? all.length + urls.length;
                     await expect
                         .poll(() => api.playlistItemCount(id), { message: `the player adds ${count} items` })
                         .toBe(count);
@@ -121,7 +133,7 @@ export const test = base.extend<Fixtures, Options>({
                 // It updates the playlist once more about half a second later, with nothing
                 // visible changed; a client that loaded it before then would act on a stale
                 // revision and be refused.
-                if (all.length) {
+                if (all.length || urls.length) {
                     let last = { revision: -1, at: 0 };
                     await expect
                         .poll(

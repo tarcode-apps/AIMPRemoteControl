@@ -196,6 +196,11 @@ export function NowPlaying() {
     const track = player?.track ?? null;
     const duration = player?.duration ?? 0;
     const repeat = player?.repeat ?? 'off';
+    // The player records only a stream; the button names its state while it can be used.
+    const capturing = player?.radioCapture ?? false;
+    const captureTitle = track?.isUrl
+        ? `${t('player.radioCapture')} ${t(capturing ? 'player.stateOn' : 'player.stateOff')}`
+        : t('player.radioCapture');
     const count = track && playlists?.find(playlist => playlist.id === track.playlistId)?.itemCount;
 
     const setVolume = (value: number, commit: boolean) => {
@@ -241,41 +246,54 @@ export function NowPlaying() {
                         onChange={mark => setMark.mutate({ playlistId: track.playlistId, index: track.index, mark })}
                     />
                 )}
-                <div ref={volumeRef} className={clsx(styles.volumeArea, volumeOpen && styles.volumeOpen)}>
-                    {volumeOpen && (
-                        <div className={styles.volumePanel}>
-                            <IconButton
-                                title={t(mute ? 'player.unmute' : 'player.mute')}
-                                className={clsx(styles.toggle, mute && styles.on)}
-                                onClick={() => {
-                                    adjust({ volume: mute ? lastVolume.current : volume, mute: !mute });
-                                    setPlayer.mutate({ mute: !mute });
-                                }}
-                            >
-                                <Icon>no_sound</Icon>
-                            </IconButton>
-                            <Slider
-                                title={t('player.volume')}
-                                value={shownVolume}
-                                max={1}
-                                step={0.01}
-                                onChange={value => setVolume(value, false)}
-                                onCommit={value => setVolume(value, true)}
-                            />
-                        </div>
+                <div className={clsx(styles.actions, volumeOpen && styles.volumeOpen)}>
+                    {!volumeOpen && (
+                        <IconButton
+                            title={captureTitle}
+                            className={clsx(styles.capture, capturing && styles.capturing)}
+                            aria-pressed={capturing}
+                            disabled={!track?.isUrl}
+                            onClick={() => setPlayer.mutate({ radioCapture: !capturing })}
+                        >
+                            <Icon>sensors</Icon>
+                        </IconButton>
                     )}
-                    <IconButton
-                        title={volumeLabel}
-                        className={clsx(volumeOpen && styles.on)}
-                        aria-expanded={volumeOpen}
-                        onClick={() => setVolumeOpen(!volumeOpen)}
-                    >
-                        <Icon>{volumeIcon(shownVolume, mute)}</Icon>
+                    <div ref={volumeRef} className={clsx(styles.volumeArea, volumeOpen && styles.volumeOpen)}>
+                        {volumeOpen && (
+                            <div className={styles.volumePanel}>
+                                <IconButton
+                                    title={t(mute ? 'player.unmute' : 'player.mute')}
+                                    className={clsx(styles.toggle, mute && styles.on)}
+                                    onClick={() => {
+                                        adjust({ volume: mute ? lastVolume.current : volume, mute: !mute });
+                                        setPlayer.mutate({ mute: !mute });
+                                    }}
+                                >
+                                    <Icon>no_sound</Icon>
+                                </IconButton>
+                                <Slider
+                                    title={t('player.volume')}
+                                    value={shownVolume}
+                                    max={1}
+                                    step={0.01}
+                                    onChange={value => setVolume(value, false)}
+                                    onCommit={value => setVolume(value, true)}
+                                />
+                            </div>
+                        )}
+                        <IconButton
+                            title={volumeLabel}
+                            className={clsx(volumeOpen && styles.on)}
+                            aria-expanded={volumeOpen}
+                            onClick={() => setVolumeOpen(!volumeOpen)}
+                        >
+                            <Icon>{volumeIcon(shownVolume, mute)}</Icon>
+                        </IconButton>
+                    </div>
+                    <IconButton title={t('player.collapse')} className={styles.collapse} onClick={collapse}>
+                        <Icon>expand_more</Icon>
                     </IconButton>
                 </div>
-                <IconButton title={t('player.collapse')} className={styles.collapse} onClick={collapse}>
-                    <Icon>expand_more</Icon>
-                </IconButton>
             </header>
             <div ref={coverArea} className={styles.cover}>
                 {/* Loaded while the sheet is closed too, so that it opens on the image rather than the placeholder. */}
@@ -404,6 +422,8 @@ export function NowPlaying() {
                 title={t('player.position')}
                 value={position}
                 max={duration}
+                // A stream has no length to seek in.
+                disabled={duration <= 0}
                 onCommit={value => setPlayer.mutate({ position: value })}
             />
             <div className={styles.times}>

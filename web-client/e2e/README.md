@@ -64,7 +64,7 @@ points the UI tests at another client, such as the dev server on
 e2e/
   playwright.config.ts   projects: api, ui-mobile (400×800), ui-desktop (1400×900), ui-desktop-wide (1920×1080)
   global-setup.ts        starts the throwaway player; global-teardown.ts closes it
-  fixtures.ts            what a test asks for: api, events, media, playlists, presets;
+  fixtures.ts            what a test asks for: api, events, media, streams, playlists, presets;
                          withPluginSettings for the specs that restart the player
   lib/
     aimp.ts              the throwaway player: copy, seed, start, restart, stop
@@ -74,6 +74,7 @@ e2e/
     digest.ts            Digest authentication headers
     http.ts              requests Playwright cannot make, such as headers without a body
     media.ts             generated WAV tracks with tags (RIFF INFO, plus ID3 for the rest), CUE sheets, covers, .lrc lyrics
+    streams.ts           an HTTP server broadcasting endless silence, a radio station for what only a stream allows
     paths.ts             where things are
   api/*.spec.ts          one file per resource of the web API, plus the server,
                          authentication and permissions

@@ -156,7 +156,14 @@ export class Api {
     }
 
     addFiles(playlistId: string, files: string[]) {
-        return this.expectOk(this.post(`/playlists/${encode(playlistId)}/items`, { files }), 'adding files');
+        return this.addItems(playlistId, files, []);
+    }
+
+    addItems(playlistId: string, files: string[], urls: string[]) {
+        const body: { files?: string[]; urls?: string[] } = {};
+        if (files.length) body.files = files;
+        if (urls.length) body.urls = urls;
+        return this.expectOk(this.post(`/playlists/${encode(playlistId)}/items`, body), 'adding items');
     }
 
     async playlistItemCount(id: string): Promise<number> {

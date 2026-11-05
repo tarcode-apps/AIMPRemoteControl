@@ -358,7 +358,9 @@ export type PlayTrackRequest = {
     revision?: number;
 };
 
-export type PlayerPatch = Partial<Pick<PlayerState, 'position' | 'volume' | 'mute' | 'repeat' | 'shuffle'>>;
+export type PlayerPatch = Partial<
+    Pick<PlayerState, 'position' | 'volume' | 'mute' | 'repeat' | 'shuffle' | 'radioCapture'>
+>;
 
 // What the plugin's options page lets a client do.
 export type Permissions = {

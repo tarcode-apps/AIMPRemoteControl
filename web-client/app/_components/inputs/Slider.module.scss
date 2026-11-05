@@ -55,6 +55,18 @@
         outline-offset: 2px;
         border-radius: 12px;
     }
+
+    &:disabled {
+        cursor: default;
+
+        &::-webkit-slider-thumb {
+            visibility: hidden;
+        }
+
+        &::-moz-range-thumb {
+            visibility: hidden;
+        }
+    }
 }
 
 // A horizontal slider turned on its side: the browsers' own vertical ranges

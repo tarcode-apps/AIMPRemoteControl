@@ -82,6 +82,7 @@ namespace
 		if (const auto repeat = OptionalField<std::string>(body, "repeat", &nlohmann::json::is_string))
 			patch.Repeat = RepeatNamed(*repeat);
 		patch.Shuffle = OptionalField<bool>(body, "shuffle", &nlohmann::json::is_boolean);
+		patch.RadioCapture = OptionalField<bool>(body, "radioCapture", &nlohmann::json::is_boolean);
 		if ((patch.Position && *patch.Position < 0) || (patch.Volume && (*patch.Volume < 0 || *patch.Volume > 1)))
 			throw ApiError(400, "invalidBody");
 		return patch;

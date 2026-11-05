@@ -88,6 +88,7 @@ namespace player
 		std::optional<bool> Mute;
 		std::optional<RepeatMode> Repeat;
 		std::optional<bool> Shuffle;
+		std::optional<bool> RadioCapture;
 	};
 
 	bool ApplyPlayerPatch(IAIMPCore *core, const PlayerPatch &patch);

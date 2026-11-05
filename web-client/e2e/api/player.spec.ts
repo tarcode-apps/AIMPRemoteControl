@@ -82,6 +82,24 @@ test.describe('player', () => {
         }
     });
 
+    test('captures a stream and refuses to capture a file', async ({ api, playlists, streams }) => {
+        const playlist = await playlists.create({ tracks: [{ seconds: 30 }], urls: [streams.station()] });
+        await api.play(playlist.id, 0);
+        await expect.poll(async () => (await api.player()).state).toBe('playing');
+        expect((await api.patch('/player', { radioCapture: true })).error?.code).toBe('playerCommandFailed');
+
+        await api.play(playlist.id, 1);
+        await expect.poll(async () => (await api.player()).track?.isUrl).toBe(true);
+        expect((await api.player()).duration).toBe(0);
+        try {
+            await api.setPlayer({ radioCapture: true });
+            await expect.poll(async () => (await api.player()).radioCapture).toBe(true);
+        } finally {
+            await api.setPlayer({ radioCapture: false });
+        }
+        await expect.poll(async () => (await api.player()).radioCapture).toBe(false);
+    });
+
     test('refuses bad settings and unknown items', async ({ api, playlists }) => {
         const playlist = await playlists.create({ tracks: 1 });
         for (const body of [
@@ -91,6 +109,7 @@ test.describe('player', () => {
             { position: -1 },
             { repeat: 'always' },
             { shuffle: 1 },
+            { radioCapture: 'on' },
         ])
             expect((await api.patch('/player', body)).error?.code, JSON.stringify(body)).toBe('invalidBody');
         expect((await api.post('/player/play', { playlistId: playlist.id, index: 4 })).error?.code).toBe(

@@ -792,7 +792,8 @@ The player's state at request time.
 
 `state` is `playing`, `paused` or `stopped`. `position` and `duration` are in
 seconds, `volume` is `0..1`. `repeat` is `off`, `playlist` (the player's
-"repeat playlist" action at the end of the playlist) or `track`. `trackNumber`
+"repeat playlist" action at the end of the playlist) or `track`. `radioCapture`
+is the player's radio capture, recording the playing stream. `trackNumber`
 is the tag as written, `"3"` or `"3/12"`, empty when there is none. `track` is the item the player is playing or
 paused on, `null` when stopped: like the player's own window, a stopped player
 shows nothing, even though it remembers what to restart. `index` is the item's
@@ -858,15 +859,18 @@ Changes any of the settings below; the others stay as they are. An empty body
 is refused.
 
 ```json
-{ "position": 120.5, "volume": 0.5, "mute": false, "repeat": "playlist", "shuffle": false }
+{ "position": 120.5, "volume": 0.5, "mute": false, "repeat": "playlist", "shuffle": false, "radioCapture": true }
 ```
 
 `position` is in seconds and applies to the playing track, `volume` is
 `0..1`, `repeat` is `off`, `playlist` or `track`; leaving `playlist` restores
 the player's default action at the end of the playlist (jump to the next one)
-unless it is set to do nothing. The response is an empty object.
+unless it is set to do nothing. `radioCapture` records the playing stream; the
+player takes it only while its track is a stream, playing or paused, and
+refuses it otherwise. The response is an empty object.
 
-Errors: `400 invalidBody`, `500 playerCommandFailed`.
+Errors: `400 invalidBody`, `500 playerCommandFailed` (also for `radioCapture`
+without a stream).
 
 ## Effects
 

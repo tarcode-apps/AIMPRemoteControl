@@ -20,6 +20,7 @@ const stopTimeout = 15_000;
 // As the player's options page sets them.
 export type PluginSettings = {
     physicalDeletion: boolean;
+    downloadTracks: boolean;
     uploadTracks: boolean;
     scheduler: boolean;
     browseFiles: boolean;
@@ -30,6 +31,7 @@ export type PluginSettings = {
 // What the tests count on: every permission on and no authentication.
 export const defaultPluginSettings: PluginSettings = {
     physicalDeletion: true,
+    downloadTracks: true,
     uploadTracks: true,
     scheduler: true,
     browseFiles: true,
@@ -142,6 +144,7 @@ function writePluginSettings(settings: PluginSettings) {
         'Auth\\Username': settings.auth?.username ?? '',
         'Auth\\HA1': settings.auth ? md5(`${settings.auth.username}:${authRealm}:${settings.auth.password}`) : '',
         'Features\\PhysicalDeletion': flag(settings.physicalDeletion),
+        'Features\\DownloadTracks': flag(settings.downloadTracks),
         'Features\\UploadTracks': flag(settings.uploadTracks),
         'Features\\UploadFolder': uploadDir,
         'Features\\Scheduler': flag(settings.scheduler),

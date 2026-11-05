@@ -31,7 +31,7 @@ import {
 } from '@/app/_components/lists';
 import styles from '@/app/_components/lists/ListPage.module.scss';
 import { menuSeparator, useRowMenu } from '@/app/_components/menus';
-import { useItemRemoval } from '@/app/_components/playlists';
+import { useItemRemoval, useTrackDownload } from '@/app/_components/playlists';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
@@ -293,6 +293,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
     const trackActions = useTrackActions();
     const favoriteActions = useFavoriteActions();
     const removal = useItemRemoval();
+    const download = useTrackDownload();
     const rowMenu = useRowMenu((item: PlaylistItem) => {
         const track = { ...item, playlistId: playlist.id, revision: playlist.revision };
         return [
@@ -302,6 +303,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
             ...(switches && !docked ? [switchMenuItem(item)] : []),
             menuSeparator,
             ...removal.trackItems({ ...track, name: item.displayText }),
+            ...download.trackItems(track),
         ];
     });
     // A group's items as a selection: in a search, the matches among them.
@@ -602,6 +604,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
             {rowMenu.popover}
             {groupMenu.popover}
             {removal.dialogs}
+            {download.dialogs}
         </section>
     );
 }

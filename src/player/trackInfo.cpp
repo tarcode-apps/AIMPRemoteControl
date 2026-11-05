@@ -8,6 +8,7 @@
 #include "aimpHelper.h"
 #include "covers.h"
 #include "playlistItemContext.h"
+#include "trackFile.h"
 
 namespace
 {
@@ -27,26 +28,6 @@ namespace
 		for (char &c : extension)
 			c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
 		return extension;
-	}
-
-	// The audio file behind a part of a container: for a CUE sheet, the file the
-	// sheet names, which the player labels the part's format with.
-	std::string AudioSourceFile(IAIMPCore *core, const std::string &fileUri)
-	{
-		std::string source;
-		IAIMPServiceFileInfo *service = AcquireService<IAIMPServiceFileInfo>(core, IID_IAIMPServiceFileInfo);
-		IAIMPString *uri = StringToIAIMPString(core, fileUri);
-		IAIMPVirtualFile *virtualFile = nullptr;
-		if (service && uri && Succeeded(service->GetVirtualFile(uri, 0, &virtualFile)) && virtualFile)
-		{
-			source = GetPropertyAsString(virtualFile, AIMP_VIRTUALFILE_PROPID_AUDIOSOURCEFILE);
-			virtualFile->Release();
-		}
-		if (uri)
-			uri->Release();
-		if (service)
-			service->Release();
-		return source;
 	}
 
 	// A field from the file's tags, or from the playlist's copy when the file gave none.

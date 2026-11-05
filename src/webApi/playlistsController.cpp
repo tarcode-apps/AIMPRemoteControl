@@ -4,14 +4,17 @@
 
 #include <algorithm>
 #include <cctype>
+#include <filesystem>
 #include <optional>
 #include <utility>
 #include <string>
+#include <system_error>
 #include <vector>
 
 #include <nlohmann/json.hpp>
 
 #include "apiPlaylists.h"
+#include "helpers/contentDisposition.h"
 #include "helpers/itemJson.h"
 #include "helpers/requestHelpers.h"
 #include "delphiDateTime.h"
@@ -20,10 +23,12 @@
 #include "player/lyrics.h"
 #include "player/playlistItems.h"
 #include "player/playlists.h"
+#include "player/trackFile.h"
 #include "player/trackInfo.h"
 #include "player/uploads.h"
 #include "settings.h"
 #include "stateUpdateEvents.h"
+#include "utf8Path.h"
 
 namespace
 {
@@ -393,6 +398,27 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 		player::Lyrics lyrics;
 		ThrowUnlessOk(player::ReadLyrics(core, request.PathMatches.at(0), fileUri, lyrics));
 		return ToJson(lyrics); });
+
+	// Only the files of the playlist's items, never a path from the request.
+	endpoints.MapGet(R"(/api/v1/playlists/([^/]+)/items/file)", [core = FCore, &settings = FSettings](const ApiRequest &request) -> std::optional<HttpContent>
+			   {
+		if (!settings.Get().Features.DownloadTracks)
+			throw ApiError(403, "downloadDisabled");
+		const std::string fileUri = QueryString(request, "uri");
+		if (fileUri.empty())
+			throw ApiError(400, "invalidQuery");
+		std::string file;
+		ThrowUnlessOk(RunOnMainThread(core, [&]
+									  { return player::FindTrackFile(core, request.PathMatches.at(0), fileUri, file); }));
+		const std::filesystem::path path = PathFromUtf8(file);
+		std::error_code ec;
+		if (!std::filesystem::is_regular_file(path, ec))
+			throw ApiError(404, "fileNotFound");
+		HttpContent content;
+		content.ContentType = player::AudioContentType(path);
+		content.FilePath = file;
+		content.Headers["Content-Disposition"] = webapi::AttachmentContentDisposition(PathToUtf8(path.filename()));
+		return content; });
 
 	endpoints.MapApi(HttpMethod::Post, "/api/v1/playlists/locate", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {

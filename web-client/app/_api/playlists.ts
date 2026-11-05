@@ -8,7 +8,7 @@ import {
     type QueryClient,
 } from '@tanstack/react-query';
 import { isPrediction, predict, revert, useOptimisticMutation, type Prediction } from './helpers/optimistic';
-import { request } from './helpers/request';
+import { basePath, request } from './helpers/request';
 import { playerKeys, type PlayerSnapshot } from './player';
 import { trackKey } from './queue';
 import type {
@@ -408,6 +408,11 @@ export function useTrackInfo(playlistId: string, fileUri: string) {
             ),
         enabled: playlistId !== '' && fileUri !== '',
     });
+}
+
+// The item's file, sent for the browser to save.
+export function itemFileUrl(playlistId: string, fileUri: string): string {
+    return `${basePath}/playlists/${encodeURIComponent(playlistId)}/items/file?uri=${encodeURIComponent(fileUri)}`;
 }
 
 // Asked only where the lyrics are to be shown: the player may go to the

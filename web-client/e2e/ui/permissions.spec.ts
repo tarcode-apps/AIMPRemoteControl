@@ -4,9 +4,15 @@ import { t } from './strings';
 
 // What the client offers when the plugin's settings allow nothing optional.
 test.describe('with every permission off', () => {
-    withPluginSettings({ physicalDeletion: false, uploadTracks: false, scheduler: false, browseFiles: false });
+    withPluginSettings({
+        physicalDeletion: false,
+        downloadTracks: false,
+        uploadTracks: false,
+        scheduler: false,
+        browseFiles: false,
+    });
 
-    test('the Add menu offers a URL only, and the track menu no deletion from disk', async ({
+    test('the Add menu offers a URL only, and the track menu neither deletion from disk nor download', async ({
         api,
         app,
         playlists,
@@ -31,6 +37,7 @@ test.describe('with every permission off', () => {
             .click();
         await expect(app.menuItem(t('playlist.removeFromPlaylist'))).toBeVisible();
         await expect(app.menuItem(t('playlist.deleteFromDisk'))).toHaveCount(0);
+        await expect(app.menuItem(t('playlist.download'))).toHaveCount(0);
     });
 
     test('the timer says it is disabled', async ({ app }) => {

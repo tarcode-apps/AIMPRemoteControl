@@ -236,6 +236,8 @@
     "selectedActions": "Actions with selected tracks",
     "removeFromPlaylist": "Remove from playlist",
     "deleteFromDisk": "Delete from disk",
+    "download": "Download",
+    "downloadAlbum": "Download the album file",
     "deleteFromDiskConfirm": "Delete the file of “{{name}}” from disk?",
     "deleteSelectedFromDiskConfirm": "Delete the files of the selected tracks from disk?",
     "enqueue": "Add to queue",

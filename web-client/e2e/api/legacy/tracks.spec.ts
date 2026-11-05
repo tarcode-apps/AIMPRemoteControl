@@ -117,4 +117,16 @@ test.describe('frozen protocol: tracks', () => {
         expect((await response.body()).equals(fs.readFileSync(path.join(media.dir, name)))).toBe(true);
         expect((await api.context.get(`/downloadTrack/playlist_id/${legacyId}/track_id/77`)).status()).toBe(404);
     });
+
+    test('downloadTrack sends the audio file a part of a CUE sheet is cut from', async ({ api, media, playlists }) => {
+        const sheet = media.cue(['Part one', 'Part two']);
+        const playlist = await playlists.create({ files: [sheet], expectItems: 2 });
+        const legacyId = await legacyPlaylistId(api, playlist.name);
+        const [first] = await legacyTrackIds(api, legacyId);
+
+        const response = await api.context.get(`/downloadTrack/playlist_id/${legacyId}/track_id/${first}`);
+        expect(response.status()).toBe(200);
+        expect(response.headers()['content-disposition']).toBe('attachment; filename="album.wav"');
+        expect((await response.body()).equals(fs.readFileSync(path.join(path.dirname(sheet), 'album.wav')))).toBe(true);
+    });
 });

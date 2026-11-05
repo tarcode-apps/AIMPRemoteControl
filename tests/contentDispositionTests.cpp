@@ -1,9 +1,11 @@
 // webapi::InlineContentDisposition and its parts: the name a browser offers for a
-// saved cover, which comes from the tags and may hold anything.
+// saved cover, which comes from the tags and may hold anything; and the header of
+// a downloaded track.
 #include "webApi/helpers/contentDisposition.h"
 
 #include "check.h"
 
+using webapi::AttachmentContentDisposition;
 using webapi::InlineContentDisposition;
 using webapi::PercentEncode;
 using webapi::SafeFileName;
@@ -25,5 +27,9 @@ int main()
 	Check("a Cyrillic name: a stand-in per character and the UTF-8 name",
 		  InlineContentDisposition("Ёж", "png") == "inline; filename=\"__.png\"; filename*=UTF-8''%D0%81%D0%B6.png");
 	Check("no name, no header", InlineContentDisposition("  ", "png").empty());
+
+	Check("a downloaded file keeps its extension", AttachmentContentDisposition("Трек.mp3") ==
+													   "attachment; filename=\"____.mp3\"; filename*=UTF-8''%D0%A2%D1%80%D0%B5%D0%BA.mp3");
+	Check("a download without a name is still an attachment", AttachmentContentDisposition("..") == "attachment");
 	return Finish();
 }

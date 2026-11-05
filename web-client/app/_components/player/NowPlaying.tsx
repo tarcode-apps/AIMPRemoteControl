@@ -19,7 +19,7 @@ import { TrackCover } from '../cover';
 import { Icon } from '../icons';
 import { Slider } from '../inputs';
 import { Menu, menuSeparator, type MenuEntry } from '../menus';
-import { useItemRemoval } from '../playlists';
+import { useItemRemoval, useTrackDownload } from '../playlists';
 import { Rating } from '../rating';
 import { useDrawer } from '../sidenav';
 import { Lyrics } from './Lyrics';
@@ -73,6 +73,7 @@ export function NowPlaying() {
     const isFavorite = !!playing && favorites.has(playing.fileUri);
     const favoriteItem = playingRef && favoriteActions.favoriteMenuItem(playingRef);
     const removal = useItemRemoval();
+    const download = useTrackDownload();
 
     // The lyrics are shown under the cover where there is room for them, and in
     // the title block's place, a swipe away, where there is not.
@@ -144,6 +145,7 @@ export function NowPlaying() {
                   },
                   menuSeparator,
                   ...removal.trackItems({ ...playingRef, name: playingRef.title }),
+                  ...download.trackItems(playingRef),
               ]
             : [];
 
@@ -342,6 +344,7 @@ export function NowPlaying() {
                     <span />
                 )}
                 {removal.dialogs}
+                {download.dialogs}
             </div>
             <div className={styles.controls}>
                 <IconButton

@@ -141,7 +141,7 @@ HRESULT WINAPI AIMPPlugin::Initialize(IAIMPCore *Core)
 	commands.push_back(std::make_unique<rpcapi::EqualizerCommand>(Core));
 	commands.push_back(std::make_unique<rpcapi::LyricsCommand>(Core, FIdManager));
 	commands.push_back(std::make_unique<rpcapi::SchedulerCommand>(FSleepTimer, FSettings));
-	commands.push_back(std::make_unique<rpcapi::DownloadTrackCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::DownloadTrackCommand>(Core, FIdManager, FSettings));
 	commands.push_back(std::make_unique<rpcapi::GetFormatsCommand>(Core));
 	commands.push_back(std::make_unique<rpcapi::BrowseFilesCommand>(Core, FSettings));
 	commands.push_back(std::make_unique<rpcapi::AddFilesCommand>(Core, FIdManager, FSettings));

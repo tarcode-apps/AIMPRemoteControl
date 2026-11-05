@@ -99,6 +99,7 @@ namespace
 	constexpr const char *KeyAuthUsername = R"(AIMPRemoteControl\Auth\Username)";
 	constexpr const char *KeyAuthHa1 = R"(AIMPRemoteControl\Auth\HA1)";
 	constexpr const char *KeyFeatPhysicalDeletion = R"(AIMPRemoteControl\Features\PhysicalDeletion)";
+	constexpr const char *KeyFeatDownloadTracks = R"(AIMPRemoteControl\Features\DownloadTracks)";
 	constexpr const char *KeyFeatUploadTracks = R"(AIMPRemoteControl\Features\UploadTracks)";
 	constexpr const char *KeyFeatUploadFolder = R"(AIMPRemoteControl\Features\UploadFolder)";
 	constexpr const char *KeyFeatScheduler = R"(AIMPRemoteControl\Features\Scheduler)";
@@ -160,6 +161,7 @@ Settings Settings::Load(IAIMPCore *core)
 	s.Auth.Username = store.GetString(KeyAuthUsername);
 	s.Auth.Ha1 = store.GetString(KeyAuthHa1);
 	s.Features.PhysicalDeletion = store.GetInt(KeyFeatPhysicalDeletion, 0) != 0;
+	s.Features.DownloadTracks = store.GetInt(KeyFeatDownloadTracks, 1) != 0;
 	s.Features.UploadTracks = store.GetInt(KeyFeatUploadTracks, 0) != 0;
 	s.Features.UploadFolder = Settings::FeatureSettings::UploadFolderForStorage(store.GetString(KeyFeatUploadFolder));
 	s.Features.Scheduler = store.GetInt(KeyFeatScheduler, 0) != 0;
@@ -178,6 +180,7 @@ void Settings::Save(IAIMPCore *core) const
 	store.SetString(KeyAuthUsername, Auth.Username);
 	store.SetString(KeyAuthHa1, Auth.Ha1);
 	store.SetInt(KeyFeatPhysicalDeletion, Features.PhysicalDeletion ? 1 : 0);
+	store.SetInt(KeyFeatDownloadTracks, Features.DownloadTracks ? 1 : 0);
 	store.SetInt(KeyFeatUploadTracks, Features.UploadTracks ? 1 : 0);
 	store.SetString(KeyFeatUploadFolder, Settings::FeatureSettings::UploadFolderForStorage(Features.UploadFolder));
 	store.SetInt(KeyFeatScheduler, Features.Scheduler ? 1 : 0);

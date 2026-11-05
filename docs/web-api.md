@@ -28,6 +28,7 @@ Error codes so far:
 | `409` | `playlistChanged` | the `revision` in the request is not the playlist's current one |
 | `403` | `playlistReadOnly` | the playlist is read-only in the player, so it cannot be sorted or reordered |
 | `404` | `itemNotFound` | an item index in the request is outside the playlist |
+| `404` | `fileNotFound` | the item has no file on disk to send: it is a stream, or its file is gone |
 | `400` | `itemInContainer` | an item to delete from disk is a part of a container file, such as one track of a CUE sheet |
 | `403` | `physicalDeletionDisabled` | deleting files from disk is not allowed in the plugin settings |
 | `403` | `filesNotDeletable` | some of the files to delete from disk cannot be deleted right now; `files` lists their paths |
@@ -37,6 +38,7 @@ Error codes so far:
 | `409` | `queueChanged` | the `revision` in the request is not the playback queue's current one |
 | `403` | `browseFilesDisabled` | browsing the computer's files is not allowed in the plugin settings, so neither is adding them by path |
 | `404` | `pathInaccessible` | the folder does not exist or cannot be read |
+| `403` | `downloadDisabled` | downloading tracks is not allowed in the plugin settings |
 | `403` | `uploadDisabled` | uploading tracks is not allowed in the plugin settings |
 | `507` | `uploadNoSpace` | the drive of the upload folder has no room for the uploaded file |
 | `500` | `uploadFailed` | the uploaded file could not be written into the upload folder; nothing of it is left behind |
@@ -400,6 +402,25 @@ When they find nothing either, the player shows the file's comment tag in
 their place, whatever it holds, and so does the API.
 
 Errors: `400 invalidQuery`, `404 playlistNotFound`, `404 itemNotFound`.
+
+### `GET /api/v1/playlists/{id}/items/file?uri=…`
+
+The file of one item, for the browser to save, by the item's `fileUri` like the
+[information](#get-apiv1playlistsiditemsinfouri). Only the files of a
+playlist's items are sent, never a path the request names.
+
+The body is the file as it lies on disk, with `Content-Type` by its extension
+(`audio/mpeg`, `audio/flac`, …, `application/octet-stream` for the rest) and
+`Content-Disposition: attachment` with the file's name, an ASCII stand-in
+and the UTF-8 name of RFC 6266 as for the
+[covers](#get-apiv1playlistsiditemsindexcoverkeysize). A part of a container
+file, such as one track of a CUE sheet, sends the audio file the parts are cut
+from, the whole album. A `Range` request gets `206` with the part asked for,
+so a browser can resume a broken download.
+
+Errors: `403 downloadDisabled`, `400 invalidQuery`, `404 playlistNotFound`,
+`404 itemNotFound`, `404 fileNotFound` (a stream, or a file that is no longer
+on disk).
 
 ### `POST /api/v1/playlists/locate`
 
@@ -1140,6 +1161,7 @@ added beside the permissions:
 ```json
 {
   "permissions": {
+    "downloadTracks": true,
     "uploadTracks": true,
     "browseFiles": false,
     "physicalDeletion": false,

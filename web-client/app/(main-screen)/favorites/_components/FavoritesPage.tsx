@@ -19,7 +19,7 @@ import {
 } from '@/app/_components/lists';
 import styles from '@/app/_components/lists/ListPage.module.scss';
 import { menuSeparator, useRowMenu } from '@/app/_components/menus';
-import { useItemRemoval } from '@/app/_components/playlists';
+import { useItemRemoval, useTrackDownload } from '@/app/_components/playlists';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { useFavoriteRelink, useFavorites, type FavoriteRecord } from '@/app/_state/Favorites';
 import { useNavigation } from '@/app/_state/Navigation';
@@ -141,6 +141,7 @@ export function FavoritesPage() {
 
     const queuePositions = useQueuePositions();
     const removal = useItemRemoval();
+    const download = useTrackDownload();
     const rowMenu = useRowMenu(({ record, located }: FavoriteEntry) => {
         const remove = {
             label: t('favorites.remove'),
@@ -170,6 +171,7 @@ export function FavoritesPage() {
             ...removal.trackItems({ ...located, name: record.displayText }, physically => {
                 if (physically) favorites.remove([record.fileUri]);
             }),
+            ...download.trackItems(located),
         ];
     });
 
@@ -343,6 +345,7 @@ export function FavoritesPage() {
             )}
             {rowMenu.popover}
             {removal.dialogs}
+            {download.dialogs}
         </section>
     );
 }

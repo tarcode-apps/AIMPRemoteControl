@@ -1,103 +1,52 @@
 #include "downloadTrackCommand.h"
 
-#include <cctype>
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <system_error>
 
-#include "apiCore.h"
-#include "apiFileManager.h"
 #include "apiPlaylists.h"
-#include "aimpHelper.h"
 #include "helpers/idLookup.h"
 #include "mainThreadRunner.h"
 #include "helpers/remoteControlIdManager.h"
-
-namespace
-{
-	std::string ContentTypeFor(const std::filesystem::path &file)
-	{
-		std::string ext = file.extension().generic_string();
-		for (char &c : ext)
-			c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-		if (ext == ".mp3")
-			return "audio/mpeg";
-		if (ext == ".flac")
-			return "audio/flac";
-		if (ext == ".ogg" || ext == ".oga" || ext == ".opus")
-			return "audio/ogg";
-		if (ext == ".m4a" || ext == ".mp4" || ext == ".aac")
-			return "audio/mp4";
-		if (ext == ".wav")
-			return "audio/wav";
-		if (ext == ".wma")
-			return "audio/x-ms-wma";
-		if (ext == ".ape")
-			return "audio/x-ape";
-		return "application/octet-stream";
-	}
-
-	std::string LocalFileName(IAIMPCore *core, RemoteControlIdManager &idManager, std::int32_t trackId)
-	{
-		return RunOnMainThread(core, [&]() -> std::string
-							   {
-			IAIMPPlaylistItem *item = FindPlaylistItem(core, idManager, trackId);
-			if (!item)
-				return {};
-			std::string result;
-			IAIMPString *uri = nullptr;
-			if (Succeeded(item->GetValueAsObject(AIMP_PLAYLISTITEM_PROPID_FILENAME, IID_IAIMPString, reinterpret_cast<void **>(&uri))) && uri)
-			{
-				IAIMPServiceFileURI *fileUri = nullptr;
-				if (Succeeded(core->QueryInterface(IID_IAIMPServiceFileURI, reinterpret_cast<void **>(&fileUri))) && fileUri)
-				{
-					if (fileUri->IsURL(uri) != S_OK)
-					{
-						IAIMPString *container = nullptr, *part = nullptr;
-						if (Succeeded(fileUri->Parse(uri, &container, &part)) && container)
-						{
-							result = IAIMPStringToString(container);
-							container->Release();
-							if (part)
-								part->Release();
-						}
-						else
-							result = IAIMPStringToString(uri);
-					}
-					fileUri->Release();
-				}
-				uri->Release();
-			}
-			item->Release();
-			return result; });
-	}
-}
+#include "player/trackFile.h"
+#include "settings.h"
+#include "utf8Path.h"
 
 void rpcapi::DownloadTrackCommand::Register(IEndpointRouteBuilder &endpoints)
 {
 	endpoints.MapGet(R"(/downloadTrack/playlist_id/-?\d+/track_id/(-?\d+))",
-			   [core = FCore, &idManager = FIdManager](const ApiRequest &request) -> std::optional<HttpContent>
+			   [core = FCore, &idManager = FIdManager, &settings = FSettings](const ApiRequest &request) -> std::optional<HttpContent>
 			   {
 				   if (request.PathMatches.empty())
 					   return std::nullopt;
-				   const std::string fileName = LocalFileName(core, idManager, static_cast<std::int32_t>(std::stol(request.PathMatches[0])));
-				   if (fileName.empty())
-					   return std::nullopt;
-
-				   const std::filesystem::path path(std::u8string(fileName.begin(), fileName.end()));
+				   const auto trackId = static_cast<std::int32_t>(std::stol(request.PathMatches[0]));
+				   const std::string file = RunOnMainThread(core, [&]() -> std::string
+															{
+					   IAIMPPlaylistItem *item = FindPlaylistItem(core, idManager, trackId);
+					   if (!item)
+						   return {};
+					   std::string result = player::TrackFile(core, item);
+					   item->Release();
+					   return result; });
+				   const std::filesystem::path path = PathFromUtf8(file);
 				   std::error_code ec;
 				   if (!std::filesystem::is_regular_file(path, ec))
 					   return std::nullopt;
 
-				   const std::u8string u8name = path.filename().u8string();
-				   const std::string name(u8name.begin(), u8name.end());
 				   HttpContent content;
-				   content.ContentType = ContentTypeFor(path);
-				   content.FilePath = fileName;
 				   // Raw UTF-8 in the quotes and no filename*, as the original plugin sent it: the
 				   // app's download manager crashes on a percent-encoded name. Not the web API's
-				   // header, which is built to the standard.
-				   content.Headers["Content-Disposition"] = "attachment; filename=\"" + name + "\"";
+				   // header, which is built to the standard. Sent with a refusal too: the app
+				   // reads the name before it downloads, and falls over without the header.
+				   content.Headers["Content-Disposition"] = "attachment; filename=\"" + PathToUtf8(path.filename()) + "\"";
+				   if (!settings.Get().Features.DownloadTracks)
+				   {
+					   content.Status = 403;
+					   return content;
+				   }
+				   content.ContentType = player::AudioContentType(path);
+				   content.FilePath = file;
 				   return content;
 			   });
 }

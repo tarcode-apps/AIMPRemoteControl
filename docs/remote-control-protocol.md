@@ -692,8 +692,14 @@ Returns the audio file with `Content-Type` by extension (`audio/x-mp3`, …) and
 **raw UTF‑8 inside the quotes**, without an RFC 5987 `filename*` — this is what
 the original plugin sent and what the app's download manager understands (it
 crashes on percent-encoded names). `playlist_id` is accepted but not needed.
-For CUE entries and other container-backed tracks the container file is
-returned. `404` for an unknown track or URL entries.
+For CUE entries and other container-backed tracks the audio file the parts are
+cut from is returned, the whole album; earlier versions of this plugin sent the
+CUE sheet itself. A `Range` request gets `206` with the part asked for. `404` for an
+unknown track, a URL entry or a file no longer on disk. `403` when downloading
+is turned off in the plugin settings, which the original plugin had no setting
+for and `PluginCapabilities` does not report; the `Content-Disposition` header is
+sent all the same, since the app reads the file name from it before it starts
+the download and shows an exception when the header is missing.
 
 ### 9.3 Track upload
 

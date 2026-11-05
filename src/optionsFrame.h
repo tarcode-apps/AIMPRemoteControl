@@ -62,6 +62,7 @@ private:
 
 	// Features group
 	IAIMPUICheckBox *FPhysicalDeletionCheck = nullptr;
+	IAIMPUICheckBox *FDownloadTracksCheck = nullptr;
 	IAIMPUICheckBox *FUploadTracksCheck = nullptr;
 	IAIMPUIEdit *FUploadFolderEdit = nullptr;
 	IAIMPUICheckBox *FBrowseFilesCheck = nullptr;

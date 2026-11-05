@@ -26,6 +26,8 @@ struct Settings
 	struct FeatureSettings
 	{
 		bool PhysicalDeletion = false;
+		// On unless turned off: the original plugin always let the app download.
+		bool DownloadTracks = true;
 		bool UploadTracks = false;
 		bool Scheduler = false;
 		bool BrowseFiles = false;

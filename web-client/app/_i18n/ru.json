@@ -236,6 +236,8 @@
     "selectedActions": "Действия с выбранными треками",
     "removeFromPlaylist": "Удалить из плейлиста",
     "deleteFromDisk": "Удалить с диска",
+    "download": "Скачать",
+    "downloadAlbum": "Скачать файл альбома",
     "deleteFromDiskConfirm": "Удалить файл трека «{{name}}» с диска?",
     "deleteSelectedFromDiskConfirm": "Удалить файлы выбранных треков с диска?",
     "enqueue": "Добавить в очередь",

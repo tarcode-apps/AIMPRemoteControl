@@ -1,4 +1,5 @@
 import type { ItemDetailsResponse, LocateResponse, Lyrics, PlaylistItemsPage, TrackInfo } from '@/app/_api/types';
+import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '../fixtures';
 
@@ -341,6 +342,56 @@ test.describe('items', () => {
         expect((await api.get(route('C:\\no\\such\\file.wav'))).error?.code).toBe('itemNotFound');
         expect((await api.get(`/playlists/${encode(playlist.id)}/items/lyrics`)).error?.code).toBe('invalidQuery');
         expect((await api.get(`/playlists/${encode(unknownId)}/items/lyrics?uri=x`)).error?.code).toBe(
+            'playlistNotFound',
+        );
+    });
+
+    test('sends the file of a track, the audio a CUE part is cut from, and no file for a stream', async ({
+        api,
+        media,
+        playlists,
+    }) => {
+        const sheet = media.cue(['Part one', 'Part two']);
+        const name = 'Трек один.wav';
+        const playlist = await playlists.create({
+            tracks: [{ title: 'One', name }, { title: 'Gone' }],
+            files: [sheet],
+            expectItems: 4,
+        });
+        const items = `/playlists/${encode(playlist.id)}/items`;
+        await api.post(items, { urls: ['http://127.0.0.1:9/radio'] });
+        await expect.poll(() => api.playlistItemCount(playlist.id)).toBe(5);
+        const route = (uri: string) => `${items}/file?uri=${encode(uri)}`;
+        const download = (uri: string, headers?: Record<string, string>) =>
+            api.context.get(`/api/v1${route(uri)}`, { headers });
+
+        const file = await download(playlist.files[0]);
+        expect(file.status()).toBe(200);
+        expect(file.headers()['content-type']).toBe('audio/wav');
+        expect(file.headers()['content-disposition']).toBe(
+            `attachment; filename="____ ____.wav"; filename*=UTF-8''${encode(name)}`,
+        );
+        expect((await file.body()).equals(fs.readFileSync(playlist.files[0]))).toBe(true);
+        // A download the browser resumes asks for the rest.
+        const rest = await download(playlist.files[0], { Range: 'bytes=100-' });
+        expect(rest.status()).toBe(206);
+        expect((await rest.body()).equals(fs.readFileSync(playlist.files[0]).subarray(100))).toBe(true);
+
+        const listed = (await api.items(playlist.id)).items;
+        const part = listed.find(item => item.inContainer)!;
+        const album = await download(part.fileUri);
+        expect(album.status()).toBe(200);
+        expect(album.headers()['content-disposition']).toContain('filename="album.wav"');
+        expect((await album.body()).equals(fs.readFileSync(path.join(path.dirname(sheet), 'album.wav')))).toBe(true);
+
+        const stream = listed.find(item => item.isUrl)!;
+        expect((await api.get(route(stream.fileUri))).error?.code).toBe('fileNotFound');
+        fs.rmSync(playlist.files[1]);
+        expect((await api.get(route(playlist.files[1]))).error?.code).toBe('fileNotFound');
+
+        expect((await api.get(route('C:\\no\\such\\file.wav'))).error?.code).toBe('itemNotFound');
+        expect((await api.get(`${items}/file`)).error?.code).toBe('invalidQuery');
+        expect((await api.get(`/playlists/${encode(unknownId)}/items/file?uri=x`)).error?.code).toBe(
             'playlistNotFound',
         );
     });

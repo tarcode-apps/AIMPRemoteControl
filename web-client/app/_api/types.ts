@@ -362,6 +362,7 @@ export type PlayerPatch = Partial<Pick<PlayerState, 'position' | 'volume' | 'mut
 
 // What the plugin's options page lets a client do.
 export type Permissions = {
+    downloadTracks: boolean;
     uploadTracks: boolean;
     browseFiles: boolean;
     physicalDeletion: boolean;

@@ -19,4 +19,8 @@ namespace webapi
 	// an ASCII stand-in for old clients and the UTF-8 name of RFC 6266. Empty for
 	// a name with nothing left after `SafeFileName`.
 	std::string InlineContentDisposition(std::string_view name, std::string_view extension);
+
+	// `attachment`, which a browser saves rather than shows, with the file name in
+	// the same two forms; a bare `attachment` for a name with nothing left.
+	std::string AttachmentContentDisposition(std::string_view fileName);
 }

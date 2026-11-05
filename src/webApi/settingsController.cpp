@@ -7,6 +7,7 @@ nlohmann::json webapi::SettingsController::ToJson(const Settings &settings)
 	const Settings::FeatureSettings &features = settings.Features;
 	return {
 		{"permissions", {
+			{"downloadTracks", features.DownloadTracks},
 			{"uploadTracks", features.UploadTracks},
 			{"browseFiles", features.BrowseFiles},
 			{"physicalDeletion", features.PhysicalDeletion},

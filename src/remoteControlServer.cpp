@@ -129,7 +129,9 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 					res.status = 404;
 					return;
 				}
-				res.status = content->Status;
+				// Left unset for a file, httplib answers a range request with 206.
+				if (content->FilePath.empty() || content->Status != 200)
+					res.status = content->Status;
 				for (const auto &[name, value] : content->Headers)
 					res.set_header(name, value);
 				if (!content->FilePath.empty())

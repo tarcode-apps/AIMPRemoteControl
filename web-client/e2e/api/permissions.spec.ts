@@ -4,12 +4,18 @@ import { legacyPlaylistId, legacyTrackIds } from '../lib/legacy';
 
 const encode = encodeURIComponent;
 
-test.describe('with deletion, upload and the timer disallowed', () => {
-    withPluginSettings({ physicalDeletion: false, uploadTracks: false, scheduler: false });
+test.describe('with deletion, download, upload and the timer disallowed', () => {
+    withPluginSettings({ physicalDeletion: false, downloadTracks: false, uploadTracks: false, scheduler: false });
 
     test('the settings and the capabilities tell so', async ({ api }) => {
         expect((await api.get('/settings')).body).toEqual({
-            permissions: { uploadTracks: false, browseFiles: true, physicalDeletion: false, scheduler: false },
+            permissions: {
+                downloadTracks: false,
+                uploadTracks: false,
+                browseFiles: true,
+                physicalDeletion: false,
+                scheduler: false,
+            },
         });
         expect(await api.rpcResult('PluginCapabilities')).toEqual({
             physical_track_deletion: false,
@@ -36,6 +42,20 @@ test.describe('with deletion, upload and the timer disallowed', () => {
         expect((await api.post(route, { indexes: [0] })).status).toBe(200);
         await expect.poll(() => api.playlistItemCount(playlist.id)).toBe(2);
         expect(fs.existsSync(playlist.files[0])).toBe(true);
+    });
+
+    test('downloads are refused in both protocols', async ({ api, playlists }) => {
+        const playlist = await playlists.create({ tracks: 1 });
+        const refused = await api.get(`/playlists/${encode(playlist.id)}/items/file?uri=${encode(playlist.files[0])}`);
+        expect(refused.status).toBe(403);
+        expect(refused.error?.code).toBe('downloadDisabled');
+
+        const legacyId = await legacyPlaylistId(api, playlist.name);
+        const [first] = await legacyTrackIds(api, legacyId);
+        // The app reads the file name from the refusal too, before its download manager hears 403.
+        const legacy = await api.context.get(`/downloadTrack/playlist_id/${legacyId}/track_id/${first}`);
+        expect(legacy.status()).toBe(403);
+        expect(legacy.headers()['content-disposition']).toBe('attachment; filename="track-01.wav"');
     });
 
     test('uploads are refused before anything is written', async ({ api, media, playlists }) => {

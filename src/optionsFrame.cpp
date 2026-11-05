@@ -348,6 +348,7 @@ void OptionsFrame::BuildFeaturesGroup(IAIMPServiceUI *svc)
 
 	FSchedulerCheck = CreateCheckBox(FCore, svc, FForm, group, FEvents, "cbScheduler");
 	FPhysicalDeletionCheck = CreateCheckBox(FCore, svc, FForm, group, FEvents, "cbPhysicalDeletion");
+	FDownloadTracksCheck = CreateCheckBox(FCore, svc, FForm, group, FEvents, "cbDownloadTracks");
 	FUploadTracksCheck = CreateCheckBox(FCore, svc, FForm, group, FEvents, "cbUploadTracks");
 
 	FUploadFolderEdit = CreateLabeledEdit(FCore, svc, FForm, group, FEvents, "UploadFolder", FUploadChildren);
@@ -386,6 +387,7 @@ void OptionsFrame::LoadFromSettings()
 
 	SetChecked(FPhysicalDeletionCheck, AIMPUI_CHECKBOX_PROPID_STATE, f.PhysicalDeletion);
 	SetChecked(FBrowseFilesCheck, AIMPUI_CHECKBOX_PROPID_STATE, f.BrowseFiles);
+	SetChecked(FDownloadTracksCheck, AIMPUI_CHECKBOX_PROPID_STATE, f.DownloadTracks);
 	SetChecked(FUploadTracksCheck, AIMPUI_CHECKBOX_PROPID_STATE, f.UploadTracks);
 	if (FUploadFolderEdit)
 		SetString(FCore, FUploadFolderEdit, AIMPUI_BASEEDIT_PROPID_TEXT, f.EffectiveUploadFolder());
@@ -420,6 +422,7 @@ void OptionsFrame::SaveToSettings()
 	Settings::FeatureSettings &f = s.Features;
 	f.PhysicalDeletion = IsChecked(FPhysicalDeletionCheck, AIMPUI_CHECKBOX_PROPID_STATE);
 	f.BrowseFiles = IsChecked(FBrowseFilesCheck, AIMPUI_CHECKBOX_PROPID_STATE);
+	f.DownloadTracks = IsChecked(FDownloadTracksCheck, AIMPUI_CHECKBOX_PROPID_STATE);
 	f.UploadTracks = IsChecked(FUploadTracksCheck, AIMPUI_CHECKBOX_PROPID_STATE);
 	if (FUploadFolderEdit)
 		f.UploadFolder = Settings::FeatureSettings::UploadFolderForStorage(
@@ -506,6 +509,7 @@ void WINAPI OptionsFrame::DestroyFrame()
 	Drop(FAuthGroup);
 	Drop(FPhysicalDeletionCheck);
 	Drop(FBrowseFilesCheck);
+	Drop(FDownloadTracksCheck);
 	Drop(FUploadTracksCheck);
 	Drop(FUploadFolderEdit);
 	Drop(FSchedulerCheck);

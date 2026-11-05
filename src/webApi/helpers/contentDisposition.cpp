@@ -40,22 +40,33 @@ std::string webapi::SafeFileName(std::string_view name)
 	return safe.substr(start);
 }
 
+namespace
+{
+	std::string ContentDisposition(const std::string &type, const std::string &file)
+	{
+		// One stand-in per character: a UTF-8 sequence is its lead byte and continuation
+		// bytes, which are 10xxxxxx.
+		std::string ascii;
+		for (const char c : file)
+		{
+			const auto byte = static_cast<unsigned char>(c);
+			if (byte < 0x80)
+				ascii += c;
+			else if ((byte & 0xC0) != 0x80)
+				ascii += '_';
+		}
+		return type + "; filename=\"" + ascii + "\"; filename*=UTF-8''" + webapi::PercentEncode(file);
+	}
+}
+
 std::string webapi::InlineContentDisposition(std::string_view name, std::string_view extension)
 {
 	const std::string safe = SafeFileName(name);
-	if (safe.empty())
-		return {};
-	const std::string file = safe + "." + std::string(extension);
-	// One stand-in per character: a UTF-8 sequence is its lead byte and continuation
-	// bytes, which are 10xxxxxx.
-	std::string ascii;
-	for (const char c : file)
-	{
-		const auto byte = static_cast<unsigned char>(c);
-		if (byte < 0x80)
-			ascii += c;
-		else if ((byte & 0xC0) != 0x80)
-			ascii += '_';
-	}
-	return "inline; filename=\"" + ascii + "\"; filename*=UTF-8''" + PercentEncode(file);
+	return safe.empty() ? std::string() : ContentDisposition("inline", safe + "." + std::string(extension));
+}
+
+std::string webapi::AttachmentContentDisposition(std::string_view fileName)
+{
+	const std::string safe = SafeFileName(fileName);
+	return safe.empty() ? std::string("attachment") : ContentDisposition("attachment", safe);
 }

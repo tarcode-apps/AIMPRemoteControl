@@ -75,6 +75,26 @@ test.describe('queue', () => {
         expect((await api.queue()).items).toEqual([]);
     });
 
+    test('stays as it was over a track switch that takes nothing out of it', async ({ api, events, playlists }) => {
+        const playlist = await playlists.create({ tracks: [{ seconds: 20 }, { seconds: 20 }, { seconds: 20 }] });
+        await api.play(playlist.id, 0);
+        await expect.poll(async () => (await api.player()).track?.index).toBe(0);
+        const { revision } = await api.queue();
+        const since = events.mark();
+        await api.command('next');
+        await expect.poll(async () => (await api.player()).track?.index).toBe(1);
+        // The player notifies the queue's listeners a moment after the switch.
+        await expect(events.next('queue', () => true, { since, timeout: 2000 })).rejects.toThrow();
+        expect((await api.queue()).revision).toBe(revision);
+
+        // One the player takes out of the queue is a change.
+        await api.enqueue(playlist.id, [0]);
+        const taken = events.next<{ count: number }>('queue', data => data.count === 0);
+        await api.command('next');
+        await taken;
+        await expect.poll(async () => (await api.player()).track?.index).toBe(0);
+    });
+
     test('counts its changes and refuses stale or bad requests', async ({ api, playlists }) => {
         const playlist = await playlists.create({ tracks: 2 });
         const before = (await api.queue()).revision;

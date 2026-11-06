@@ -48,7 +48,8 @@ Bin, because that is where the player deletes to.
 A few specs restart the throwaway player with other plugin settings — every
 permission off, or Digest authentication on — or with a setting of the player
 itself, such as the playlists' switch column hidden, and restore the usual
-ones afterwards (`withPluginSettings` in `fixtures.ts`). They are skipped with
+ones afterwards (`withPluginSettings` in `fixtures.ts`); `ui/events.spec.ts`
+restarts it to see the client get its event stream back. They are skipped with
 `E2E_PLAYER_URL`, since a player the run did not start cannot be restarted.
 
 To test a player that is already running instead, set `E2E_PLAYER_URL`

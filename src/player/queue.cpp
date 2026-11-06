@@ -150,8 +150,17 @@ player::QueueState player::GetQueueState(IAIMPCore *core)
 	QueueState state;
 	if (IAIMPPlaylistQueue *queue = Queue(core))
 	{
-		state.Count = queue->GetItemCount();
 		state.Suspended = IsSuspended(queue);
+		// Skips what cannot be read, as the snapshot does.
+		const INT32 count = queue->GetItemCount();
+		for (INT32 i = 0; i < count; ++i)
+		{
+			IAIMPPlaylistItem *item = nullptr;
+			if (Failed(queue->GetItem(i, IID_IAIMPPlaylistItem, reinterpret_cast<void **>(&item))) || !item)
+				continue;
+			state.Tracks.push_back(TrackOf(item));
+			item->Release();
+		}
 		queue->Release();
 	}
 	return state;

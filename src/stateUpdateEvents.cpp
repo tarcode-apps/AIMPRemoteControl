@@ -208,10 +208,9 @@ void StateUpdateEvents::Start(IAIMPCore *core)
 		queue->Release();
 	}
 	{
-		const player::QueueState state = player::GetQueueState(core);
+		player::QueueState state = player::GetQueueState(core);
 		std::lock_guard lock(FMutex);
-		FQueue.Count = state.Count;
-		FQueue.Suspended = state.Suspended;
+		FQueueState = std::move(state);
 	}
 
 	IAIMPServicePlaylistManager *mgr = nullptr;
@@ -346,12 +345,13 @@ void StateUpdateEvents::PlaylistRemoved(const std::string &playlistId)
 // Called on the player's own thread, where the queue can be read.
 void StateUpdateEvents::QueueChanged()
 {
-	const player::QueueState state = player::GetQueueState(FCore);
+	player::QueueState state = player::GetQueueState(FCore);
 	{
 		std::lock_guard lock(FMutex);
-		++FQueue.Revision;
-		FQueue.Count = state.Count;
-		FQueue.Suspended = state.Suspended;
+		if (state == FQueueState)
+			return;
+		FQueueState = std::move(state);
+		++FQueueRevision;
 	}
 	Notify(Queue);
 }
@@ -370,13 +370,13 @@ void StateUpdateEvents::StreamEnded(unsigned flags)
 StateUpdateEvents::QueueInfo StateUpdateEvents::CurrentQueue()
 {
 	std::lock_guard lock(FMutex);
-	return FQueue;
+	return {FQueueRevision, static_cast<std::int32_t>(FQueueState.Tracks.size()), FQueueState.Suspended};
 }
 
 std::uint64_t StateUpdateEvents::QueueRevision()
 {
 	std::lock_guard lock(FMutex);
-	return FQueue.Revision;
+	return FQueueRevision;
 }
 
 void StateUpdateEvents::FilterChange(const std::string &playlistId, unsigned long flags, std::int32_t itemCount)

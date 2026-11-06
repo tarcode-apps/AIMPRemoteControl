@@ -19,6 +19,13 @@ const invalidations: Record<string, QueryKey> = {
     settings: settingsKeys.all,
 };
 
+// The server pings after 30 s without events; a stream silent for longer than
+// two of those is dead, whatever the browser says of it: a sleeping mobile
+// loses its connections without a word.
+const silenceLimit = 75_000;
+// As the server's `retry:` hint, which only the browser's own reconnection obeys.
+const retryDelay = 3000;
+
 // Kept outside React on purpose: it must survive remounts and die with the page,
 // so a differing version on reconnect can only mean the plugin was replaced.
 let knownPluginVersion: string | undefined;
@@ -50,33 +57,71 @@ function invalidateChangedPlaylists(client: QueryClient, { playlists }: Playlist
 
 export function useEventStream(client: QueryClient) {
     useEffect(() => {
-        const source = new EventSource('/api/v1/events');
-        let reconnecting = false;
+        let source: EventSource | undefined;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let heardAt = 0;
+        let opened = false;
 
-        source.onopen = () => {
-            if (reconnecting) client.invalidateQueries();
-            reconnecting = true;
+        const reconnect = (delay: number) => {
+            source?.close();
+            source = undefined;
+            clearTimeout(timer);
+            timer = setTimeout(connect, delay);
         };
-        source.addEventListener('hello', (event: MessageEvent<string>) => {
-            const { pluginVersion } = JSON.parse(event.data) as Hello;
-            if (knownPluginVersion !== undefined && knownPluginVersion !== pluginVersion) location.reload();
-            knownPluginVersion = pluginVersion;
-        });
-        source.addEventListener('playlists', (event: MessageEvent<string>) => {
-            invalidateChangedPlaylists(client, JSON.parse(event.data) as PlaylistsChanged);
-        });
-        source.addEventListener('player', (event: MessageEvent<string>) => {
-            client.setQueryData(playerKeys.state, snapshot(JSON.parse(event.data) as PlayerState));
-        });
-        source.addEventListener('timer', (event: MessageEvent<string>) => {
-            client.setQueryData(timerKeys.all, JSON.parse(event.data) as TimerState);
-        });
-        source.addEventListener('effects', (event: MessageEvent<string>) => {
-            receiveEffects(client, JSON.parse(event.data) as EffectsState);
-        });
-        for (const [name, queryKey] of Object.entries(invalidations))
-            source.addEventListener(name, () => client.invalidateQueries({ queryKey }));
 
-        return () => source.close();
+        const heard = () => {
+            heardAt = Date.now();
+            clearTimeout(timer);
+            timer = setTimeout(() => reconnect(0), silenceLimit);
+        };
+
+        const connect = () => {
+            source = new EventSource('/api/v1/events');
+            heard();
+            const on = <T>(name: string, handler: (data: T) => void) =>
+                source!.addEventListener(name, (event: MessageEvent<string>) => {
+                    heard();
+                    handler(JSON.parse(event.data) as T);
+                });
+
+            source.onopen = () => {
+                heard();
+                if (opened) client.invalidateQueries();
+                opened = true;
+            };
+            // The browser reopens a dropped stream by itself, but gives up for good on
+            // an answer that is no stream, such as a proxy's 500 while the player
+            // restarts; one path for both.
+            source.onerror = () => reconnect(retryDelay);
+            on<Hello>('hello', ({ pluginVersion }) => {
+                if (knownPluginVersion !== undefined && knownPluginVersion !== pluginVersion) location.reload();
+                knownPluginVersion = pluginVersion;
+            });
+            on<PlaylistsChanged>('playlists', data => invalidateChangedPlaylists(client, data));
+            on<PlayerState>('player', data => client.setQueryData(playerKeys.state, snapshot(data)));
+            on<TimerState>('timer', data => client.setQueryData(timerKeys.all, data));
+            on<EffectsState>('effects', data => receiveEffects(client, data));
+            on('ping', () => {});
+            for (const [name, queryKey] of Object.entries(invalidations))
+                on(name, () => client.invalidateQueries({ queryKey }));
+        };
+
+        // Timers stand still while a mobile sleeps; the clock does not.
+        const checkSilence = () => {
+            if (Date.now() - heardAt > silenceLimit) reconnect(0);
+        };
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') checkSilence();
+        };
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        window.addEventListener('online', checkSilence);
+        connect();
+
+        return () => {
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+            window.removeEventListener('online', checkSilence);
+            clearTimeout(timer);
+            source?.close();
+        };
     }, [client]);
 }

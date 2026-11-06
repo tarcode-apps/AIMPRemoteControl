@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "playlistItems.h"
@@ -29,10 +30,15 @@ namespace player
 		std::vector<QueueItem> Items;
 	};
 
+	// What a client sees of the queue, to tell a change from the player's
+	// notifications that change nothing, such as those of every track switch.
 	struct QueueState
 	{
-		std::int32_t Count = 0;
 		bool Suspended = false;
+		// Every position: the track's playlist and its index there.
+		std::vector<std::pair<std::string, std::int32_t>> Tracks;
+
+		bool operator==(const QueueState &) const = default;
 	};
 
 	// `playlist` may be null when the item's playlist is gone.

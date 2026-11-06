@@ -13,6 +13,8 @@
 #include <thread>
 #include <vector>
 
+#include "player/queue.h"
+
 class IAIMPCore;
 class IAIMPPlaylist;
 class PlaylistChangeFilter;
@@ -102,7 +104,9 @@ private:
 	std::uint64_t FVersions[KindCount] = {};
 	PlaylistRevisions FPlaylistRevisions;
 	PlaylistRevisions FTagWrites;
-	QueueInfo FQueue;
+	std::uint64_t FQueueRevision = 1;
+	// The queue as last seen, to tell real changes from the player's empty notifications.
+	player::QueueState FQueueState;
 	// Its changes move the playing item's index, so they count as player changes too.
 	std::string FPlayingPlaylistId;
 	bool FStopped = false;

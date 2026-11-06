@@ -254,7 +254,7 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 			return Write(message + "\n");
 		}
 
-		bool Ping() override { return Write(": ping\n\n"); }
+		bool Ping() override { return Send("ping", "{}"); }
 
 		bool Write(const std::string &text)
 		{

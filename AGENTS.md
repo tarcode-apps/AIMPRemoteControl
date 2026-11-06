@@ -169,7 +169,10 @@ Things that bite:
   load-bearing — it makes the export emit `<route>/index.html`, which is what
   the static lookup in `remoteControlServer.cpp` resolves. Its API lives under
   `/api` and is new — `/RPC_JSON` stays frozen for the old Android app.
-  Licenses of anything it bundles are not in `THIRD-PARTY-NOTICES.txt` yet.
+  Licenses of the npm packages it bundles land in
+  `out/_next/static/third-party-licenses.txt`; CI appends them to the
+  `.aimppack`'s `THIRD-PARTY-NOTICES.txt` (the one in `dist/` covers
+  `third_party/` only).
 - **Localization.** `Langs/*.lng` are UTF-16LE with BOM and CRLF line endings
   — preserve both, git treats them as binary. Keys used in code must exist in
   every language file; format placeholders (`{0}`) must survive translation.

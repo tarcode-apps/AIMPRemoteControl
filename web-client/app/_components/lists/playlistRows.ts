@@ -54,6 +54,11 @@ export class PlaylistRows {
         return span && { startRow: span.startRow, rowCount: span.rowCount };
     }
 
+    // The group of `row`, its header included; undefined in a flat playlist.
+    groupAt(row: number): PlaylistGroup | undefined {
+        return this.spanOf(row)?.group;
+    }
+
     keyAt(row: number): PlaylistRowKey {
         const entry = this.at(row);
         return entry.kind === 'group'

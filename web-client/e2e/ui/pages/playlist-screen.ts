@@ -44,6 +44,16 @@ export class PlaylistScreen extends ListScreen {
         return this.row(text).getByTestId('item-switch');
     }
 
+    // The thumb beside the list, which drags it through, and the group name it
+    // shows meanwhile.
+    get scrollThumb(): Locator {
+        return this.list.locator('..').getByTestId('scroll-thumb');
+    }
+
+    get scrollLabel(): Locator {
+        return this.list.locator('..').getByTestId('scroll-label');
+    }
+
     // The three-state switch of a group's header.
     groupSwitch(name: string): Locator {
         return this.list.getByTestId('group-row').filter({ hasText: name }).getByTestId('group-switch');

@@ -20,6 +20,7 @@ test.describe('a long playlist', () => {
             tracks: Array.from({ length: trackCount }, (_, i) => ({
                 title: track(i + 1),
                 seconds: i === trackCount - 1 ? 30 : 0.2,
+                folder: i < trackCount / 2 ? 'early' : 'late',
             })),
         });
         screen = new PlaylistScreen(app, playlist.name);
@@ -42,6 +43,27 @@ test.describe('a long playlist', () => {
 
         await screen.play(track(trackCount));
         await expect.poll(async () => (await api.player()).track?.index).toBe(trackCount - 1);
+    });
+
+    test('the scroll thumb drags the list and names the group it passes', async ({ page }) => {
+        await screen.open();
+        // Measured once still: a mobile slides the tab's page in.
+        await screen.scrollThumb.hover();
+        const thumb = (await screen.scrollThumb.boundingBox())!;
+        const list = (await screen.list.boundingBox())!;
+        const x = thumb.x + thumb.width / 2;
+        const y = thumb.y + thumb.height / 2;
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        await page.mouse.move(x, y + 20, { steps: 4 });
+        await expect(screen.scrollLabel).toContainText('early');
+        // Near the top it stops at the list's edge, clear of the bar above.
+        expect((await screen.scrollLabel.boundingBox())!.y).toBeGreaterThanOrEqual(list.y);
+        await page.mouse.move(x, list.y + list.height, { steps: 10 });
+        await expect(screen.scrollLabel).toContainText('late');
+        await page.mouse.up();
+        await expect(screen.scrollLabel).toBeHidden();
+        await expect(screen.row(track(trackCount))).toBeInViewport();
     });
 
     test('comes back where it was left after other playlists', async ({ app, playlists }) => {

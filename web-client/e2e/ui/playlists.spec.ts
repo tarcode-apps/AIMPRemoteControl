@@ -79,4 +79,32 @@ test.describe('playlists', () => {
         await one.show();
         await expect(one.row('Heron song')).toBeInViewport();
     });
+
+    test('a swipe that ends before the page redraws leaves the playlists in place', async ({ app, playlists }) => {
+        test.skip(app.drawerDocked, 'a docked drawer has no pager');
+        // The last playlist: a swipe on towards the next one stays where it is.
+        const last = await playlists.create({ name: 'rc-e2e Plover', tracks: 3 });
+        const screen = new PlaylistScreen(app, last.name);
+        await screen.open();
+        await screen.list.hover();
+        // A busy page, such as one drawing a list that still scrolls by inertia,
+        // gets the move that starts the drag and the release in one go.
+        await screen.list.evaluate(async list => {
+            const box = list.getBoundingClientRect();
+            const pointer = (x: number, buttons: number) => ({
+                bubbles: true,
+                pointerId: 7,
+                pointerType: 'touch',
+                isPrimary: true,
+                clientX: x,
+                clientY: box.y + box.height / 2,
+                buttons,
+            });
+            list.dispatchEvent(new PointerEvent('pointerdown', pointer(300, 1)));
+            await new Promise(resolve => setTimeout(resolve, 50));
+            window.dispatchEvent(new PointerEvent('pointermove', pointer(260, 1)));
+            window.dispatchEvent(new PointerEvent('pointerup', pointer(260, 0)));
+        });
+        await expect.poll(async () => Math.round((await screen.list.boundingBox())!.x)).toBe(0);
+    });
 });

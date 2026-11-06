@@ -5,12 +5,14 @@ import { queueMark, trackKey, useQueuePositions } from '@/app/_api/queue';
 import type { LocatedItem, PlaylistGroup, PlaylistItem } from '@/app/_api/types';
 import { ListCheckbox } from '@/app/_components/inputs';
 import {
+    FastScroll,
     groupPositions,
     GroupRow,
     ItemRow,
     positionsCheckState,
     SkeletonRow,
     thumbnailMargin,
+    topGroupName,
     twoLineRowHeight,
     useActiveRow,
     usePlaylistDrag,
@@ -251,101 +253,103 @@ export function FavoritesPage() {
     }
 
     return (
-        <section
-            ref={scrollRef}
-            className={clsx(styles.page, active.byKeyboard && styles.keyboard)}
-            aria-label={t('screens.favorites')}
-            role="listbox"
-            tabIndex={0}
-            aria-activedescendant={active.row === null ? undefined : rowId(active.row)}
-            onKeyDown={onKeyDown}
-            // Word selection starts on the second press of a double click.
-            onMouseDown={event => {
-                if (event.detail > 1) event.preventDefault();
-            }}
-        >
-            {entries.length === 0 ? (
-                <p className={styles.message}>{t(searching ? 'playlist.noResults' : 'favorites.empty')}</p>
-            ) : (
-                <div
-                    className={clsx(styles.list, drag.state && !drag.settled && styles.dragging)}
-                    style={{ height: virtualizer.getTotalSize() + (drag.state?.source.ghostHeight ?? 0) }}
-                >
-                    {virtualRows.map(({ index, start }) => {
-                        const row = rows.at(index);
-                        const isActive = active.row === index;
-                        const hidden = drag.hidden(index);
-                        const transform = `translateY(${start + drag.shift(index)}px)`;
-                        if (row.kind === 'group')
+        <FastScroll scrollRef={scrollRef} label={topGroupName(rows, virtualizer)}>
+            <section
+                ref={scrollRef}
+                className={clsx(styles.page, active.byKeyboard && styles.keyboard)}
+                aria-label={t('screens.favorites')}
+                role="listbox"
+                tabIndex={0}
+                aria-activedescendant={active.row === null ? undefined : rowId(active.row)}
+                onKeyDown={onKeyDown}
+                // Word selection starts on the second press of a double click.
+                onMouseDown={event => {
+                    if (event.detail > 1) event.preventDefault();
+                }}
+            >
+                {entries.length === 0 ? (
+                    <p className={styles.message}>{t(searching ? 'playlist.noResults' : 'favorites.empty')}</p>
+                ) : (
+                    <div
+                        className={clsx(styles.list, drag.state && !drag.settled && styles.dragging)}
+                        style={{ height: virtualizer.getTotalSize() + (drag.state?.source.ghostHeight ?? 0) }}
+                    >
+                        {virtualRows.map(({ index, start }) => {
+                            const row = rows.at(index);
+                            const isActive = active.row === index;
+                            const hidden = drag.hidden(index);
+                            const transform = `translateY(${start + drag.shift(index)}px)`;
+                            if (row.kind === 'group')
+                                return (
+                                    <div
+                                        key={index}
+                                        id={rowId(index)}
+                                        role="option"
+                                        data-testid="group-row"
+                                        aria-selected={isActive}
+                                        className={clsx(
+                                            styles.groupRow,
+                                            isActive && styles.active,
+                                            hidden && styles.hidden,
+                                        )}
+                                        style={{ height: groupRowHeight, transform }}
+                                    >
+                                        {selecting && (
+                                            <ListCheckbox
+                                                title={t('playlist.selectGroup')}
+                                                tabIndex={-1}
+                                                className={styles.groupCheckbox}
+                                                {...groupSelection(row.group)}
+                                                onChange={event => setGroupSelected(row.group, event.target.checked)}
+                                            />
+                                        )}
+                                        <GroupRow group={row.group} onToggle={() => mode.toggleGroup(row.group)} />
+                                    </div>
+                                );
+                            const entry = entries[row.position];
+                            const { located } = entry;
                             return (
                                 <div
                                     key={index}
                                     id={rowId(index)}
                                     role="option"
-                                    data-testid="group-row"
+                                    data-testid="item-row"
                                     aria-selected={isActive}
+                                    title={located ? undefined : t('favorites.missing')}
                                     className={clsx(
-                                        styles.groupRow,
+                                        styles.row,
+                                        index % 2 && styles.odd,
                                         isActive && styles.active,
+                                        !located && styles.missing,
+                                        located && isPlaying(located) && styles.playing,
                                         hidden && styles.hidden,
                                     )}
-                                    style={{ height: groupRowHeight, transform }}
+                                    style={{ height: twoLineRowHeight, transform }}
+                                    onClick={event => onItemClick(event, index, row.position, entry)}
+                                    onDoubleClick={() => located && mode.mode === null && play(located)}
                                 >
-                                    {selecting && (
-                                        <ListCheckbox
-                                            title={t('playlist.selectGroup')}
-                                            tabIndex={-1}
-                                            className={styles.groupCheckbox}
-                                            {...groupSelection(row.group)}
-                                            onChange={event => setGroupSelected(row.group, event.target.checked)}
-                                        />
-                                    )}
-                                    <GroupRow group={row.group} onToggle={() => mode.toggleGroup(row.group)} />
+                                    <ItemRow
+                                        {...itemProps(entry)}
+                                        number={row.position + 1}
+                                        queueMark={
+                                            located &&
+                                            queueMark(queuePositions.get(trackKey(located.playlistId, located.index)))
+                                        }
+                                        selected={selecting && mode.isSelected(row.position)}
+                                        onSelect={selected => mode.setSelected([row.position], selected, rows)}
+                                        onDragStart={event => drag.start(index, event)}
+                                        menu={selecting ? undefined : rowMenu.button(index, entry)}
+                                    />
                                 </div>
                             );
-                        const entry = entries[row.position];
-                        const { located } = entry;
-                        return (
-                            <div
-                                key={index}
-                                id={rowId(index)}
-                                role="option"
-                                data-testid="item-row"
-                                aria-selected={isActive}
-                                title={located ? undefined : t('favorites.missing')}
-                                className={clsx(
-                                    styles.row,
-                                    index % 2 && styles.odd,
-                                    isActive && styles.active,
-                                    !located && styles.missing,
-                                    located && isPlaying(located) && styles.playing,
-                                    hidden && styles.hidden,
-                                )}
-                                style={{ height: twoLineRowHeight, transform }}
-                                onClick={event => onItemClick(event, index, row.position, entry)}
-                                onDoubleClick={() => located && mode.mode === null && play(located)}
-                            >
-                                <ItemRow
-                                    {...itemProps(entry)}
-                                    number={row.position + 1}
-                                    queueMark={
-                                        located &&
-                                        queueMark(queuePositions.get(trackKey(located.playlistId, located.index)))
-                                    }
-                                    selected={selecting && mode.isSelected(row.position)}
-                                    onSelect={selected => mode.setSelected([row.position], selected, rows)}
-                                    onDragStart={event => drag.start(index, event)}
-                                    menu={selecting ? undefined : rowMenu.button(index, entry)}
-                                />
-                            </div>
-                        );
-                    })}
-                    {ghost}
-                </div>
-            )}
-            {rowMenu.popover}
-            {removal.dialogs}
-            {download.dialogs}
-        </section>
+                        })}
+                        {ghost}
+                    </div>
+                )}
+                {rowMenu.popover}
+                {removal.dialogs}
+                {download.dialogs}
+            </section>
+        </FastScroll>
     );
 }

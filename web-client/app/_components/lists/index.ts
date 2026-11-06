@@ -1,3 +1,4 @@
+export { FastScroll, topGroupName, type FastScrollProps } from './FastScroll';
 export { groupPositions, positionsCheckState, useCollapsedGroups } from './groups';
 export {
     DragHandle,

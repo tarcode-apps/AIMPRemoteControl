@@ -6,6 +6,7 @@ import { usePlaylists } from '@/app/_api/playlists';
 import { useMoveQueueItems, useQueue, useRemoveFromQueue } from '@/app/_api/queue';
 import type { QueueItem } from '@/app/_api/types';
 import {
+    FastScroll,
     ItemRow,
     PlaylistRows,
     SkeletonRow,
@@ -166,80 +167,82 @@ export function QueuePage() {
     }
 
     return (
-        <section
-            ref={scrollRef}
-            className={clsx(styles.page, active.byKeyboard && styles.keyboard)}
-            aria-label={t('screens.queue')}
-            role="listbox"
-            tabIndex={0}
-            aria-activedescendant={active.row === null ? undefined : rowId(active.row)}
-            onKeyDown={onKeyDown}
-            // Word selection starts on the second press of a double click.
-            onMouseDown={event => {
-                if (event.detail > 1) event.preventDefault();
-            }}
-        >
-            {query.isError ? (
-                <div className={styles.message}>
-                    <p>{errorMessage(query.error, t)}</p>
-                    <button className={styles.retry} onClick={() => query.refetch()}>
-                        {t('actions.retry')}
-                    </button>
-                </div>
-            ) : query.isPending ? (
-                <div className={styles.list}>
-                    {Array.from({ length: pendingRows }, (_, i) => (
-                        <div
-                            key={i}
-                            className={styles.row}
-                            style={{ height: twoLineRowHeight, transform: `translateY(${i * twoLineRowHeight}px)` }}
-                        >
-                            <SkeletonRow {...rowProps} index={i} />
-                        </div>
-                    ))}
-                </div>
-            ) : items.length === 0 ? (
-                <p className={styles.message}>{t(searching ? 'playlist.noResults' : 'queue.empty')}</p>
-            ) : (
-                <div
-                    className={clsx(styles.list, drag.state && !drag.settled && styles.dragging)}
-                    style={{ height: virtualizer.getTotalSize() + (drag.state?.source.ghostHeight ?? 0) }}
-                >
-                    {virtualRows.map(({ index, start }) => {
-                        const item = items[index];
-                        const isActive = active.row === index;
-                        const transform = `translateY(${start + drag.shift(index)}px)`;
-                        return (
+        <FastScroll scrollRef={scrollRef}>
+            <section
+                ref={scrollRef}
+                className={clsx(styles.page, active.byKeyboard && styles.keyboard)}
+                aria-label={t('screens.queue')}
+                role="listbox"
+                tabIndex={0}
+                aria-activedescendant={active.row === null ? undefined : rowId(active.row)}
+                onKeyDown={onKeyDown}
+                // Word selection starts on the second press of a double click.
+                onMouseDown={event => {
+                    if (event.detail > 1) event.preventDefault();
+                }}
+            >
+                {query.isError ? (
+                    <div className={styles.message}>
+                        <p>{errorMessage(query.error, t)}</p>
+                        <button className={styles.retry} onClick={() => query.refetch()}>
+                            {t('actions.retry')}
+                        </button>
+                    </div>
+                ) : query.isPending ? (
+                    <div className={styles.list}>
+                        {Array.from({ length: pendingRows }, (_, i) => (
                             <div
-                                key={index}
-                                id={rowId(index)}
-                                role="option"
-                                data-testid="item-row"
-                                aria-selected={isActive}
-                                className={clsx(
-                                    styles.row,
-                                    index % 2 && styles.odd,
-                                    isActive && styles.active,
-                                    isPlaying(item) && styles.playing,
-                                    drag.hidden(index) && styles.hidden,
-                                )}
-                                style={{ height: twoLineRowHeight, transform }}
-                                onClick={event => onItemClick(event, index, item)}
+                                key={i}
+                                className={styles.row}
+                                style={{ height: twoLineRowHeight, transform: `translateY(${i * twoLineRowHeight}px)` }}
                             >
-                                <ItemRow
-                                    {...itemProps(item)}
-                                    selected={selecting && mode.isSelected(item.position)}
-                                    onSelect={selected => mode.setSelected([item.position], selected, rows)}
-                                    onDragStart={event => drag.start(index, event)}
-                                    menu={selecting ? undefined : rowMenu.button(index, item)}
-                                />
+                                <SkeletonRow {...rowProps} index={i} />
                             </div>
-                        );
-                    })}
-                    {ghost}
-                </div>
-            )}
-            {rowMenu.popover}
-        </section>
+                        ))}
+                    </div>
+                ) : items.length === 0 ? (
+                    <p className={styles.message}>{t(searching ? 'playlist.noResults' : 'queue.empty')}</p>
+                ) : (
+                    <div
+                        className={clsx(styles.list, drag.state && !drag.settled && styles.dragging)}
+                        style={{ height: virtualizer.getTotalSize() + (drag.state?.source.ghostHeight ?? 0) }}
+                    >
+                        {virtualRows.map(({ index, start }) => {
+                            const item = items[index];
+                            const isActive = active.row === index;
+                            const transform = `translateY(${start + drag.shift(index)}px)`;
+                            return (
+                                <div
+                                    key={index}
+                                    id={rowId(index)}
+                                    role="option"
+                                    data-testid="item-row"
+                                    aria-selected={isActive}
+                                    className={clsx(
+                                        styles.row,
+                                        index % 2 && styles.odd,
+                                        isActive && styles.active,
+                                        isPlaying(item) && styles.playing,
+                                        drag.hidden(index) && styles.hidden,
+                                    )}
+                                    style={{ height: twoLineRowHeight, transform }}
+                                    onClick={event => onItemClick(event, index, item)}
+                                >
+                                    <ItemRow
+                                        {...itemProps(item)}
+                                        selected={selecting && mode.isSelected(item.position)}
+                                        onSelect={selected => mode.setSelected([item.position], selected, rows)}
+                                        onDragStart={event => drag.start(index, event)}
+                                        menu={selecting ? undefined : rowMenu.button(index, item)}
+                                    />
+                                </div>
+                            );
+                        })}
+                        {ghost}
+                    </div>
+                )}
+                {rowMenu.popover}
+            </section>
+        </FastScroll>
     );
 }

@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type SyntheticEvent } from 'react';
+import {
+    useEffect,
+    useLayoutEffect,
+    useRef,
+    useState,
+    type PointerEvent as ReactPointerEvent,
+    type SyntheticEvent,
+} from 'react';
 
 export type DragRelease = {
     delta: number;
@@ -83,6 +90,13 @@ export function usePointerDrag({
         if (!dragging) onDragEnd?.();
     }, [dragging, onDragEnd]);
 
+    // Whether the screen shows the drag. One that ends before React draws it leaves
+    // the state as it was, so React skips the render and the effect above with it.
+    const shown = useRef(false);
+    useLayoutEffect(() => {
+        shown.current = dragging;
+    }, [dragging]);
+
     const position = (event: { clientX: number; clientY: number }) => (axis === 'x' ? event.clientX : event.clientY);
     const crossPosition = (event: { clientX: number; clientY: number }) =>
         axis === 'x' ? event.clientY : event.clientX;
@@ -123,6 +137,7 @@ export function usePointerDrag({
             const delta = position(end) - current.start;
             setDragging(false);
             onRelease({ delta, velocity: delta / Math.max(end.timeStamp - current.startTime, 1), cancelled });
+            if (!shown.current) onDragEnd?.();
         };
 
         // Tracked on the window rather than the element: a fast mouse move can leave it

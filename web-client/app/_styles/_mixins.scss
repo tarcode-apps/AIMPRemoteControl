@@ -18,6 +18,12 @@
     }
 }
 
+@mixin drawer-wide() {
+    @media (min-width: breakpoints.$drawer-wide-from) {
+        @content;
+    }
+}
+
 @mixin player-sheet() {
     @media (max-width: breakpoints.$player-docked-from - 1px) {
         @content;

@@ -14,7 +14,7 @@ with the client that ships in the same package.
 | Identifiers | a playlist `id` is AIMP's own playlist id (string), stable across player restarts |
 | Field names | camelCase |
 | Errors | HTTP status plus `{"error": {"code": string, "message": string}}`; `code` is stable, `message` is for humans and comes in the language of the player's interface (`Langs/*.lng`, section `[AIMPRemoteControlErrors]`, keyed by `code`). An error may carry more fields, which its description names |
-| Limits | request bodies above 16 MB, and chunked ones, whose size is unknown, are refused with `413`; only the [upload](#post-apiv1playlistsidupload) takes up to 2 GB |
+| Limits | request bodies above 16 MB, and chunked ones, whose size is unknown, are refused with `413`; only the [uploads](#post-apiv1playlistsidupload) take more, up to the `uploadLimit` of the [settings](#get-apiv1settings): 16 GB, 4 GB in the x86 build |
 
 Error codes so far:
 
@@ -41,7 +41,7 @@ Error codes so far:
 | `403` | `downloadDisabled` | downloading tracks is not allowed in the plugin settings |
 | `403` | `uploadDisabled` | uploading tracks is not allowed in the plugin settings |
 | `507` | `uploadNoSpace` | the drive of the upload folder has no room for the uploaded file |
-| `500` | `uploadFailed` | a file could not be written into the upload folder; nothing of that file is left behind, the files of the parts before it stay, not added |
+| `500` | `uploadFailed` | a file could not be written into the upload folder, or the folder is no absolute path or cannot be created; nothing of the upload is left behind |
 | `403` | `schedulerDisabled` | timer functions are not allowed in the plugin settings |
 | `404` | `presetNotFound` | the player's equalizer library has no preset of this name |
 | `409` | `presetExists` | another equalizer preset already has the new name |
@@ -220,19 +220,61 @@ Errors: `400 invalidBody`, `403 browseFilesDisabled`, `404 playlistNotFound`,
 
 ### `POST /api/v1/playlists/{id}/upload`
 
-`multipart/form-data` with one or more file parts, each saved under its
-`filename` into the upload folder configured on the player and then appended
-to the playlist. Only the file name part of the name is used; characters the
-file system refuses become `_`, a clash gets a ` (2)`, ` (3)`… suffix. The
-playlist is checked before anything is written. Needs the permission to
-upload tracks. The body may be up to 2 GB; the files go to disk as they
-arrive, a body that breaks off leaves none of them behind (`400 invalidBody`),
-and a request refused before its body is answered at once with the connection
-closed. The web client sends one file per request. The response is an empty
-object.
+`multipart/form-data` with one or more file parts, saved into the upload folder
+configured on the player and then added to the playlist. A part's `filename`
+is a path relative to what the user picked, with `/` between its parts:
+`song.mp3` for a file of its own, `Album/CD1/01.flac` for one in a folder.
+Each top folder gets a name of its own in the upload folder (` (2)`, ` (3)`…
+when the name is taken) and its folders are recreated under it; a file of its
+own clashing with another gets the same suffix. Only `/` separates the parts:
+a `\` is a character of a name, as Android and Linux allow, and like the other
+characters the file system refuses it becomes `_` on Windows. Control
+characters become `_` everywhere, and a part that is no UTF-8 is named `_`.
+A file is always created anew, never written through a file or a link that
+was there. A path with an empty, `.` or `..` part is refused. Every
+file is saved, whatever its type; then the top folders and the files of their
+own are added in the order they came, and the player expands the folders as
+it does when they are dropped on it: covers and other files it does not play
+stay on disk only. It expands them in the background, so the new items may come
+after the answer, with the [`playlists` event](#get-apiv1events); a scatter is
+done before the answer.
 
-Errors: `400 invalidBody` (no file parts), `403 uploadDisabled`,
-`404 playlistNotFound`, `403 playlistReadOnly`, `507 uploadNoSpace`,
+The query says where the new items go:
+
+| Parameter | |
+|---|---|
+| `placement` | `end` (the default), `start`, `at` (before the item at `index`) or `scatter` (each new item at a random index) |
+| `index` | for `at`; an index past the end appends |
+
+Unlike the other routes that take an index, this one takes no `revision`: the
+player changes the revision as it reads the tags of items it has just added,
+an upload may wait behind another one into the same playlist, and a refusal
+would cost the whole upload, while a change of the playlist meanwhile only
+moves the new items a little.
+
+The playlist and the permission are checked before anything is written. Needs the permission to upload tracks. The body may be up to the
+`uploadLimit` of the [settings](#get-apiv1settings), in at most
+`uploadFileLimit` parts; the files go to disk as they arrive. The upload is
+all or nothing: a body that breaks off (`400 invalidBody`), a file that cannot
+be written or a playlist that refuses the files leaves none of them behind,
+folders included. A request refused before its body, or partway through it, is
+answered at once with the connection closed. The response is an empty object.
+
+Errors: `400 invalidQuery`, `400 invalidBody` (no file parts, a path refused,
+or more parts than `uploadFileLimit`), `403 uploadDisabled`, `404 playlistNotFound`, `403 playlistReadOnly`,
+`507 uploadNoSpace`, `500 uploadFailed`, `500 playlistUpdateFailed`.
+
+### `POST /api/v1/playlists/upload`
+
+The [upload](#post-apiv1playlistsidupload) into a new playlist, which the
+player names by its content. The playlist is created once the files have
+arrived, so a failed upload leaves no empty one. The response is its `id`:
+
+```json
+{ "id": "{A1B2C3D4-...}" }
+```
+
+Errors: `400 invalidBody`, `403 uploadDisabled`, `507 uploadNoSpace`,
 `500 uploadFailed`, `500 playlistUpdateFailed`.
 
 ### `PATCH /api/v1/playlists/{id}/items/{index}/mark`
@@ -1177,12 +1219,16 @@ added beside the permissions:
     "browseFiles": false,
     "physicalDeletion": false,
     "scheduler": true
-  }
+  },
+  "uploadLimit": 17179869184,
+  "uploadFileLimit": 100000
 }
 ```
 
 `permissions` are the client permissions of the plugin's options page. The
-[`settings` event](#get-apiv1events) tells when they change.
+[`settings` event](#get-apiv1events) tells when they change. `uploadLimit` is
+the largest upload body in bytes and `uploadFileLimit` the most parts it may
+have, so that the client can refuse a bigger one before sending it.
 
 ## Events
 

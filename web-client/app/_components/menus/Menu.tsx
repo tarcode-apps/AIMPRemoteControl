@@ -32,11 +32,13 @@ export type MenuPopoverProps = {
     // The CSS anchor name of the element the menu opens at.
     anchor?: string;
     items: MenuEntry[];
+    // A line above the items, telling what they act on.
+    heading?: string;
     onClose?(): void;
 };
 
 // The popover of a menu, shown by any button with `popoverTarget={id}`.
-export function MenuPopover({ id, anchor, items, onClose }: MenuPopoverProps) {
+export function MenuPopover({ id, anchor, items, heading, onClose }: MenuPopoverProps) {
     const ref = useRef<HTMLDivElement>(null);
     const [open, setOpen] = useState(false);
 
@@ -115,6 +117,7 @@ export function MenuPopover({ id, anchor, items, onClose }: MenuPopoverProps) {
             onKeyDown={onKeyDown}
             onToggle={onToggle}
         >
+            {heading && <p className={styles.heading}>{heading}</p>}
             {items.map((item, index) =>
                 item === menuSeparator ? (
                     <hr key={index} role="separator" className={styles.separator} />

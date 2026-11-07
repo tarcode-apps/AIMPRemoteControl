@@ -103,7 +103,13 @@
     padding: 8px 12px 0;
 }
 
+// A pill as the rows below are: their height, and the icon and the text where
+// theirs are.
 .search {
+    --search-field-height: 48px;
+    --search-field-inset: 16px;
+    --search-field-gap: 20px;
+
     flex: 1;
     min-width: 0;
 }
@@ -161,4 +167,62 @@
     @include mixins.player-docked {
         display: none;
     }
+}
+
+// A playlist that takes the files dragged over it.
+.item.dropOver {
+    background: var(--color-selection-soft);
+    color: var(--color-accent);
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+}
+
+// What is on its way into a playlist yet to be: no link, nothing to press.
+.pending {
+    color: var(--color-text-secondary);
+    cursor: default;
+
+    @include mixins.hover-capable {
+        &:hover {
+            background: none;
+        }
+    }
+}
+
+// Under the add button of the bar above: the pill's padding is taken back.
+.pendingButton {
+    flex: none;
+    margin-right: -16px;
+}
+
+.failure {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.875em;
+}
+
+// Where the search and the add button were, while files are dragged over the
+// page: it creates a playlist of what is dropped on it. As tall as the search,
+// its icon and text where the search's are, the padding less the border.
+.newZone {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    height: 48px;
+    padding: 0 14px;
+    border: 2px dashed var(--color-accent);
+    border-radius: 24px;
+    color: var(--color-text-secondary);
+}
+
+.newZoneOver {
+    border-style: solid;
+    background: var(--color-selection-soft);
+    color: var(--color-accent);
+}
+
+.newZoneRefused {
+    border-color: var(--color-divider);
 }

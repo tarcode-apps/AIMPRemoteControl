@@ -114,4 +114,36 @@ export class App {
     dialogButton(name: string): Locator {
         return this.dialog.getByRole('button', { name, exact: true });
     }
+
+    // Files and folders dragged in from outside, as the system hands them to the
+    // browser: by path, so that a folder comes with what is in it.
+    async dragFiles(paths: string[]) {
+        const cdp = await this.page.context().newCDPSession(this.page);
+        const data = { items: [], files: paths, dragOperationsMask: 1 };
+        let at = { x: 0, y: 0 };
+        const send = (type: 'dragEnter' | 'dragOver' | 'drop' | 'dragCancel') =>
+            cdp.send('Input.dispatchDragEvent', { type, ...at, data });
+        let entered = false;
+        return {
+            // Over the middle of `target`, or `offsetY` below its top.
+            async moveTo(target: Locator, offsetY?: number) {
+                const box = (await target.boundingBox())!;
+                at = { x: box.x + box.width / 2, y: box.y + (offsetY ?? box.height / 2) };
+                if (!entered) await send('dragEnter');
+                entered = true;
+                // Chrome hands the page a dragover at a new point only with the
+                // next one sent.
+                await send('dragOver');
+                await send('dragOver');
+            },
+            async drop() {
+                await send('drop');
+                await cdp.detach();
+            },
+            async cancel() {
+                await send('dragCancel');
+                await cdp.detach();
+            },
+        };
+    }
 }

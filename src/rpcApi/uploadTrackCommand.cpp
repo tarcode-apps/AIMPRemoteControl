@@ -30,7 +30,7 @@ namespace
 		}
 		if (title.empty())
 			return {};
-		return player::SanitizeFileName(artist.empty() ? title : artist + " - " + title);
+		return artist.empty() ? title : artist + " - " + title;
 	}
 
 	// The app sends the name with every character outside ISO-8859-1 replaced by a
@@ -42,10 +42,19 @@ namespace
 													{ return TagBasedName(core, savedUtf8); });
 		if (tagName.empty())
 			return savedUtf8;
-		const std::filesystem::path target = player::UniqueTarget(saved.parent_path(), PathFromUtf8(tagName + PathToUtf8(saved.extension())));
+		// The extension is part of what is cleaned: "NUL.mp3" is a device on Windows.
+		const std::string name = player::SanitizeFileName(tagName + PathToUtf8(saved.extension()));
+		// The file is moved over an empty one created for it, so that it never
+		// replaces a file another upload gave the same name.
+		const std::filesystem::path target = player::CreateUniqueFile(saved.parent_path(), PathFromUtf8(name));
+		if (target.empty())
+			return savedUtf8;
 		std::error_code ec;
 		std::filesystem::rename(saved, target, ec);
-		return ec ? savedUtf8 : PathToUtf8(target);
+		if (!ec)
+			return PathToUtf8(target);
+		std::filesystem::remove(target, ec);
+		return savedUtf8;
 	}
 }
 
@@ -70,7 +79,7 @@ void rpcapi::UploadTrackCommand::Register(IEndpointRouteBuilder &endpoints)
 						  return 404;
 
 					  player::UploadWriter writer(features.EffectiveUploadFolder());
-					  if (!writer.HasRoomFor(body.DeclaredSize()))
+					  if (!writer.Ready() || !writer.HasRoomFor(body.DeclaredSize()))
 						  return 500;
 					  std::vector<std::string> names;
 					  const bool whole = body.ReadFiles([&](const UploadPart &part)
@@ -80,12 +89,10 @@ void rpcapi::UploadTrackCommand::Register(IEndpointRouteBuilder &endpoints)
 														[&](const char *data, std::size_t size)
 														{ return writer.Write(data, size); });
 					  player::SavedUploads saved = writer.Finish();
-					  if (saved.Failure != player::UploadFailure::None)
-						  return 500;
-					  if (!whole || saved.Paths.empty())
+					  if (saved.Failure != player::UploadFailure::None || !whole || saved.Paths.empty())
 					  {
 						  writer.Abandon();
-						  return 400;
+						  return saved.Failure == player::UploadFailure::None || saved.Failure == player::UploadFailure::InvalidName ? 400 : 500;
 					  }
 					  for (std::size_t i = 0; i < saved.Paths.size(); ++i)
 						  if (names[i].find('?') != std::string::npos)
@@ -93,6 +100,13 @@ void rpcapi::UploadTrackCommand::Register(IEndpointRouteBuilder &endpoints)
 
 					  const HRESULT result = RunOnMainThread(core, [&]
 															 { return AddFilesByPlaylistId(core, idManager, *playlistId, saved.Paths); });
-					  return result == E_INVALIDARG ? 404 : (Failed(result) ? 500 : 200);
+					  if (Succeeded(result))
+						  return 200;
+					  // A renamed file is no longer where the writer put it.
+					  std::error_code ec;
+					  for (const std::string &path : saved.Paths)
+						  std::filesystem::remove(PathFromUtf8(path), ec);
+					  writer.Abandon();
+					  return result == E_INVALIDARG ? 404 : 500;
 				  });
 }

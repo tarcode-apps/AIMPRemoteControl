@@ -51,9 +51,19 @@ namespace player
 	// otherwise why not, with `playlist` left null.
 	MutationResult OpenWritablePlaylist(IAIMPCore *core, const std::string &playlistId, IAIMPPlaylist *&playlist);
 
-	// Appends files, folders, playlist files and URLs; the player expands folders
-	// and playlist files itself.
-	MutationResult AddFiles(IAIMPCore *core, const std::string &playlistId, const std::vector<std::string> &uris);
+	enum class Placement
+	{
+		End,
+		Start,
+		At, // before the item at an index
+		Scatter // each new item at a random index
+	};
+
+	// Adds files, folders, playlist files and URLs where asked; the player expands
+	// folders and playlist files itself, in the background but for a scatter. The
+	// index of `At` is clamped to the playlist.
+	MutationResult AddFiles(IAIMPCore *core, const std::string &playlistId, const std::vector<std::string> &uris,
+							Placement placement = Placement::End, std::int32_t index = 0);
 
 	// The playlist's view, formatting and grouping settings as one comparable string,
 	// for a player that does not notify of their changes.

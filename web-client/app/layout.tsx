@@ -5,6 +5,7 @@ import { Drawer, DrawerContainer, DrawerContent, Sidebar } from './_components/s
 import { ToastProvider } from './_components/toast';
 import { DetectLanguage } from './_i18n/DetectLanguage';
 import { fallbackLanguage, resources } from './_i18n/resources';
+import { FileDragProvider } from './_state/FileDrag';
 import { NavigationProvider } from './_state/Navigation';
 import { PlaylistSelectionProvider } from './_state/PlaylistSelection';
 import { UploadsProvider } from './_state/Uploads';
@@ -39,15 +40,17 @@ export default function RootLayout({
                         <NavigationProvider>
                             <PlaylistSelectionProvider>
                                 <UploadsProvider>
-                                    <PlayerPanelProvider>
-                                        <DrawerContainer>
-                                            <Drawer>
-                                                <Sidebar />
-                                            </Drawer>
-                                            <DrawerContent>{children}</DrawerContent>
-                                            <PlayerPanel />
-                                        </DrawerContainer>
-                                    </PlayerPanelProvider>
+                                    <FileDragProvider>
+                                        <PlayerPanelProvider>
+                                            <DrawerContainer>
+                                                <Drawer>
+                                                    <Sidebar />
+                                                </Drawer>
+                                                <DrawerContent>{children}</DrawerContent>
+                                                <PlayerPanel />
+                                            </DrawerContainer>
+                                        </PlayerPanelProvider>
+                                    </FileDragProvider>
                                 </UploadsProvider>
                             </PlaylistSelectionProvider>
                         </NavigationProvider>

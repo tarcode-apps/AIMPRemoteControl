@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '../../fixtures';
 import { uploadDir } from '../../lib/aimp';
+import { multipart } from '../../lib/http';
 import { legacyPlaylistId } from '../../lib/legacy';
 import { unreachableStreamUrl } from '../../lib/streams';
 
@@ -55,6 +56,51 @@ test.describe('frozen protocol: files', () => {
             multipart: { [name]: { name, mimeType: 'application/octet-stream', buffer } },
         });
         expect(unknown.status()).toBe(404);
+    });
+
+    // An Android file name may hold a backslash, which is no folder; a name that
+    // is a step up is refused, and nothing of its upload kept.
+    test('uploadTrack keeps a backslash in the name and refuses ..', async ({ api, media, playlists }) => {
+        const playlist = await playlists.create();
+        const legacyId = await legacyPlaylistId(api, playlist.name);
+        const content = fs.readFileSync(media.track('Uploaded'));
+        const name = `rc-e2e AC\\DC ${Date.now()}.wav`;
+        const saved = await api.context.post(`/uploadTrack/playlist_id/${legacyId}`, multipart([{ name, content }]));
+        expect(saved.status()).toBe(200);
+        expect(fs.existsSync(path.join(uploadDir, name.replace('\\', '_')))).toBe(true);
+
+        const first = `rc-e2e before refused ${Date.now()}.wav`;
+        const refused = await api.context.post(
+            `/uploadTrack/playlist_id/${legacyId}`,
+            multipart([
+                { name: first, content },
+                { name: '..', content },
+            ]),
+        );
+        expect(refused.status()).toBe(400);
+        expect(fs.existsSync(path.join(uploadDir, first))).toBe(false);
+        expect(await api.playlistItemCount(playlist.id)).toBe(1);
+    });
+
+    // The app sends "?" for what ISO-8859-1 cannot hold, so the tags name the
+    // file, which never replaces one of the same name.
+    test('uploadTrack names a file of question marks by its tags', async ({ api, media, playlists }) => {
+        const playlist = await playlists.create();
+        const legacyId = await legacyPlaylistId(api, playlist.name);
+        const title = `rc-e2e tagged ${Date.now()}`;
+        const content = fs.readFileSync(media.track(title, { artist: 'Artist' }));
+        const taken = path.join(uploadDir, `Artist - ${title}.wav`);
+        fs.mkdirSync(uploadDir, { recursive: true });
+        fs.writeFileSync(taken, 'taken');
+        const saved = await api.context.post(
+            `/uploadTrack/playlist_id/${legacyId}`,
+            multipart([{ name: '?????.wav', content }]),
+        );
+        expect(saved.status()).toBe(200);
+        expect(fs.readFileSync(taken, 'utf8')).toBe('taken');
+        expect(fs.existsSync(path.join(uploadDir, `Artist - ${title} (2).wav`))).toBe(true);
+        expect(fs.existsSync(path.join(uploadDir, '_____.wav'))).toBe(false);
+        await expect.poll(() => api.playlistItemCount(playlist.id)).toBe(1);
     });
 
     test('ShowMessage is accepted', async ({ api }) => {

@@ -24,12 +24,15 @@ export function Marquee({ className, children }: MarqueeProps) {
     const scrolling = overflow > 0 && !reducedMotion;
 
     // The box resizing is observed; the text is measured again when it changes,
-    // as while cut it keeps the box's width.
+    // as while cut it keeps the box's width. The elements are taken once: the
+    // observer may report the box's removal after the refs are cleared.
     useEffect(() => {
-        const measure = () => setOverflow(Math.max(0, text.current!.scrollWidth - box.current!.clientWidth));
+        const boxElement = box.current!;
+        const textElement = text.current!;
+        const measure = () => setOverflow(Math.max(0, textElement.scrollWidth - boxElement.clientWidth));
         measure();
         const observer = new ResizeObserver(measure);
-        observer.observe(box.current!);
+        observer.observe(boxElement);
         return () => observer.disconnect();
     }, [children]);
 

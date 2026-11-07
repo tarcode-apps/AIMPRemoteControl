@@ -767,24 +767,28 @@ the playlist.
 | Status | Meaning |
 |---|---|
 | `200` | saved and added |
-| `400` | no file parts, or a body that broke off (none of its files is kept) |
+| `400` | no file parts, a name refused, or a body that broke off (none of its files is kept) |
 | `403` | uploading is disabled in the plugin settings |
 | `404` | unknown playlist (checked before anything is written) |
-| `500` | could not write the file or add it to the playlist |
+| `500` | could not write the file or add it to the playlist (none of its files is kept) |
 
 Notes:
 
-- Only the `filename` component is used (no directories); characters invalid
-  for the file system become `_`; a clash gets a ` (2)`, ` (3)`… suffix.
+- The `filename` is saved as the web API's
+  [upload](web-api.md#post-apiv1playlistsidupload) saves it: the app sends a
+  bare name, which lands in the upload folder; control characters and those
+  invalid for the file system become `_` (a `\` too, on Windows); a clash gets a ` (2)`, ` (3)`…
+  suffix. A name that is empty, `.` or `..` is refused. Unlike the original
+  plugin, a name with `/` keeps its folders, which the app never sends.
 - The app encodes part names in ISO‑8859‑1 and replaces every other character
   with `?` (e.g. `"?????.mp3"` for a Cyrillic name). When the name
   contains `?` the server renames the saved file to `<Artist> - <Title>.<ext>`
   from the tags, or `<Title>.<ext>` without an artist; without a title the file
   keeps its name, in which `?` becomes `_` on Windows (Linux allows it).
-- Request bodies up to 2 GB are accepted. Files go to disk as they arrive; a
+- Request bodies up to 16 GB (4 GB in the x86 build) are accepted. Files go to disk as they arrive; a
   request refused before its body (`403`, `404`, or `500` when the drive has no
   room for the declared size) is answered at once and the connection closed,
-  without reading the body.
+  without reading the body; so is one refused partway through it.
 
 ---
 

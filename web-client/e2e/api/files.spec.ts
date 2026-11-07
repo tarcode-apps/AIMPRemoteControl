@@ -2,8 +2,8 @@ import type { FileFormats, FolderListing } from '@/app/_api/types';
 import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '../fixtures';
-import { uploadDir } from '../lib/aimp';
-import { startUpload, statusForHeaders } from '../lib/http';
+import { defaultPluginSettings, restartThrowawayPlayer, uploadDir } from '../lib/aimp';
+import { multipart, startUpload, statusForHeaders, trickleUpload } from '../lib/http';
 import { writeWav } from '../lib/media';
 
 const encode = encodeURIComponent;
@@ -94,14 +94,189 @@ test.describe('files', () => {
         playlists,
     }) => {
         const playlist = await playlists.create();
-        const first = `rc-e2e first ${Date.now()}.wav`;
-        const second = `rc-e2e second ${Date.now()}.wav`;
-        const upload = startUpload(playerUrl, `/api/v1/playlists/${encode(playlist.id)}/upload`, first, second);
+        const folder = `rc-e2e broken ${Date.now()}`;
+        const first = `${folder}/first.wav`;
+        const upload = startUpload(
+            playerUrl,
+            `/api/v1/playlists/${encode(playlist.id)}/upload`,
+            first,
+            `${folder}/second.wav`,
+        );
         // On disk while the body is still coming.
         await expect.poll(() => fs.existsSync(path.join(uploadDir, first))).toBe(true);
         upload.breakOff();
-        await expect.poll(() => fs.existsSync(path.join(uploadDir, first))).toBe(false);
-        expect(fs.existsSync(path.join(uploadDir, second))).toBe(false);
+        await expect.poll(() => fs.existsSync(path.join(uploadDir, folder))).toBe(false);
         expect(await api.playlistItemCount(playlist.id)).toBe(0);
+    });
+});
+
+test.describe('uploads', () => {
+    const stamp = () => `${Date.now()}`;
+
+    test('keeps the folders of an upload, and the player adds what it plays', async ({ api, media, playlists }) => {
+        const playlist = await playlists.create();
+        const album = `rc-e2e Album ${stamp()}`;
+        const response = await api.context.post(
+            `/api/v1/playlists/${encode(playlist.id)}/upload`,
+            multipart([
+                { name: `${album}/CD1/One.wav`, content: fs.readFileSync(media.track('One')) },
+                { name: `${album}/cover.jpg`, content: 'not a picture' },
+                { name: `${album}/notes.txt`, content: 'notes' },
+                { name: `${album} Loose.wav`, content: fs.readFileSync(media.track('Loose')) },
+            ]),
+        );
+        expect(response.status()).toBe(200);
+        const folder = path.join(uploadDir, album);
+        expect(fs.readFileSync(path.join(folder, 'cover.jpg'), 'utf8')).toBe('not a picture');
+        expect(fs.existsSync(path.join(folder, 'notes.txt'))).toBe(true);
+        // The player expands the folder in the background.
+        await expect
+            .poll(async () => (await api.allItems(playlist.id)).map(item => item.fileUri))
+            .toEqual([path.join(folder, 'CD1', 'One.wav'), path.join(uploadDir, `${album} Loose.wav`)]);
+    });
+
+    test('puts the upload where asked', async ({ api, media, playlists }) => {
+        const playlist = await playlists.create({ tracks: 3 });
+        const [a, b, c] = playlist.files.map(file => path.basename(file));
+        const name = stamp();
+        const send = async (query: string, files: string[]) => {
+            const response = await api.context.post(
+                `/api/v1/playlists/${encode(playlist.id)}/upload?${query}`,
+                multipart(files.map(file => ({ name: file, content: fs.readFileSync(media.track('Sent')) }))),
+            );
+            expect(response.status()).toBe(200);
+        };
+        const names = async () => (await api.allItems(playlist.id)).map(item => path.basename(item.fileUri));
+
+        // The player adds in the background, so each step waits for the last.
+        await send('placement=at&index=1', [`at ${name}.wav`]);
+        await expect.poll(names).toEqual([a, `at ${name}.wav`, b, c]);
+        await send('placement=start', [`start ${name}.wav`]);
+        await expect.poll(async () => (await names())[0]).toBe(`start ${name}.wav`);
+        await send('placement=end', [`end ${name}.wav`]);
+        await expect.poll(names).toEqual([`start ${name}.wav`, a, `at ${name}.wav`, b, c, `end ${name}.wav`]);
+        // A folder is expanded at the index, its files in order.
+        await send('placement=at&index=2', [`pair ${name}/2.wav`, `pair ${name}/1.wav`]);
+        await expect.poll(async () => (await names()).slice(1, 5)).toEqual([a, '1.wav', '2.wav', `at ${name}.wav`]);
+        await send('placement=at&index=1000', [`past ${name}.wav`]);
+        await expect.poll(async () => (await names()).at(-1)).toBe(`past ${name}.wav`);
+        // A folder large enough to be expanded well after the answer keeps its place.
+        const many = Array.from({ length: 30 }, (_, i) => `${String(i + 1).padStart(2, '0')}.wav`);
+        await send(
+            'placement=at&index=1',
+            many.map(file => `many ${name}/${file}`),
+        );
+        await expect.poll(async () => (await names()).slice(0, 32)).toEqual([`start ${name}.wav`, ...many, a]);
+    });
+
+    test('scatters an upload over the playlist', async ({ api, media, playlists }) => {
+        const playlist = await playlists.create({ tracks: 6 });
+        const before = playlist.files.map(file => path.basename(file));
+        const name = stamp();
+        const sent = [1, 2, 3].map(n => `scattered ${name} ${n}.wav`);
+        const response = await api.context.post(
+            `/api/v1/playlists/${encode(playlist.id)}/upload?placement=scatter`,
+            multipart(sent.map(file => ({ name: file, content: fs.readFileSync(media.track('Sent')) }))),
+        );
+        expect(response.status()).toBe(200);
+        const after = (await api.allItems(playlist.id)).map(item => path.basename(item.fileUri));
+        expect(after).toHaveLength(9);
+        expect(after).toEqual(expect.arrayContaining(sent));
+        expect(after.filter(file => before.includes(file))).toEqual(before);
+    });
+
+    test('refuses a bad placement and a path out of its folder, writing nothing', async ({ api, playlists }) => {
+        const playlist = await playlists.create({ tracks: 1 });
+        const name = `rc-e2e refused ${stamp()}.wav`;
+        const send = (query: string, file = name) =>
+            api.context.post(
+                `/api/v1/playlists/${encode(playlist.id)}/upload${query}`,
+                multipart([{ name: file, content: 'data' }]),
+            );
+        const refusal = async (query: string, file?: string) => {
+            const response = await send(query, file);
+            return `${response.status()} ${(await response.json()).error.code}`;
+        };
+
+        expect(await refusal('?placement=middle')).toBe('400 invalidQuery');
+        expect(await refusal('?placement=at')).toBe('400 invalidQuery');
+        expect(await refusal('?placement=at&index=-1')).toBe('400 invalidQuery');
+        expect(fs.existsSync(path.join(uploadDir, name))).toBe(false);
+
+        for (const file of [`../${name}`, `folder/../../${name}`, `/${name}`, `a//${name}`])
+            expect(await refusal('', file)).toBe('400 invalidBody');
+        expect(fs.existsSync(path.join(uploadDir, '..', name))).toBe(false);
+
+        // Refused after a file it took: the file goes, and so does the connection,
+        // which the rest of the body would otherwise follow into the next request.
+        const late = await api.context.post(
+            `/api/v1/playlists/${encode(playlist.id)}/upload`,
+            multipart([
+                { name, content: 'data' },
+                { name: `../${name}`, content: 'data' },
+            ]),
+        );
+        expect(late.status()).toBe(400);
+        expect(late.headers().connection).toBe('close');
+        expect(fs.existsSync(path.join(uploadDir, name))).toBe(false);
+        expect(await api.playlistItemCount(playlist.id)).toBe(1);
+    });
+
+    test('uploads into a new playlist, created once the files are in', async ({ api, media, playerUrl }) => {
+        const before = (await api.playlists()).map(playlist => playlist.id);
+        const broken = `rc-e2e new broken ${stamp()}`;
+        const upload = startUpload(
+            playerUrl,
+            '/api/v1/playlists/upload',
+            `${broken}/first.wav`,
+            `${broken}/second.wav`,
+        );
+        await expect.poll(() => fs.existsSync(path.join(uploadDir, broken))).toBe(true);
+        upload.breakOff();
+        await expect.poll(() => fs.existsSync(path.join(uploadDir, broken))).toBe(false);
+        expect((await api.playlists()).map(playlist => playlist.id)).toEqual(before);
+
+        const album = `rc-e2e new ${stamp()}`;
+        const response = await api.context.post(
+            '/api/v1/playlists/upload',
+            multipart([{ name: `${album}/One.wav`, content: fs.readFileSync(media.track('One')) }]),
+        );
+        expect(response.status()).toBe(200);
+        const { id } = (await response.json()) as { id: string };
+        try {
+            expect(before).not.toContain(id);
+            await expect
+                .poll(async () => (await api.allItems(id)).map(item => item.fileUri))
+                .toEqual([path.join(uploadDir, album, 'One.wav')]);
+        } finally {
+            await api.deletePlaylist(id);
+        }
+    });
+
+    // The helper kills a player that has not quit in 15 s; this one quits at once.
+    test('an upload on its way does not keep the player from quitting', async ({ playerUrl, playlists }) => {
+        test.skip(!!process.env.E2E_PLAYER_URL, 'needs the throwaway player, which E2E_PLAYER_URL replaces');
+        const playlist = await playlists.create();
+        const name = `rc-e2e trickle ${stamp()}.wav`;
+        const upload = trickleUpload(playerUrl, `/api/v1/playlists/${encode(playlist.id)}/upload`, name);
+        try {
+            await expect.poll(() => fs.existsSync(path.join(uploadDir, name))).toBe(true);
+            const started = Date.now();
+            await restartThrowawayPlayer(playerUrl, defaultPluginSettings);
+            expect(Date.now() - started).toBeLessThan(12_000);
+            expect(fs.existsSync(path.join(uploadDir, name))).toBe(false);
+        } finally {
+            upload.stop();
+        }
+    });
+
+    test('names its limit and refuses a larger body before reading it', async ({ api, playerUrl, playlists }) => {
+        const settings = (await api.get<{ uploadLimit: number; uploadFileLimit: number }>('/settings')).body!;
+        expect(settings).toMatchObject({ uploadLimit: 16 * 1024 ** 3, uploadFileLimit: 100_000 });
+        const { uploadLimit } = settings;
+        const playlist = await playlists.create();
+        const headers = { 'Content-Type': 'multipart/form-data; boundary=x', 'Content-Length': uploadLimit + 1 };
+        expect(await statusForHeaders(playerUrl, `/api/v1/playlists/${encode(playlist.id)}/upload`, headers)).toBe(413);
+        expect(await statusForHeaders(playerUrl, '/api/v1/playlists/upload', headers)).toBe(413);
     });
 });

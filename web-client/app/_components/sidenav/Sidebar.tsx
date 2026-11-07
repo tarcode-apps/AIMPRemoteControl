@@ -8,19 +8,21 @@ import { useSettings } from '@/app/_api/settings';
 import { useTimer } from '@/app/_api/timer';
 import type { Playlist } from '@/app/_api/types';
 import { useFavorites } from '@/app/_state/Favorites';
+import { hasFiles, useFileDrag } from '@/app/_state/FileDrag';
 import { useNavigation } from '@/app/_state/Navigation';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
+import { useUploads } from '@/app/_state/Uploads';
 import clsx from 'clsx';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { useState, type CSSProperties, type DragEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '../buttons';
 import { Icon } from '../icons';
 import { SearchField } from '../inputs';
 import { useRowMenu } from '../menus';
 import { usePlayerPanel } from '../player';
-import { usePlaylistActions } from '../playlists';
+import { useFileUpload, usePlaylistActions } from '../playlists';
 import { Skeleton } from '../skeleton';
 import { useDrawer } from './Drawer';
 import styles from './Sidebar.module.scss';
@@ -110,6 +112,47 @@ function Playlists() {
     const menu = useRowMenu((playlist: Playlist) => [actions.renameItem(playlist), actions.removeItem(playlist)]);
     const shown = playlists?.filter(playlist => matches(playlist, filter.trim().toLocaleLowerCase()));
 
+    // Files dragged in go to the end of the playlist they are dropped on, or into a
+    // new one at the zone that takes the place of the search meanwhile.
+    const fileDrag = useFileDrag();
+    const fileUpload = useFileUpload();
+    const uploads = useUploads();
+    const uploadRefusal = fileUpload.refusal(null);
+    const [newZone, setNewZone] = useState<HTMLElement | null>(null);
+    const [dropRow, setDropRow] = useState<{ id: string; element: Element } | null>(null);
+    const isDropRow = (playlist: Playlist) => dropRow?.id === playlist.id && fileDrag.isOver(dropRow.element);
+    const dropTarget = (playlist: Playlist) => ({
+        onDragOver: (event: DragEvent<HTMLElement>) => {
+            if (!hasFiles(event)) return;
+            event.preventDefault();
+            const refused = fileUpload.refusal(playlist) !== null;
+            event.dataTransfer.dropEffect = refused ? 'none' : 'copy';
+            const element = event.currentTarget;
+            setDropRow(current =>
+                refused ? null : current?.element === element ? current : { id: playlist.id, element },
+            );
+        },
+        onDrop: (event: DragEvent<HTMLElement>) => {
+            if (!hasFiles(event)) return;
+            event.preventDefault();
+            if (fileUpload.refusal(playlist) === null)
+                void fileUpload.drop(event.dataTransfer, { playlistId: playlist.id, placement: { kind: 'end' } });
+        },
+    });
+    const newPlaylistTarget = {
+        onDragOver: (event: DragEvent<HTMLElement>) => {
+            if (!hasFiles(event)) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = uploadRefusal ? 'none' : 'copy';
+        },
+        onDrop: (event: DragEvent<HTMLElement>) => {
+            if (!hasFiles(event)) return;
+            event.preventDefault();
+            if (!uploadRefusal) void fileUpload.drop(event.dataTransfer, { playlistId: null }, select);
+        },
+    };
+    const newPlaylistJobs = uploads.jobs.filter(job => job.playlistId === null);
+
     const open = (playlist: Playlist) =>
         closeThen(() => {
             select(playlist.id);
@@ -146,10 +189,15 @@ function Playlists() {
                     const active = pathname === '/' && playlist === selected;
                     const button = menu.button(index, playlist);
                     return (
-                        <li key={playlist.id} data-row className={styles.row}>
+                        <li key={playlist.id} data-row className={styles.row} {...dropTarget(playlist)}>
                             <Link
                                 href="/"
-                                className={clsx(styles.item, styles.playlist, active && styles.active)}
+                                className={clsx(
+                                    styles.item,
+                                    styles.playlist,
+                                    active && styles.active,
+                                    isDropRow(playlist) && styles.dropOver,
+                                )}
                                 aria-current={active ? 'true' : undefined}
                                 onClick={event => {
                                     event.preventDefault();
@@ -175,6 +223,43 @@ function Playlists() {
                         </li>
                     );
                 })}
+                {newPlaylistJobs.map(job => (
+                    <li
+                        key={job.id}
+                        className={styles.row}
+                        data-testid="new-playlist-upload"
+                        role={job.state === 'failed' ? 'alert' : undefined}
+                    >
+                        <span className={clsx(styles.item, styles.pending)}>
+                            <Icon>
+                                {job.state === 'failed' ? 'error' : job.state === 'waiting' ? 'schedule' : 'upload'}
+                            </Icon>
+                            {job.state === 'failed' ? (
+                                <span className={styles.failure}>
+                                    {t('upload.failed', { name: job.name, message: errorMessage(job.error, t) })}
+                                </span>
+                            ) : (
+                                <>
+                                    <span className={styles.label} title={job.name}>
+                                        {t('upload.newPlaylist')}
+                                    </span>
+                                    <span>
+                                        {job.state === 'waiting'
+                                            ? t('upload.queued')
+                                            : `${Math.round(job.fraction * 100)}%`}
+                                    </span>
+                                </>
+                            )}
+                            <IconButton
+                                title={t(job.state === 'failed' ? 'actions.close' : 'actions.cancel')}
+                                className={styles.pendingButton}
+                                onClick={() => uploads.cancel(job.id)}
+                            >
+                                <Icon>close</Icon>
+                            </IconButton>
+                        </span>
+                    </li>
+                ))}
                 {menu.popover}
             </ul>
         );
@@ -191,15 +276,35 @@ function Playlists() {
                     open(shown[0]);
                 }}
             >
-                <SearchField
-                    className={styles.search}
-                    value={filter}
-                    onChange={setFilter}
-                    placeholder={t('playlists.searchPlaceholder')}
-                />
-                <IconButton title={t('playlists.create')} onClick={actions.create}>
-                    <Icon>playlist_add</Icon>
-                </IconButton>
+                {fileDrag.active ? (
+                    <div
+                        ref={setNewZone}
+                        className={clsx(
+                            styles.newZone,
+                            uploadRefusal && styles.newZoneRefused,
+                            !uploadRefusal && fileDrag.isOver(newZone) && styles.newZoneOver,
+                        )}
+                        data-testid="new-playlist-zone"
+                        {...newPlaylistTarget}
+                    >
+                        <Icon>{uploadRefusal ? 'block' : 'playlist_add'}</Icon>
+                        <span className={styles.label}>
+                            {uploadRefusal ?? t(fileDrag.isOver(newZone) ? 'upload.dropNew' : 'upload.newPlaylist')}
+                        </span>
+                    </div>
+                ) : (
+                    <>
+                        <SearchField
+                            className={styles.search}
+                            value={filter}
+                            onChange={setFilter}
+                            placeholder={t('playlists.searchPlaceholder')}
+                        />
+                        <IconButton title={t('playlists.create')} onClick={actions.create}>
+                            <Icon>playlist_add</Icon>
+                        </IconButton>
+                    </>
+                )}
             </div>
             {list}
             {actions.dialogs}

@@ -11,7 +11,8 @@ import {
     useSetItemsEnabled,
 } from '@/app/_api/playlists';
 import { queueMark, trackKey, useEnqueueSelections, useQueuePositions } from '@/app/_api/queue';
-import type { Playlist, PlaylistGroup, PlaylistItem } from '@/app/_api/types';
+import type { Playlist, PlaylistGroup, PlaylistItem, UploadFile, UploadPlacement } from '@/app/_api/types';
+import { Icon } from '@/app/_components/icons';
 import { Checkbox } from '@/app/_components/inputs';
 import type { PlaylistRow } from '@/app/_components/lists';
 import {
@@ -36,17 +37,31 @@ import {
     usePlaylistDrag,
 } from '@/app/_components/lists';
 import styles from '@/app/_components/lists/ListPage.module.scss';
-import { menuSeparator, useRowMenu } from '@/app/_components/menus';
-import { useItemRemoval, useTrackDownload } from '@/app/_components/playlists';
+import { MenuPopover, menuSeparator, useRowMenu, type MenuEntry } from '@/app/_components/menus';
+import { useFileUpload, useItemRemoval, useTrackDownload } from '@/app/_components/playlists';
 import { useErrorToast } from '@/app/_components/toast';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
+import { hasFiles, useFileDrag } from '@/app/_state/FileDrag';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
 import { useTrackActions } from '@/app/_state/useTrackActions';
 import { media } from '@/app/_styles/media';
+import { anchorName } from '@/app/_utils/anchorName';
+import { readDroppedFiles, totalSize } from '@/app/_utils/droppedFiles';
+import { formatSize } from '@/app/_utils/format';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import clsx from 'clsx';
-import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import {
+    useEffect,
+    useId,
+    useLayoutEffect,
+    useRef,
+    useState,
+    type CSSProperties,
+    type DragEvent,
+    type KeyboardEvent,
+    type MouseEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePlaylistMode } from './PlaylistMode';
 import { usePlaylistLayout } from './usePlaylistLayout';
@@ -57,13 +72,28 @@ const noFolding: ReadonlyMap<number, boolean> = new Map();
 // pager keeps only the neighbouring playlists mounted, and a docked drawer shows
 // one at a time.
 const scrollOffsets = new Map<string, number>();
+// Files held this close to an edge scroll the list, the faster the closer.
+const dropEdge = 48;
+const dropScrollStep = 24;
+// The line before the first row lies this far down, so that the list's top edge
+// does not cut its circle.
+const dropLineInset = 5;
+
+// Files dropped on the list, until the user says where they go: `index` is the
+// place the line showed, null where none could be told, as in a search without
+// matches.
+type DropMenu = {
+    offset: number;
+    index: number | null;
+    files: UploadFile[] | null;
+};
 
 export type PlaylistPageProps = {
     playlist: Playlist;
 };
 
 export function PlaylistPage({ playlist }: PlaylistPageProps) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const showError = useErrorToast();
     const docked = useMediaQuery(media.drawerDocked);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -430,6 +460,126 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
         if (searching || pointerType !== 'mouse') play(item);
     };
 
+    // Files dragged in from outside: a line shows where they would go, and the drop
+    // asks beside it where they should. An empty playlist has one place only, so
+    // its files go without asking.
+    const fileDrag = useFileDrag();
+    const fileUpload = useFileUpload();
+    const uploadRefusal = fileUpload.refusal(playlist);
+    const emptyPlaylist = playlist.itemCount === 0;
+    const [dragOffset, setDragOffset] = useState(0);
+    const [dropMenu, setDropMenu] = useState<DropMenu | null>(null);
+    const dropMenuId = useId();
+    const dropAnchor = anchorName('drop', dropMenuId);
+    const dragOver = mine && fileDrag.isOver(scrollRef.current);
+
+    // The playlist's index of the item at a position of the list: a search lists
+    // the matches, each with its own index; null while its page is loading.
+    const playlistIndexAt = (position: number) => {
+        if (!searching) return position;
+        const page = loaded.get(Math.floor(position / pageSize));
+        return page?.items[position - page.offset]?.index ?? null;
+    };
+
+    // The edge between rows nearest to a point of the list: where its line lies,
+    // and the index the files would take, before the item that follows the edge or
+    // right after the last one.
+    const dropPlace = (offset: number) => {
+        const hit = virtualizer.getVirtualItemForOffset(offset);
+        const boundary = !hit ? 0 : offset < hit.start + hit.size / 2 ? hit.index : hit.index + 1;
+        const before = boundary < rows.count ? rows.at(boundary) : null;
+        const last = rows.itemCount > 0 ? playlistIndexAt(rows.itemCount - 1) : null;
+        return {
+            offset:
+                boundary < rows.count
+                    ? (virtualizer.measurementsCache[boundary]?.start ?? 0)
+                    : virtualizer.getTotalSize(),
+            index: before
+                ? playlistIndexAt(before.kind === 'item' ? before.position : before.group.firstPosition)
+                : last === null
+                  ? null
+                  : last + 1,
+        };
+    };
+    const listOffset = (event: DragEvent<HTMLElement>) =>
+        event.clientY - event.currentTarget.getBoundingClientRect().top + event.currentTarget.scrollTop;
+
+    const onFileDragOver = (event: DragEvent<HTMLElement>) => {
+        if (!mine || !hasFiles(event)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = uploadRefusal ? 'none' : 'copy';
+        // The event comes again and again while the pointer rests, so the list
+        // keeps scrolling at an edge.
+        const scroll = event.currentTarget;
+        const rect = scroll.getBoundingClientRect();
+        const above = event.clientY - rect.top;
+        const below = rect.bottom - event.clientY;
+        if (above < dropEdge) scroll.scrollTop -= dropScrollStep * (1 - Math.max(above, 0) / dropEdge);
+        else if (below < dropEdge) scroll.scrollTop += dropScrollStep * (1 - Math.max(below, 0) / dropEdge);
+        setDragOffset(listOffset(event));
+    };
+
+    const onFileDrop = (event: DragEvent<HTMLElement>) => {
+        if (!mine || !hasFiles(event)) return;
+        event.preventDefault();
+        if (uploadRefusal) return;
+        if (emptyPlaylist) {
+            void fileUpload.drop(event.dataTransfer, { playlistId: playlist.id, placement: { kind: 'end' } });
+            return;
+        }
+        setDropMenu({ ...dropPlace(listOffset(event)), files: null });
+        readDroppedFiles(event.dataTransfer).then(
+            files => setDropMenu(menu => menu && { ...menu, files }),
+            error => {
+                setDropMenu(null);
+                showError(error);
+            },
+        );
+    };
+
+    const dropMenuShown = dropMenu !== null;
+    const dropFilesRead = dropMenu?.files != null;
+    useEffect(() => {
+        const menu = document.getElementById(dropMenuId);
+        if (!menu || !dropMenuShown) return;
+        if (!menu.matches(':popover-open')) menu.showPopover();
+        // The items wait for the files to be read; then Enter takes the first.
+        if (dropFilesRead) menu.querySelector<HTMLButtonElement>('[role=menuitem]:enabled')?.focus();
+    }, [dropMenuId, dropMenuShown, dropFilesRead]);
+
+    let dropHeading;
+    let dropItems: MenuEntry[] = [];
+    if (dropMenu) {
+        const { files } = dropMenu;
+        const refused = files && fileUpload.filesRefusal(files);
+        dropHeading = !files
+            ? t('upload.reading')
+            : (refused ??
+              t('upload.summary', { count: files.length, size: formatSize(totalSize(files), i18n.language) }));
+        const send = (placement: UploadPlacement) => () =>
+            fileUpload.start({ playlistId: playlist.id, placement }, files!);
+        const disabled = !files || refused !== null;
+        dropItems = [
+            {
+                label: t('upload.here'),
+                icon: 'playlist_add',
+                disabled: disabled || dropMenu.index === null,
+                onSelect: send({ kind: 'at', index: dropMenu.index ?? 0 }),
+            },
+            { label: t('upload.atStart'), icon: 'vertical_align_top', disabled, onSelect: send({ kind: 'start' }) },
+            { label: t('upload.atEnd'), icon: 'vertical_align_bottom', disabled, onSelect: send({ kind: 'end' }) },
+            { label: t('upload.scatter'), icon: 'shuffle', disabled, onSelect: send({ kind: 'scatter' }) },
+            menuSeparator,
+            { label: t('actions.cancel'), icon: 'close', onSelect: () => {} },
+        ];
+    }
+    let dropLine;
+    if (dropMenu) dropLine = { offset: dropMenu.offset, shown: dropMenu.index !== null };
+    else if (dragOver && !uploadRefusal && !emptyPlaylist) {
+        const place = dropPlace(dragOffset);
+        if (place.index !== null) dropLine = { offset: place.offset, shown: true };
+    }
+
     const rowId = (row: number) => `${listId}-${row}`;
     const rowProps = {
         view: playlist,
@@ -474,12 +624,14 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
         <FastScroll scrollRef={scrollRef} label={topGroupName(rows, virtualizer)}>
             <section
                 ref={scrollRef}
-                className={clsx(styles.page, active.byKeyboard && styles.keyboard)}
+                className={clsx(styles.page, styles.droppable, active.byKeyboard && styles.keyboard)}
                 aria-label={playlist.name}
                 role="listbox"
                 tabIndex={0}
                 aria-activedescendant={active.row === null ? undefined : rowId(active.row)}
                 onKeyDown={onKeyDown}
+                onDragOver={onFileDragOver}
+                onDrop={onFileDrop}
                 // Word selection starts on the second press of a double click.
                 onMouseDown={event => {
                     if (event.detail > 1) event.preventDefault();
@@ -621,11 +773,37 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                         {ghost}
                     </div>
                 )}
+                {dropLine && (
+                    <div
+                        className={clsx(styles.dropLine, !dropLine.shown && styles.dropAnchor)}
+                        data-testid="drop-line"
+                        style={
+                            { top: Math.max(dropLine.offset, dropLineInset), anchorName: dropAnchor } as CSSProperties
+                        }
+                    />
+                )}
+                <MenuPopover
+                    id={dropMenuId}
+                    anchor={dropAnchor}
+                    heading={dropHeading}
+                    items={dropItems}
+                    onClose={() => setDropMenu(null)}
+                />
                 {rowMenu.popover}
                 {groupMenu.popover}
                 {removal.dialogs}
                 {download.dialogs}
             </section>
+            {/* Where no line shows the place, the frame shows that the list takes the files. */}
+            {dragOver && !dropLine && uploadRefusal === null && (
+                <div className={styles.dropFrame} data-testid="drop-frame" />
+            )}
+            {dragOver && uploadRefusal && (
+                <div className={styles.dropRefused} data-testid="drop-refused">
+                    <Icon>block</Icon>
+                    <span>{uploadRefusal}</span>
+                </div>
+            )}
         </FastScroll>
     );
 }

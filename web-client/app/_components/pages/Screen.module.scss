@@ -112,6 +112,20 @@
     font-size: 14px;
 }
 
+// Several notices of one kind, a line each, as the jobs of an upload.
+.noticeLines {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.noticeLine {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
 // One line on a narrow screen: the text gives way before the button does, and the
 // icon goes first.
 .noticeText {

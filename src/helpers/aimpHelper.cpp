@@ -130,7 +130,7 @@ IAIMPPlaylist *LoadedPlaylistByAIMPId(IAIMPCore *core, const std::string &aimpId
 	return playlist;
 }
 
-HRESULT AddFilesToPlaylist(IAIMPCore *core, IAIMPPlaylist *playlist, const std::vector<std::string> &fileUris)
+HRESULT AddFilesToPlaylist(IAIMPCore *core, IAIMPPlaylist *playlist, const std::vector<std::string> &fileUris, DWORD flags, INT32 insertIn)
 {
 	HRESULT hr = E_FAIL;
 	IAIMPObjectList *list = nullptr;
@@ -144,7 +144,7 @@ HRESULT AddFilesToPlaylist(IAIMPCore *core, IAIMPPlaylist *playlist, const std::
 				s->Release();
 			}
 		}
-		hr = playlist->AddList(list, 0, -1); // -1: append
+		hr = playlist->AddList(list, flags, insertIn);
 		list->Release();
 	}
 	return hr;

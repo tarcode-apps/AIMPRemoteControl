@@ -126,13 +126,13 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 	{
 		Routes.push_back([this](httplib::Server &http)
 						 {
-			http.set_payload_max_length(static_cast<std::size_t>(2) * 1024 * 1024 * 1024);
+			http.set_payload_max_length(static_cast<std::size_t>(MaxUploadSize));
 
 			http.set_pre_routing_handler([this](const httplib::Request &req, httplib::Response &res)
 										 {
 											 if (RequiresAuthentication(req) && !Auth.Authorize(req, res))
 												 return httplib::Server::HandlerResponse::Handled;
-											 if (!IsUploadRequest(req) && PayloadTooLarge(req))
+											 if (PayloadTooLarge(req))
 											 {
 												 res.status = 413;
 												 return httplib::Server::HandlerResponse::Handled;
@@ -227,6 +227,9 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 		res.set_content(nlohmann::json{{"error", std::move(error)}}.dump(), "application/json");
 	}
 
+	// What is left of a body refused before its end is never read: httplib closes
+	// the connection after any error status, so a refusal neither waits for
+	// gigabytes it is going to throw away nor takes them for the next request.
 	class UploadBody : public IUploadBody
 	{
 	public:
@@ -240,36 +243,30 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 		bool ReadFiles(const std::function<bool(const UploadPart &)> &begin,
 					   const std::function<bool(const char *, std::size_t)> &write) override
 		{
-			FRead = true;
 			if (!FRequest.is_multipart_form_data())
 				return false;
-			// Text fields are skipped; parts are capped as httplib caps a buffered form.
+			// A closing listener ends an upload as it ends a long wait: a slow
+			// client would otherwise hold the player's exit until its last byte.
+			const auto closing = []
+			{ return Current.Listener && Current.Listener->Closing.load(); };
+			// Text fields are skipped, and count among the parts.
 			bool isFile = false;
 			std::size_t parts = 0;
 			return FReader(
 				[&](const httplib::FormData &part)
 				{
-					if (++parts > CPPHTTPLIB_MULTIPART_FORM_DATA_FILE_MAX_COUNT)
+					if (closing() || ++parts > MaxUploadParts)
 						return false;
 					isFile = !part.filename.empty();
 					return !isFile || begin({part.name, part.filename, part.content_type});
 				},
 				[&](const char *data, std::size_t size)
-				{ return !isFile || write(data, size); });
-		}
-
-		// A body left unread is not drained: the connection closes instead, so a
-		// refusal does not wait for gigabytes it is going to throw away.
-		void CloseIfUnread(httplib::Response &res) const
-		{
-			if (!FRead)
-				res.set_header("Connection", "close");
+				{ return !closing() && (!isFile || write(data, size)); });
 		}
 
 	private:
 		const httplib::Request &FRequest;
 		const httplib::ContentReader &FReader;
-		bool FRead = false;
 	};
 
 	void MapUpload(const std::string &pathPattern, HttpUploadHandler handler) override
@@ -280,8 +277,7 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 													  [handler](const httplib::Request &req, httplib::Response &res, const httplib::ContentReader &reader)
 													  {
 				UploadBody body(req, reader);
-				res.status = handler(ParseRequest(req).PathMatches, body);
-				body.CloseIfUnread(res); })); });
+				res.status = handler(ParseRequest(req).PathMatches, body); })); });
 	}
 
 	void MapApiUpload(const std::string &pathPattern, ApiUploadHandler handler) override
@@ -299,8 +295,7 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 				catch (const ApiError &e)
 				{
 					SetApiError(res, e);
-				}
-				body.CloseIfUnread(res); })); });
+				} })); });
 	}
 
 	using HttpRoute = httplib::Server &(httplib::Server::*)(const std::string &, httplib::Server::Handler);
@@ -412,12 +407,14 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 						   { return std::regex_match(req.path, pattern); });
 	}
 
+	// A chunked body, whose size is unknown, only an upload may send.
 	bool PayloadTooLarge(const httplib::Request &req) const
 	{
-		if (httplib::detail::is_chunked_transfer_encoding(req.headers))
+		const bool upload = IsUploadRequest(req);
+		if (!upload && httplib::detail::is_chunked_transfer_encoding(req.headers))
 			return true;
 		if (req.has_header("Content-Length"))
-			return std::strtoull(req.get_header_value("Content-Length").c_str(), nullptr, 10) > MaxJsonPayload;
+			return std::strtoull(req.get_header_value("Content-Length").c_str(), nullptr, 10) > (upload ? MaxUploadSize : MaxJsonPayload);
 		return false;
 	}
 

@@ -373,7 +373,21 @@ export type Permissions = {
 
 export type Settings = {
     permissions: Permissions;
+    // The largest upload body, in bytes.
+    uploadLimit: number;
+    // The most files one upload may carry.
+    uploadFileLimit: number;
 };
+
+// Where the new items of an upload go in its playlist; `at` is before the item at
+// an index of the revision.
+export type UploadPlacement = { kind: 'end' | 'start' | 'scatter' } | { kind: 'at'; index: number };
+
+// A playlist of the player, or a new one that the player names by its content.
+export type UploadTarget = { playlistId: string; placement: UploadPlacement } | { playlistId: null };
+
+// A file with its path relative to what the user picked: its folders, then its name.
+export type UploadFile = { file: File; path: string };
 
 // What the sleep timer does at its moment.
 export type TimerAction = 'pause' | 'closePlayer' | 'shutdown' | 'sleep' | 'hibernate' | 'reboot' | 'logOff';

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <utility>
@@ -79,6 +80,72 @@ namespace
 			return false;
 		return std::all_of(text.begin(), text.begin() + static_cast<std::ptrdiff_t>(colon), [](unsigned char c)
 						   { return std::isalnum(c) || c == '+' || c == '-' || c == '.'; });
+	}
+
+	// The files of an upload, with their folders, until they are added: whatever
+	// fails on the way, nothing of them is left.
+	class Upload
+	{
+	public:
+		explicit Upload(const Settings::FeatureSettings &features) : FWriter(features.EffectiveUploadFolder()) {}
+		~Upload()
+		{
+			if (!FAdded)
+				FWriter.Abandon();
+		}
+
+		// The top folders and the files outside any, for the player to add.
+		std::vector<std::string> Receive(IUploadBody &body)
+		{
+			if (!FWriter.Ready())
+				throw ApiError(500, "uploadFailed");
+			if (!FWriter.HasRoomFor(body.DeclaredSize()))
+				throw ApiError(507, "uploadNoSpace");
+			const bool whole = body.ReadFiles([&](const UploadPart &part)
+											  { return FWriter.Begin(part.FileName); },
+											  [&](const char *data, std::size_t size)
+											  { return FWriter.Write(data, size); });
+			const player::SavedUploads saved = FWriter.Finish();
+			if (saved.Failure == player::UploadFailure::NoSpace)
+				throw ApiError(507, "uploadNoSpace");
+			if (saved.Failure == player::UploadFailure::WriteFailed)
+				throw ApiError(500, "uploadFailed");
+			if (saved.Failure == player::UploadFailure::InvalidName || !whole || saved.Items.empty())
+				throw ApiError(400, "invalidBody");
+			return saved.Items;
+		}
+
+		void Added() { FAdded = true; }
+
+	private:
+		player::UploadWriter FWriter;
+		bool FAdded = false;
+	};
+
+	struct UploadPlacement
+	{
+		player::Placement Placement = player::Placement::End;
+		std::int32_t Index = 0;
+	};
+
+	UploadPlacement PlacementQuery(const ApiRequest &request)
+	{
+		const std::string name = QueryString(request, "placement");
+		UploadPlacement result;
+		if (name == "start")
+			result.Placement = player::Placement::Start;
+		else if (name == "scatter")
+			result.Placement = player::Placement::Scatter;
+		else if (name == "at")
+		{
+			result.Placement = player::Placement::At;
+			result.Index = QueryInt(request, "index", -1, 0, INT32_MAX);
+			if (result.Index < 0)
+				throw ApiError(400, "invalidQuery");
+		}
+		else if (!name.empty() && name != "end")
+			throw ApiError(400, "invalidQuery");
+		return result;
 	}
 
 	bool EnabledBody(const nlohmann::json &body)
@@ -269,12 +336,17 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 									  { return player::AddFiles(core, playlistId, uris); }));
 		return nlohmann::json::object(); });
 
+	// The index of `at` is not checked against a revision: the player changes the
+	// revision as it reads the tags of new items, a job may wait in its queue
+	// behind another of the playlist, and a refusal costs the whole upload, while
+	// a change moves the files a little.
 	endpoints.MapApiUpload(R"(/api/v1/playlists/([^/]+)/upload)", [core = FCore, &settings = FSettings](const ApiRequest &request, IUploadBody &body) -> nlohmann::json
 			   {
 		const std::string playlistId = request.PathMatches.at(0);
 		const Settings::FeatureSettings features = settings.Get().Features;
 		if (!features.UploadTracks)
 			throw ApiError(403, "uploadDisabled");
+		const UploadPlacement placement = PlacementQuery(request);
 		// Nothing is read or written for a playlist that cannot take the files.
 		ThrowUnlessOk(RunOnMainThread(core, [&]
 									  {
@@ -283,26 +355,34 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 			if (playlist)
 				playlist->Release();
 			return writable; }));
-		player::UploadWriter writer(features.EffectiveUploadFolder());
-		if (!writer.HasRoomFor(body.DeclaredSize()))
-			throw ApiError(507, "uploadNoSpace");
-		const bool whole = body.ReadFiles([&](const UploadPart &part)
-										  { return writer.Begin(part.FileName); },
-										  [&](const char *data, std::size_t size)
-										  { return writer.Write(data, size); });
-		const player::SavedUploads saved = writer.Finish();
-		if (saved.Failure == player::UploadFailure::NoSpace)
-			throw ApiError(507, "uploadNoSpace");
-		if (saved.Failure != player::UploadFailure::None)
-			throw ApiError(500, "uploadFailed");
-		if (!whole || saved.Paths.empty())
-		{
-			writer.Abandon();
-			throw ApiError(400, "invalidBody");
-		}
+		Upload upload(features);
+		const std::vector<std::string> items = upload.Receive(body);
 		ThrowUnlessOk(RunOnMainThread(core, [&]
-									  { return player::AddFiles(core, playlistId, saved.Paths); }));
+									  { return player::AddFiles(core, playlistId, items, placement.Placement, placement.Index); }));
+		upload.Added();
 		return nlohmann::json::object(); });
+
+	endpoints.MapApiUpload("/api/v1/playlists/upload", [core = FCore, &settings = FSettings](const ApiRequest &, IUploadBody &body) -> nlohmann::json
+			   {
+		const Settings::FeatureSettings features = settings.Get().Features;
+		if (!features.UploadTracks)
+			throw ApiError(403, "uploadDisabled");
+		Upload upload(features);
+		const std::vector<std::string> items = upload.Receive(body);
+		// Created only now, so that a failed upload leaves no empty playlist.
+		const std::string id = RunOnMainThread(core, [&]
+												{
+			const std::string created = player::CreatePlaylist(core, std::string());
+			if (!created.empty() && player::AddFiles(core, created, items) != player::MutationResult::Ok)
+			{
+				player::RemovePlaylist(core, created);
+				return std::string();
+			}
+			return created; });
+		if (id.empty())
+			throw ApiError(500, "playlistUpdateFailed");
+		upload.Added();
+		return {{"id", id}}; });
 
 	endpoints.MapApi(HttpMethod::Get, R"(/api/v1/playlists/([^/]+)/items)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {

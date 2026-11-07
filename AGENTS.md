@@ -151,7 +151,9 @@ Things that bite:
   and wait with `requestScope::Cancelled`, which ends them when their listener
   closes; `src/requestScope.h` explains the thread-local request context.
 - **Limits are asymmetric.** JSON-RPC bodies are capped at 16 MB, only
-  registered upload endpoints may receive up to 2 GB. The cap is checked after
+  registered upload endpoints may receive up to 16 GB (4 GB on x86, where
+  httplib keeps body lengths in a 32-bit `size_t`), in at most
+  `MaxUploadParts` parts. The cap is checked after
   authentication so an unauthorized client learns nothing about the limits;
   both checks still run in the pre-routing handler, which httplib calls before
   it buffers any body.

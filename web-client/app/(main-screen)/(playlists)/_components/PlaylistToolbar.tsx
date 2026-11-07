@@ -11,14 +11,14 @@ import { Icon } from '@/app/_components/icons';
 import { ListToolbar } from '@/app/_components/lists';
 import toolbarStyles from '@/app/_components/lists/ListToolbar.module.scss';
 import { Menu, menuSeparator, type MenuEntry } from '@/app/_components/menus';
-import { AddUrlDialog, useItemRemoval, usePlaylistActions } from '@/app/_components/playlists';
-import { useErrorToast } from '@/app/_components/toast';
+import { AddUrlDialog, useFileUpload, useItemRemoval, usePlaylistActions } from '@/app/_components/playlists';
+import { useErrorToast, useToast } from '@/app/_components/toast';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { useNavigation } from '@/app/_state/Navigation';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
-import { useUploads } from '@/app/_state/Uploads';
 import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
 import { media } from '@/app/_styles/media';
+import { pickedFiles } from '@/app/_utils/droppedFiles';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePlaylistMode } from './PlaylistMode';
@@ -41,7 +41,8 @@ export function PlaylistToolbar() {
     const favoriteActions = useFavoriteActions();
     const playlistActions = usePlaylistActions();
     const removal = useItemRemoval();
-    const uploads = useUploads();
+    const fileUpload = useFileUpload();
+    const toast = useToast();
     const permissions = useSettings().data?.permissions;
     const { data: formats } = useFormats();
     const fileInput = useRef<HTMLInputElement>(null);
@@ -130,7 +131,7 @@ export function PlaylistToolbar() {
               ]
             : [];
     const uploadEntries: MenuEntry[] = canUpload
-        ? [{ label: t('playlist.upload'), icon: 'upload', disabled: uploads.progress !== null, onSelect: pickFiles }]
+        ? [{ label: t('playlist.upload'), icon: 'upload', onSelect: pickFiles }]
         : [];
     const separator: MenuEntry[] = canBrowse || canUpload ? [menuSeparator] : [];
     const addEntries: MenuEntry[] = [
@@ -240,7 +241,10 @@ export function PlaylistToolbar() {
                 hidden
                 accept={formats?.audio.map(extension => `.${extension}`).join(',')}
                 onChange={event => {
-                    if (selected) uploads.start(selected.id, [...event.target.files!]);
+                    const files = pickedFiles(event.target.files!);
+                    const refused = fileUpload.filesRefusal(files);
+                    if (refused) toast.show(refused);
+                    else if (selected) fileUpload.start({ playlistId: selected.id, placement: { kind: 'end' } }, files);
                     // The same files may be picked again.
                     event.target.value = '';
                 }}

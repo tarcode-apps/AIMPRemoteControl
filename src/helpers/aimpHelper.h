@@ -31,6 +31,7 @@ std::string Localize(IAIMPCore *core, const std::string &keyPath, const std::str
 std::string GetPlaylistAIMPId(IAIMPPlaylist *playlist);
 IAIMPPlaylist *LoadedPlaylistByAIMPId(IAIMPCore *core, const std::string &aimpId);
 
-HRESULT AddFilesToPlaylist(IAIMPCore *core, IAIMPPlaylist *playlist, const std::vector<std::string> &fileUris);
+// `flags` are AIMP_PLAYLIST_ADD_FLAGS_*; `insertIn` -1 appends.
+HRESULT AddFilesToPlaylist(IAIMPCore *core, IAIMPPlaylist *playlist, const std::vector<std::string> &fileUris, DWORD flags = 0, INT32 insertIn = -1);
 
 bool MoveFocus(IAIMPPlaylistItem *item, int delta);

@@ -3,7 +3,8 @@
     "retry": "Retry",
     "ok": "OK",
     "cancel": "Cancel",
-    "delete": "Delete"
+    "delete": "Delete",
+    "close": "Close"
   },
   "errors": {
     "network": "The player is unreachable",
@@ -299,7 +300,23 @@
   },
   "upload": {
     "progress": "Uploading {{current}} of {{total}}:",
-    "failed": "Could not upload {{name}}: {{message}}"
+    "failed": "Could not upload {{name}}: {{message}}",
+    "more": "{{name}} and {{count}} more",
+    "disabled": "Uploading files is turned off in the plugin settings",
+    "readOnly": "The playlist is read-only",
+    "nothing": "No files to upload",
+    "tooLarge": "{{size}} is more than the player takes at once ({{limit}})",
+    "tooMany": "Too many files: {{files}}, the player takes up to {{limit}} at once",
+    "reading": "Preparing…",
+    "summary": "Files: {{count}} · {{size}}",
+    "here": "Insert here",
+    "atStart": "To the start of the playlist",
+    "atEnd": "To the end of the playlist",
+    "scatter": "Scatter over the playlist",
+    "newPlaylist": "New playlist",
+    "dropNew": "Drop to create a playlist",
+    "waiting": "Waiting to upload:",
+    "queued": "queued"
   },
   "trackInfo": {
     "title": "Track information",

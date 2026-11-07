@@ -1,6 +1,8 @@
 #include "playlists.h"
 
+#include <algorithm>
 #include <initializer_list>
+#include <random>
 
 #include "apiCore.h"
 #include "apiPlaylists.h"
@@ -167,12 +169,43 @@ player::MutationResult player::OpenWritablePlaylist(IAIMPCore *core, const std::
 	return MutationResult::PlaylistReadOnly;
 }
 
-player::MutationResult player::AddFiles(IAIMPCore *core, const std::string &playlistId, const std::vector<std::string> &uris)
+player::MutationResult player::AddFiles(IAIMPCore *core, const std::string &playlistId, const std::vector<std::string> &uris,
+										 Placement placement, std::int32_t index)
 {
 	IAIMPPlaylist *playlist = nullptr;
 	if (const MutationResult opened = OpenWritablePlaylist(core, playlistId, playlist); opened != MutationResult::Ok)
 		return opened;
-	const HRESULT hr = AddFilesToPlaylist(core, playlist, uris);
+	const INT32 before = playlist->GetItemCount();
+	INT32 insertIn = -1;
+	if (placement == Placement::Start)
+		insertIn = 0;
+	else if (placement == Placement::At)
+		insertIn = std::clamp<INT32>(index, 0, before);
+	// Expanding a large folder on the main thread would freeze the player, so it is
+	// left to the background; the scatter alone needs the new items in place when
+	// AddList returns.
+	const DWORD flags = placement == Placement::Scatter ? AIMP_PLAYLIST_ADD_FLAGS_NOTHREADING : 0;
+	HRESULT hr = AddFilesToPlaylist(core, playlist, uris, flags, insertIn);
+	if (Succeeded(hr) && placement == Placement::Scatter)
+	{
+		const INT32 after = playlist->GetItemCount();
+		std::vector<IAIMPPlaylistItem *> added;
+		for (INT32 i = before; i < after; ++i)
+		{
+			IAIMPPlaylistItem *item = nullptr;
+			if (Succeeded(playlist->GetItem(i, IID_IAIMPPlaylistItem, reinterpret_cast<void **>(&item))) && item)
+				added.push_back(item);
+		}
+		std::mt19937 random(std::random_device{}());
+		std::uniform_int_distribution<INT32> anywhere(0, after - 1);
+		playlist->BeginUpdate();
+		for (IAIMPPlaylistItem *item : added)
+			if (Succeeded(hr))
+				hr = item->SetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_INDEX, anywhere(random));
+		playlist->EndUpdate();
+		for (IAIMPPlaylistItem *item : added)
+			item->Release();
+	}
 	playlist->Release();
 	return Succeeded(hr) ? MutationResult::Ok : MutationResult::Failed;
 }

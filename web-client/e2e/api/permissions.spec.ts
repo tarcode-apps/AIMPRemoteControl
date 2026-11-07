@@ -9,7 +9,7 @@ test.describe('with deletion, download, upload and the timer disallowed', () => 
     withPluginSettings({ physicalDeletion: false, downloadTracks: false, uploadTracks: false, scheduler: false });
 
     test('the settings and the capabilities tell so', async ({ api }) => {
-        expect((await api.get('/settings')).body).toEqual({
+        expect((await api.get('/settings')).body).toMatchObject({
             permissions: {
                 downloadTracks: false,
                 uploadTracks: false,
@@ -69,6 +69,11 @@ test.describe('with deletion, download, upload and the timer disallowed', () => 
         });
         expect(web.status()).toBe(403);
         expect((await web.json()).error.code).toBe('uploadDisabled');
+        const before = await api.playlists();
+        const intoNew = await api.context.post('/api/v1/playlists/upload', { multipart: { file } });
+        expect(intoNew.status()).toBe(403);
+        expect((await intoNew.json()).error.code).toBe('uploadDisabled');
+        expect(await api.playlists()).toEqual(before);
 
         const legacyId = await legacyPlaylistId(api, playlist.name);
         expect((await api.context.post(`/uploadTrack/playlist_id/${legacyId}`, { multipart: { file } })).status()).toBe(

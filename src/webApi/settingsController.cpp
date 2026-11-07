@@ -13,6 +13,8 @@ nlohmann::json webapi::SettingsController::ToJson(const Settings &settings)
 			{"physicalDeletion", features.PhysicalDeletion},
 			{"scheduler", features.Scheduler},
 		}},
+		{"uploadLimit", MaxUploadSize},
+		{"uploadFileLimit", MaxUploadParts},
 	};
 }
 

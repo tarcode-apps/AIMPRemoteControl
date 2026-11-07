@@ -30,6 +30,13 @@ struct UploadPart
 	std::string ContentType;
 };
 
+// The largest body an upload endpoint takes: 16 GB, or what a 32-bit size_t can
+// count, which the HTTP library keeps body lengths in.
+constexpr std::uint64_t MaxUploadSize = SIZE_MAX < (16ull << 30) ? SIZE_MAX : (16ull << 30);
+// The most parts an upload may have, a folder of a whole music library among
+// them; each is a file on disk.
+constexpr std::size_t MaxUploadParts = 100000;
+
 // The body of an upload, read from the connection only when the handler asks:
 // a refusal reads nothing, and the files go where the handler writes them as
 // they arrive instead of through memory.

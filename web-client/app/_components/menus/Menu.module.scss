@@ -14,6 +14,14 @@
     box-shadow: 0 4px 16px var(--color-shadow);
 }
 
+.heading {
+    max-width: 320px;
+    margin: 0;
+    padding: 6px 16px 10px;
+    color: var(--color-text-secondary);
+    font-size: 0.875em;
+}
+
 // Inset to the items' content, from the icons' edge to the text's far edge.
 .separator {
     margin: 8px 16px;

@@ -1,7 +1,15 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { NetworkError } from './helpers/errors';
 import { basePath, request, responseError } from './helpers/request';
-import type { AddItemsRequest, FileFormats, FilesSort, FileType, FolderListing } from './types';
+import type {
+    AddItemsRequest,
+    FileFormats,
+    FilesSort,
+    FileType,
+    FolderListing,
+    UploadFile,
+    UploadTarget,
+} from './types';
 
 export const fileKeys = {
     all: ['files'] as const,
@@ -42,13 +50,22 @@ export function useAddItems() {
     });
 }
 
-// Sends one file; `onProgress` gets the bytes sent so far and the total.
-export function uploadFile(
-    playlistId: string,
-    file: File,
-    onProgress: (sent: number, total: number) => void,
+function uploadUrl(target: UploadTarget) {
+    if (target.playlistId === null) return `${basePath}/playlists/upload`;
+    const { placement } = target;
+    const query = new URLSearchParams({ placement: placement.kind });
+    if (placement.kind === 'at') query.set('index', String(placement.index));
+    return `${basePath}/playlists/${encodeURIComponent(target.playlistId)}/upload?${query}`;
+}
+
+// Sends the files in one request, which the player takes whole or not at all;
+// `onProgress` gets the bytes sent so far. Resolves to the playlist they went to.
+export function uploadFiles(
+    target: UploadTarget,
+    files: UploadFile[],
+    onProgress: (sent: number) => void,
     signal: AbortSignal,
-): Promise<void> {
+): Promise<string> {
     const cancelled = () => new DOMException('The upload was cancelled', 'AbortError');
     if (signal.aborted) return Promise.reject(cancelled());
     return new Promise((resolve, reject) => {
@@ -58,20 +75,20 @@ export function uploadFile(
             signal.removeEventListener('abort', abort);
             outcome();
         };
-        xhr.open('POST', `${basePath}/playlists/${encodeURIComponent(playlistId)}/upload`);
-        xhr.upload.onprogress = event => {
-            if (event.lengthComputable) onProgress(event.loaded, event.total);
-        };
+        xhr.open('POST', uploadUrl(target));
+        xhr.upload.onprogress = event => onProgress(event.loaded);
         xhr.onload = () =>
             settle(() => {
-                if (xhr.status >= 200 && xhr.status < 300) resolve();
-                else reject(responseError(xhr.status, xhr.getResponseHeader('Content-Type'), xhr.responseText));
+                if (xhr.status < 200 || xhr.status >= 300)
+                    reject(responseError(xhr.status, xhr.getResponseHeader('Content-Type'), xhr.responseText));
+                else if (target.playlistId === null) resolve((JSON.parse(xhr.responseText) as { id: string }).id);
+                else resolve(target.playlistId);
             });
         xhr.onerror = () => settle(() => reject(new NetworkError(undefined)));
         xhr.onabort = () => settle(() => reject(cancelled()));
         signal.addEventListener('abort', abort);
         const form = new FormData();
-        form.append('file', file, file.name);
+        for (const { file, path } of files) form.append('file', file, path);
         xhr.send(form);
     });
 }

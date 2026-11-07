@@ -36,6 +36,18 @@ test.describe('extended search', () => {
         await expect(search.row('Zephyr two')).toBeVisible();
     });
 
+    test("a group's menu acts on its matches and folds every group", async ({ api }) => {
+        await search.search('zephyr');
+        // The title and the artist both match in the first playlist.
+        await search.groupAction(first.name, t('playlist.enqueue'));
+        await expect.poll(async () => (await api.queue()).items.length).toBe(2);
+
+        await search.groupAction(second.name, t('playlist.collapseAll'));
+        await expect(search.rows).toHaveCount(0);
+        await search.groupAction(first.name, t('playlist.expandAll'));
+        await expect(search.rows).toHaveCount(3);
+    });
+
     test('a found track plays, and Go to track shows it in its playlist', async ({ api, app }) => {
         await search.search('zephyr two');
         await search.play('Zephyr two');
@@ -51,7 +63,7 @@ test.describe('extended search', () => {
         await search.search('zephyr');
         await expect(search.row('Zephyr Band')).toBeVisible();
 
-        await search.toolbarButton(t('search.fields')).click();
+        await search.more(t('search.fields'));
         await app.dialog.getByRole('checkbox', { name: t('search.field.artist') }).uncheck();
         await app.dialogButton(t('actions.ok')).click();
         await expect(search.row('Zephyr Band')).toBeHidden();

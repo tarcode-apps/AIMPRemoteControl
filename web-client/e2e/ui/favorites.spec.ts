@@ -53,6 +53,21 @@ test.describe('favorites', () => {
         await expect(app.menuItem(t('trackInfo.open'))).toBeHidden();
     });
 
+    test("a group's menu acts on its favorites and folds every group", async ({ api, app }) => {
+        await screen.rowAction('Alpha', t('favorites.add'));
+        const favorites = await openFavorites(app);
+        await favorites.groupAction(playlist.name, t('playlist.enqueue'));
+        await expect.poll(async () => (await api.queue()).items.length).toBe(2);
+
+        await favorites.groupAction(playlist.name, t('playlist.collapseAll'));
+        await expect(favorites.rows).toHaveCount(0);
+        await favorites.groupAction(playlist.name, t('playlist.expandAll'));
+        await expect(favorites.rows).toHaveCount(2);
+
+        await favorites.groupAction(playlist.name, t('favorites.remove'));
+        await expect(favorites.list.getByText(t('favorites.empty'))).toBeVisible();
+    });
+
     test('a favorite is removed from its menu, and Clear removes them all', async ({ app }) => {
         await screen.rowAction('Alpha', t('favorites.add'));
         // The menu of a favorite offers to take it back.

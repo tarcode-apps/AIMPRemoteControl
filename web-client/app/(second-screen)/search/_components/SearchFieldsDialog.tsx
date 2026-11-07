@@ -38,6 +38,7 @@ function OpenSearchFieldsDialog({ onClose }: Pick<SearchFieldsDialogProps, 'onCl
     return (
         <Dialog
             open
+            compact
             title={t('search.fields')}
             onClose={onClose}
             onSubmit={submit}

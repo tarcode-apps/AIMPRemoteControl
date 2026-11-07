@@ -52,6 +52,11 @@ export type SearchModeContextValue = ListModeValue & {
     // The selection split by playlist, in the order of the results; nothing while
     // nothing is selected.
     selectionByPlaylist(): SelectionInPlaylist[] | undefined;
+    // A group's hits as a selection in its playlist; nothing while the result is
+    // still the previous one.
+    groupSelection(group: PlaylistGroup): SelectionInPlaylist | undefined;
+    // Whether a group's playlist is one whose items cannot be removed.
+    groupReadOnly(group: PlaylistGroup): boolean;
     selectionTotals: ItemsSummary | undefined;
 };
 
@@ -188,6 +193,20 @@ export function SearchModeProvider({ children }: { children: ReactNode }) {
         });
     };
 
+    const groupSelection = (group: PlaylistGroup): SelectionInPlaylist | undefined => {
+        const playlist = result?.playlists[group.index];
+        if (!params || !playlist || !settled) return undefined;
+        return {
+            playlistId: playlist.id,
+            revision: playlist.revision,
+            selection: { search: params.search, fields: params.fields, except: [] },
+        };
+    };
+    const groupReadOnly = (group: PlaylistGroup) => {
+        const id = result?.playlists[group.index]?.id;
+        return playlists?.find(playlist => playlist.id === id)?.readOnly === true;
+    };
+
     const selectionTotals = settled
         ? list.selectedTotals({
               all: result && { count: result.total, duration: result.duration, size: result.size },
@@ -216,6 +235,8 @@ export function SearchModeProvider({ children }: { children: ReactNode }) {
         setSelected,
         setGroupSelected,
         selectionByPlaylist,
+        groupSelection,
+        groupReadOnly,
         selectionTotals,
     };
     return <SearchModeContext value={value}>{children}</SearchModeContext>;

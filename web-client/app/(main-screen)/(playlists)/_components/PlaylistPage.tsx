@@ -12,7 +12,7 @@ import {
 } from '@/app/_api/playlists';
 import { queueMark, trackKey, useEnqueueSelections, useQueuePositions } from '@/app/_api/queue';
 import type { Playlist, PlaylistGroup, PlaylistItem } from '@/app/_api/types';
-import { ListCheckbox } from '@/app/_components/inputs';
+import { Checkbox } from '@/app/_components/inputs';
 import type { PlaylistRow } from '@/app/_components/lists';
 import {
     DragHandle,
@@ -32,6 +32,7 @@ import {
     topGroupName,
     twoLineRowHeight,
     useActiveRow,
+    useFoldingItems,
     usePlaylistDrag,
 } from '@/app/_components/lists';
 import styles from '@/app/_components/lists/ListPage.module.scss';
@@ -342,6 +343,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
     });
     const enqueueSelections = useEnqueueSelections();
     const foldable = !searching && !sorting;
+    const foldingItems = useFoldingItems();
     const groupMenu = useRowMenu((group: PlaylistGroup) => {
         const allOn = group.enabledCount === group.count;
         return [
@@ -374,26 +376,12 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                   ]
                 : []),
             menuSeparator,
-            {
-                label: t(group.expanded ? 'playlist.collapseGroup' : 'playlist.expandGroup'),
-                icon: group.expanded ? 'expand_less' : 'expand_more',
+            ...foldingItems(group, {
+                toggle: toggleGroup,
+                setAll: expanded =>
+                    setExpanded.mutate({ expanded, revision: playlist.revision }, { onError: showError }),
                 disabled: !foldable,
-                onSelect: () => toggleGroup(group),
-            },
-            {
-                label: t('playlist.collapseAll'),
-                icon: 'unfold_less',
-                disabled: !foldable,
-                onSelect: () =>
-                    setExpanded.mutate({ expanded: false, revision: playlist.revision }, { onError: showError }),
-            },
-            {
-                label: t('playlist.expandAll'),
-                icon: 'unfold_more',
-                disabled: !foldable,
-                onSelect: () =>
-                    setExpanded.mutate({ expanded: true, revision: playlist.revision }, { onError: showError }),
-            },
+            }),
             menuSeparator,
             ...removal.selectionItems(() => ({ parts: [groupSelection(group)] }), playlist.readOnly),
         ];
@@ -544,7 +532,8 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                                         style={{ height: groupRowHeight, transform }}
                                     >
                                         {selecting && (
-                                            <ListCheckbox
+                                            <Checkbox
+                                                variant="list"
                                                 title={t('playlist.selectGroup')}
                                                 tabIndex={-1}
                                                 className={styles.groupCheckbox}

@@ -1,5 +1,7 @@
 import type { PlaylistGroup } from '@/app/_api/types';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { MenuItem } from '../menus';
 
 // The positions of a group's items.
 export function groupPositions(group: PlaylistGroup): number[] {
@@ -32,4 +34,26 @@ export function useCollapsedGroups() {
             setCollapsed(expanded ? new Set() : new Set(keys));
         },
     };
+}
+
+type GroupFolding = {
+    toggle(group: PlaylistGroup): void;
+    setAll(expanded: boolean): void;
+    // While the list cannot fold, as a playlist being searched or sorted.
+    disabled?: boolean;
+};
+
+// The folding entries of a group's menu: the group itself, then all of them.
+export function useFoldingItems() {
+    const { t } = useTranslation();
+    return (group: PlaylistGroup, { toggle, setAll, disabled = false }: GroupFolding): MenuItem[] => [
+        {
+            label: t(group.expanded ? 'playlist.collapseGroup' : 'playlist.expandGroup'),
+            icon: group.expanded ? 'expand_less' : 'expand_more',
+            disabled,
+            onSelect: () => toggle(group),
+        },
+        { label: t('playlist.collapseAll'), icon: 'unfold_less', disabled, onSelect: () => setAll(false) },
+        { label: t('playlist.expandAll'), icon: 'unfold_more', disabled, onSelect: () => setAll(true) },
+    ];
 }

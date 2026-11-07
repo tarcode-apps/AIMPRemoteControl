@@ -24,7 +24,6 @@ export function SearchToolbar() {
     const { relinking } = useFavoriteRelink();
     const [dialog, setDialog] = useState<'playlists' | 'fields' | null>(null);
     const closeDialog = () => setDialog(null);
-    const grouped = (mode.result?.playlists.length ?? 0) > 0;
     const enqueueSelected = (atBeginning: boolean) => enqueueSelections(mode.selectionByPlaylist() ?? [], atBeginning);
 
     return (
@@ -45,25 +44,10 @@ export function SearchToolbar() {
                         >
                             <Icon>checklist</Icon>
                         </ToolbarButton>
-                        <ToolbarButton title={t('search.fields')} onClick={() => setDialog('fields')}>
-                            <Icon>tune</Icon>
-                        </ToolbarButton>
+                        <span />
                     </>
                 }
-                moreActions={[
-                    {
-                        label: t('playlist.collapseAll'),
-                        icon: 'unfold_less',
-                        disabled: !grouped,
-                        onSelect: () => mode.setAllExpanded(false),
-                    },
-                    {
-                        label: t('playlist.expandAll'),
-                        icon: 'unfold_more',
-                        disabled: !grouped,
-                        onSelect: () => mode.setAllExpanded(true),
-                    },
-                ]}
+                moreActions={[{ label: t('search.fields'), icon: 'tune', onSelect: () => setDialog('fields') }]}
                 selectedActions={[
                     {
                         label: t('playlist.enqueue'),

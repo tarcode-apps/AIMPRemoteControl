@@ -3,7 +3,7 @@
 import { errorMessage } from '@/app/_api/helpers/errors';
 import type { FileEntry, FileRoot, FolderEntry } from '@/app/_api/types';
 import { Icon } from '@/app/_components/icons';
-import { ListCheckbox } from '@/app/_components/inputs';
+import { Checkbox } from '@/app/_components/inputs';
 import listStyles from '@/app/_components/lists/ListPage.module.scss';
 import { Skeleton } from '@/app/_components/skeleton';
 import { formatSize } from '@/app/_utils/format';
@@ -100,7 +100,8 @@ export function FilesList() {
                         const selected = mode.selected.has(folder.path);
                         return (
                             <div key={folder.path} className={styles.row} style={style}>
-                                <ListCheckbox
+                                <Checkbox
+                                    variant="list"
                                     title={t('files.selectFolder')}
                                     checked={selected}
                                     onChange={event => mode.setSelected(folder.path, event.target.checked)}
@@ -117,7 +118,8 @@ export function FilesList() {
                     const selected = mode.selected.has(file.path);
                     return (
                         <label key={file.path} className={styles.row} style={style} data-testid="file-row">
-                            <ListCheckbox
+                            <Checkbox
+                                variant="list"
                                 title={t('files.selectFile')}
                                 checked={selected}
                                 onChange={event => mode.setSelected(file.path, event.target.checked)}

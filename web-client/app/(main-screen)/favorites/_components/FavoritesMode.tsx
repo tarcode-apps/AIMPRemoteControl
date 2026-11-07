@@ -1,9 +1,10 @@
 'use client';
 
 import { useLocatedFavorites } from '@/app/_api/favorites';
-import { usePlaylists } from '@/app/_api/playlists';
-import type { ItemsSummary, LocatedItem, PlaylistGroup } from '@/app/_api/types';
+import { groupByPlaylist, usePlaylists } from '@/app/_api/playlists';
+import type { ItemsSummary, LocatedItem, PlaylistGroup, SelectionInPlaylist } from '@/app/_api/types';
 import { PlaylistRows, useCollapsedGroups, useListMode, type ListModeValue } from '@/app/_components/lists';
+import type { SelectionRemoval } from '@/app/_components/playlists';
 import { useFavorites, type FavoriteRecord } from '@/app/_state/Favorites';
 import { sumSummaries } from '@/app/_utils/summary';
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
@@ -32,6 +33,29 @@ export function useFavoritesMode(): FavoritesModeContextValue {
     const value = useContext(FavoritesModeContext);
     if (!value) throw new Error('useFavoritesMode must be used inside <FavoritesModeProvider>');
     return value;
+}
+
+// The tracks of the entries that are still in their playlists, as a selection
+// per playlist.
+export function selectionByPlaylist(entries: FavoriteEntry[]): SelectionInPlaylist[] {
+    const tracks = entries.flatMap(({ located }) => (located ? [located] : []));
+    return [...groupByPlaylist(tracks)].map(([playlistId, located]) => ({
+        playlistId,
+        revision: located[0].revision,
+        selection: { indexes: located.map(track => track.index) },
+    }));
+}
+
+// Removing the entries' tracks from their playlists; a favorite whose file is
+// deleted goes with it.
+export function removalOf(entries: FavoriteEntry[], removeFavorites: (files: string[]) => void): SelectionRemoval {
+    const files = entries.flatMap(({ record, located }) => (located ? [record.fileUri] : []));
+    return {
+        parts: selectionByPlaylist(entries),
+        onRemoved: physically => {
+            if (physically) removeFavorites(files);
+        },
+    };
 }
 
 // The live values of the tracks still in their playlists, the snapshots of the rest.

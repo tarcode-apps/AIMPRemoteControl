@@ -1,9 +1,9 @@
 'use client';
 
 import { usePlayer } from '@/app/_api/player';
-import { queueMark, trackKey, useQueuePositions } from '@/app/_api/queue';
+import { queueMark, trackKey, useEnqueueSelections, useQueuePositions } from '@/app/_api/queue';
 import type { LocatedItem, PlaylistGroup, PlaylistItem } from '@/app/_api/types';
-import { ListCheckbox } from '@/app/_components/inputs';
+import { Checkbox } from '@/app/_components/inputs';
 import {
     FastScroll,
     fixedRowView,
@@ -13,17 +13,20 @@ import {
     ItemRow,
     overscanRows,
     positionsCheckState,
+    RowMenuIcon,
     SkeletonRow,
     thumbnailMargin,
     topGroupName,
     twoLineRowHeight,
     useActiveRow,
+    useFoldingItems,
     usePlaylistDrag,
     type PlaylistRow,
 } from '@/app/_components/lists';
 import styles from '@/app/_components/lists/ListPage.module.scss';
 import { menuSeparator, useRowMenu } from '@/app/_components/menus';
 import { useItemRemoval, useTrackDownload } from '@/app/_components/playlists';
+import { useErrorToast } from '@/app/_components/toast';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { useFavoriteRelink, useFavorites, type FavoriteRecord } from '@/app/_state/Favorites';
 import { useNavigation } from '@/app/_state/Navigation';
@@ -33,7 +36,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import clsx from 'clsx';
 import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useFavoritesMode, type FavoriteEntry } from './FavoritesMode';
+import { removalOf, selectionByPlaylist, useFavoritesMode, type FavoriteEntry } from './FavoritesMode';
 
 // What a row shows of a favorite that is not in its playlist: its snapshot.
 function snapshotItem(record: FavoriteRecord): PlaylistItem {
@@ -56,6 +59,7 @@ function snapshotItem(record: FavoriteRecord): PlaylistItem {
 
 export function FavoritesPage() {
     const { t } = useTranslation();
+    const showError = useErrorToast();
     const { openSecondScreen } = useNavigation();
     const docked = useMediaQuery(media.drawerDocked);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -165,6 +169,38 @@ export function FavoritesPage() {
                 if (physically) favorites.remove([record.fileUri]);
             }),
             ...download.trackItems(located),
+        ];
+    });
+
+    // As a playlist's, over the group's favorites; only those in their playlists
+    // can be queued or removed.
+    const enqueueSelections = useEnqueueSelections();
+    const foldingItems = useFoldingItems();
+    const groupMenu = useRowMenu((group: PlaylistGroup) => {
+        const members = entries.slice(group.firstPosition, group.firstPosition + group.count);
+        const noTracks = !members.some(({ located }) => located);
+        return [
+            {
+                label: t('playlist.enqueue'),
+                icon: 'playlist_add',
+                disabled: noTracks,
+                onSelect: () => void enqueueSelections(selectionByPlaylist(members), false).catch(showError),
+            },
+            {
+                label: t('playlist.enqueueFirst'),
+                icon: 'playlist_play',
+                disabled: noTracks,
+                onSelect: () => void enqueueSelections(selectionByPlaylist(members), true).catch(showError),
+            },
+            {
+                label: t('favorites.remove'),
+                icon: 'heart_minus',
+                onSelect: () => favorites.remove(members.map(({ record }) => record.fileUri)),
+            },
+            menuSeparator,
+            ...foldingItems(group, { toggle: mode.toggleGroup, setAll: mode.setAllExpanded }),
+            menuSeparator,
+            ...removal.selectionItems(() => removalOf(members, favorites.remove), noTracks),
         ];
     });
 
@@ -286,7 +322,8 @@ export function FavoritesPage() {
                                         style={{ height: groupRowHeight, transform }}
                                     >
                                         {selecting && (
-                                            <ListCheckbox
+                                            <Checkbox
+                                                variant="list"
                                                 title={t('playlist.selectGroup')}
                                                 tabIndex={-1}
                                                 className={styles.groupCheckbox}
@@ -295,6 +332,12 @@ export function FavoritesPage() {
                                             />
                                         )}
                                         <GroupRow group={row.group} onToggle={() => mode.toggleGroup(row.group)} />
+                                        {!selecting && (
+                                            <RowMenuIcon
+                                                title={t('playlist.groupActions')}
+                                                menu={groupMenu.button(index, row.group)}
+                                            />
+                                        )}
                                     </div>
                                 );
                             const entry = entries[row.position];
@@ -338,6 +381,7 @@ export function FavoritesPage() {
                     </div>
                 )}
                 {rowMenu.popover}
+                {groupMenu.popover}
                 {removal.dialogs}
                 {download.dialogs}
             </section>

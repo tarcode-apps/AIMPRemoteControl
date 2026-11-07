@@ -2,10 +2,10 @@
 
 import { errorMessage } from '@/app/_api/helpers/errors';
 import { usePlayer } from '@/app/_api/player';
-import { queueMark, trackKey, useQueuePositions } from '@/app/_api/queue';
+import { queueMark, trackKey, useEnqueueSelections, useQueuePositions } from '@/app/_api/queue';
 import { useSearchPages } from '@/app/_api/search';
 import type { PlaylistGroup, SearchHit } from '@/app/_api/types';
-import { ListCheckbox } from '@/app/_components/inputs';
+import { Checkbox } from '@/app/_components/inputs';
 import {
     fixedRowView,
     GroupRow,
@@ -15,10 +15,12 @@ import {
     pageRange,
     pagesAround,
     pageSize,
+    RowMenuIcon,
     SkeletonRow,
     thumbnailMargin,
     twoLineRowHeight,
     useActiveRow,
+    useFoldingItems,
     type PlaylistRow,
 } from '@/app/_components/lists';
 import styles from '@/app/_components/lists/ListPage.module.scss';
@@ -108,6 +110,43 @@ export function SearchPage() {
         menuSeparator,
         ...removal.trackItems({ ...hit, name: hit.displayText }),
     ]);
+
+    // As a playlist's, over the group's hits. Picking a track for a favorite
+    // leaves only the folding.
+    const enqueueSelections = useEnqueueSelections();
+    const foldingItems = useFoldingItems();
+    const groupMenu = useRowMenu((group: PlaylistGroup) => {
+        const folding = foldingItems(group, { toggle: mode.toggleGroup, setAll: mode.setAllExpanded });
+        if (relinking) return folding;
+        const parts = () => {
+            const part = mode.groupSelection(group);
+            return part ? [part] : [];
+        };
+        return [
+            {
+                label: t('playlist.enqueue'),
+                icon: 'playlist_add',
+                onSelect: () => void enqueueSelections(parts(), false).catch(showError),
+            },
+            {
+                label: t('playlist.enqueueFirst'),
+                icon: 'playlist_play',
+                onSelect: () => void enqueueSelections(parts(), true).catch(showError),
+            },
+            {
+                label: t('favorites.add'),
+                icon: 'heart_plus',
+                onSelect: () => void favoriteActions.addSelections(parts()).catch(showError),
+            },
+            menuSeparator,
+            ...folding,
+            menuSeparator,
+            ...removal.selectionItems(() => {
+                const part = mode.groupSelection(group);
+                return part && { parts: [part] };
+            }, mode.groupReadOnly(group)),
+        ];
+    });
 
     // The results are always in groups, one per playlist, which a row goes with.
     const toggleRow = (position: number, group: PlaylistGroup | undefined) =>
@@ -220,7 +259,8 @@ export function SearchPage() {
                                 style={{ height: groupRowHeight, transform }}
                             >
                                 {selecting && (
-                                    <ListCheckbox
+                                    <Checkbox
+                                        variant="list"
                                         title={t('playlist.selectGroup')}
                                         tabIndex={-1}
                                         className={styles.groupCheckbox}
@@ -231,6 +271,12 @@ export function SearchPage() {
                                     />
                                 )}
                                 <GroupRow group={row.group} onToggle={() => mode.toggleGroup(row.group)} />
+                                {!selecting && (
+                                    <RowMenuIcon
+                                        title={t('playlist.groupActions')}
+                                        menu={groupMenu.button(index, row.group)}
+                                    />
+                                )}
                             </div>
                         );
                     const hit = hitAt(row.position);
@@ -288,6 +334,7 @@ export function SearchPage() {
         >
             {content}
             {rowMenu.popover}
+            {groupMenu.popover}
             {removal.dialogs}
         </section>
     );

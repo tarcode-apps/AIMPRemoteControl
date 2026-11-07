@@ -1,6 +1,5 @@
 'use client';
 
-import { groupByPlaylist } from '@/app/_api/playlists';
 import { useEnqueueSelections } from '@/app/_api/queue';
 import { ToolbarButton } from '@/app/_components/buttons';
 import { SortDialog } from '@/app/_components/dialogs';
@@ -14,7 +13,7 @@ import { favoritesSortModes, useFavorites } from '@/app/_state/Favorites';
 import { media } from '@/app/_styles/media';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useFavoritesMode } from './FavoritesMode';
+import { removalOf, selectionByPlaylist, useFavoritesMode } from './FavoritesMode';
 import { GroupingDialog } from './GroupingDialog';
 
 export function FavoritesToolbar() {
@@ -29,26 +28,8 @@ export function FavoritesToolbar() {
     const closeDialog = () => setDialog(null);
     const empty = mode.entries.length === 0;
 
-    // The selected tracks that are in their playlists, by playlist.
-    const selectedParts = () => {
-        const tracks = mode.selectedEntries().flatMap(({ located }) => (located ? [located] : []));
-        return [...groupByPlaylist(tracks)].map(([playlistId, located]) => ({
-            playlistId,
-            revision: located[0].revision,
-            selection: { indexes: located.map(track => track.index) },
-        }));
-    };
-    const enqueueSelected = (atBeginning: boolean) => enqueueSelections(selectedParts(), atBeginning);
-    // A favorite whose file is deleted goes with it.
-    const selectedRemoval = () => {
-        const files = mode.selectedEntries().flatMap(({ record, located }) => (located ? [record.fileUri] : []));
-        return {
-            parts: selectedParts(),
-            onRemoved: (physically: boolean) => {
-                if (physically) favorites.remove(files);
-            },
-        };
-    };
+    const enqueueSelected = (atBeginning: boolean) =>
+        enqueueSelections(selectionByPlaylist(mode.selectedEntries()), atBeginning);
 
     const removeSelected = () => {
         favorites.remove(mode.selectedEntries().map(({ record }) => record.fileUri));
@@ -78,18 +59,6 @@ export function FavoritesToolbar() {
                 moreActions={[
                     { label: t('favorites.groupBy'), icon: 'view_list', onSelect: () => setDialog('grouping') },
                     {
-                        label: t('playlist.collapseAll'),
-                        icon: 'unfold_less',
-                        disabled: empty,
-                        onSelect: () => mode.setAllExpanded(false),
-                    },
-                    {
-                        label: t('playlist.expandAll'),
-                        icon: 'unfold_more',
-                        disabled: empty,
-                        onSelect: () => mode.setAllExpanded(true),
-                    },
-                    {
                         label: t('favorites.clear'),
                         icon: 'delete_sweep',
                         disabled: favorites.records.length === 0,
@@ -115,7 +84,10 @@ export function FavoritesToolbar() {
                         disabled: mode.nothingSelected,
                         onSelect: removeSelected,
                     },
-                    ...removal.selectionItems(selectedRemoval, mode.nothingSelected),
+                    ...removal.selectionItems(
+                        () => removalOf(mode.selectedEntries(), favorites.remove),
+                        mode.nothingSelected,
+                    ),
                 ]}
                 sorting={
                     <>

@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { IconButton, useHoldGesture } from '../buttons';
 import { ItemCover } from '../cover';
 import { Icon } from '../icons';
-import { ListCheckbox } from '../inputs';
+import { Checkbox } from '../inputs';
 import type { RowMenuButton } from '../menus';
 import { Rating } from '../rating';
 import { Skeleton } from '../skeleton';
@@ -191,7 +191,8 @@ export function ItemRow({
         <>
             {selecting && (
                 <span className={styles.leading}>
-                    <ListCheckbox
+                    <Checkbox
+                        variant="list"
                         title={t('playlist.selectItem')}
                         tabIndex={-1}
                         checked={selected}

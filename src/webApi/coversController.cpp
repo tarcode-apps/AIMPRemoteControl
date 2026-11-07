@@ -73,9 +73,7 @@ void webapi::CoversController::Register(IEndpointRouteBuilder &endpoints)
 HttpContent webapi::CoversController::ItemCover(const ApiRequest &request)
 {
 	const std::string &playlistId = request.PathMatches.at(0);
-	const std::optional<std::int32_t> index = ParseInt32(request.PathMatches.at(1));
-	if (!index)
-		throw ApiError(404, "itemNotFound");
+	const std::int32_t index = PathNumber(request, 1, "itemNotFound");
 	const std::string key = QueryString(request, "key");
 	if (key.empty())
 		throw ApiError(400, "invalidQuery");
@@ -86,10 +84,10 @@ HttpContent webapi::CoversController::ItemCover(const ApiRequest &request)
 	const std::uint64_t tagWrites = FEvents.TagWrites(playlistId);
 	player::CoverTarget target;
 	ThrowUnlessOk(RunOnMainThread(FCore, [&]
-								  { return player::GetCoverTarget(FCore, playlistId, *index, target); }));
+								  { return player::GetCoverTarget(FCore, playlistId, index, target); }));
 	std::string hash;
 	if (player::CoverKey(target.Source) == key)
-		hash = FCovers.HashFor(CoverLocator{target.Source, playlistId, *index}, tagWrites, target.FileInfo);
+		hash = FCovers.HashFor(CoverLocator{target.Source, playlistId, index}, tagWrites, target.FileInfo);
 	target.FileInfo->Release();
 	if (hash.empty())
 		throw NotFound();

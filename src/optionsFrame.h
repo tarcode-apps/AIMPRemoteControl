@@ -38,6 +38,7 @@ private:
 	void OnControlChanged();
 	void OnBrowseUploadFolder();
 	void UpdateEnabledStates();
+	bool HasPassword() const;
 
 	IAIMPCore *FCore;
 	SettingsChangedHandler FOnSettingsChanged;
@@ -58,6 +59,9 @@ private:
 	IAIMPUIGroupBox *FAuthGroup = nullptr;
 	IAIMPUIEdit *FUserEdit = nullptr;
 	IAIMPUIEdit *FPassEdit = nullptr;
+	// Held by FAuthChildren; one of the two shows under the password.
+	IAIMPUIControl *FPassHint = nullptr;
+	IAIMPUIControl *FPassNeeded = nullptr;
 	std::vector<IAIMPUIControl *> FAuthChildren;
 
 	// Features group

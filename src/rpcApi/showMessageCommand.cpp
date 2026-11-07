@@ -1,6 +1,5 @@
 #include "showMessageCommand.h"
 
-#include <functional>
 #include <string>
 
 #include <nlohmann/json.hpp>

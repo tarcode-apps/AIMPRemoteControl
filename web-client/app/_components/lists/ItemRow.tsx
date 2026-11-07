@@ -25,6 +25,22 @@ export type RowView = Pick<
     'showNumbers' | 'showThumbnails' | 'showSecondLine' | 'showDuration' | 'showMarks' | 'showSwitches'
 >;
 
+// The view of the lists that have no settings of their own: favorites, the
+// queue and a search.
+export const fixedRowView: RowView = {
+    showNumbers: true,
+    showThumbnails: true,
+    showSecondLine: true,
+    showDuration: true,
+    showMarks: false,
+    showSwitches: false,
+};
+
+// A group's heading row.
+export const groupRowHeight = 40;
+// Rows drawn beyond the viewport on each side.
+export const overscanRows = 6;
+
 // The switch column is the player's own: a mobile has no room for it and
 // switches tracks from the menu. It shares its slot with the selection
 // checkbox and the drag handle, which take it over in their modes.

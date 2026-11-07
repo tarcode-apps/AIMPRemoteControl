@@ -54,6 +54,19 @@ test.describe('with authentication', () => {
         expect((await api.context.get('/api/v1/events', { timeout: 5000 })).status()).toBe(401);
     });
 
+    test('a replayed header is not run, and is answered stale so a client signs anew', async ({ api }) => {
+        const command = { jsonrpc: '2.0', id: 1, method: 'Version' };
+        const challenge = challengeOf(await api.context.post('/RPC_JSON', { data: command }))!;
+        const header = authorization(challenge, { ...credentials, method: 'POST', uri: '/RPC_JSON' });
+        const send = () => api.context.post('/RPC_JSON', { data: command, headers: { Authorization: header } });
+        expect((await send()).status()).toBe(200);
+        const replay = await send();
+        expect(replay.status()).toBe(401);
+        expect(challengeOf(replay)).toMatchObject({ stale: true });
+        // Not counted as a failed attempt: right credentials pass at once.
+        expect((await signed(api.context, 'GET', '/api/v1/player')).status()).toBe(200);
+    });
+
     test('right credentials pass, a query string included', async ({ api }) => {
         const player = await signed(api.context, 'GET', '/api/v1/player');
         expect(player.status()).toBe(200);
@@ -91,7 +104,19 @@ test.describe('with authentication', () => {
         expect(await statusForHeaders(playerUrl, '/uploadTrack/playlist_id/1', headers)).toBe(401);
     });
 
-    test('wrong credentials, a forged nonce and another URI are refused', async ({ api }) => {
+    // As a proxy passes the request line on: the Next dev server drops an empty query.
+    test('a URI that names the same resource otherwise passes', async ({ api }) => {
+        expect((await signed(api.context, 'GET', '/api/v1/player', { signedUri: '/api/v1/player?' })).status()).toBe(200);
+    });
+
+    test('a URI that names another resource is a bad request, not a failed attempt', async ({ api }) => {
+        const other = await signed(api.context, 'GET', '/api/v1/player', { signedUri: '/api/v1/queue' });
+        expect(other.status()).toBe(400);
+        expect(other.headers()['www-authenticate']).toBeUndefined();
+        expect((await signed(api.context, 'GET', '/api/v1/player')).status()).toBe(200);
+    });
+
+    test('wrong credentials and a forged nonce are refused', async ({ api }) => {
         expect((await signed(api.context, 'GET', '/api/v1/player', { password: 'wrong' })).status()).toBe(401);
         await pause(failedAttemptPause);
         expect((await signed(api.context, 'GET', '/api/v1/player', { username: 'someone' })).status()).toBe(401);
@@ -100,15 +125,13 @@ test.describe('with authentication', () => {
             nonce: challenge => `${Number(challenge.nonce.split(':')[0]) + 3600}:${'0'.repeat(32)}`,
         });
         expect(forged.status()).toBe(401);
-        await pause(failedAttemptPause);
-        expect((await signed(api.context, 'GET', '/api/v1/player', { signedUri: '/api/v1/queue' })).status()).toBe(401);
-        await pause(failedAttemptPause);
+        // Right credentials pass again once the window is over, for the next test too.
+        await expect.poll(async () => (await signed(api.context, 'GET', '/api/v1/player')).status()).toBe(200);
     });
 
     test('after a failure, the next second re-challenges even right credentials', async ({ api }) => {
         expect((await signed(api.context, 'GET', '/api/v1/player', { password: 'wrong' })).status()).toBe(401);
         expect((await signed(api.context, 'GET', '/api/v1/player')).status()).toBe(401);
-        await pause(failedAttemptPause);
-        expect((await signed(api.context, 'GET', '/api/v1/player')).status()).toBe(200);
+        await expect.poll(async () => (await signed(api.context, 'GET', '/api/v1/player')).status()).toBe(200);
     });
 });

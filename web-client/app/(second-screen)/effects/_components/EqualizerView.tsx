@@ -3,8 +3,10 @@
 import type { EffectsPatch, EffectsState, EqualizerBand } from '@/app/_api/types';
 import { Slider } from '@/app/_components/inputs';
 import { useElementSize } from '@/app/_hooks/useElementSize';
+import { useHoldInPlace } from '@/app/_hooks/useHold';
+import { clamp } from '@/app/_utils/math';
 import clsx from 'clsx';
-import { useEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
+import { useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './Effects.module.scss';
 import { formatBalance, formatDecibels, formatFrequency, formatGain } from './format';
@@ -17,7 +19,6 @@ const pageStep = 3;
 const pointRadius = 4;
 // Room for a point at either end of the gain axis.
 const plotPadding = pointRadius + 4;
-const holdDelay = 500;
 // A pointer that travels further is drawing, not holding.
 const holdSlop = 6;
 // A column must hold a label such as "11.2 k"; where it cannot, the bands stack
@@ -27,7 +28,6 @@ const horizontalFrom = 720;
 type BandChange = { index: number; gain: number };
 type BandPoint = BandChange;
 
-const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 const roundGain = (gain: number) => clamp(Math.round(gain / gainStep) * gainStep, -gainRange, gainRange);
 
 // The bands a stroke passed over between two readings get the gains in between,
@@ -62,6 +62,7 @@ export function EqualizerView({ state, set }: EqualizerViewProps) {
             ref={container}
             className={clsx(styles.equalizer, horizontal && styles.horizontal, !equalizer.active && styles.inactive)}
             data-layout={horizontal ? 'horizontal' : 'vertical'}
+            data-testid="equalizer"
         >
             <SideSlider
                 area="balance"
@@ -170,12 +171,7 @@ function BandPlot({ bands, preamp, horizontal, onChange }: BandPlotProps) {
     const { width, height } = useElementSize(plot);
     const last = useRef<(BandPoint & { pointerId: number }) | null>(null);
     // A press held in place resets its band, as a held slider resets.
-    const hold = useRef<{ timer: number; x: number; y: number } | null>(null);
-    const cancelHold = () => {
-        if (hold.current) window.clearTimeout(hold.current.timer);
-        hold.current = null;
-    };
-    useEffect(() => cancelHold, []);
+    const hold = useHoldInPlace(holdSlop);
     const count = bands.length;
     // Bands sit at the middle of equal slots along one axis, gains span the other.
     const along = horizontal ? width : height;
@@ -207,31 +203,20 @@ function BandPlot({ bands, preamp, horizontal, onChange }: BandPlotProps) {
         const at = read(event);
         last.current = { ...at, pointerId: event.pointerId };
         change([at]);
-        cancelHold();
-        hold.current = {
-            x: event.clientX,
-            y: event.clientY,
-            timer: window.setTimeout(() => {
-                hold.current = null;
-                last.current = null;
-                onChange([{ index: at.index, gain: 0 }]);
-            }, holdDelay),
-        };
+        hold.start(event, () => {
+            last.current = null;
+            onChange([{ index: at.index, gain: 0 }]);
+        });
     };
     const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
-        if (!last.current || last.current.pointerId !== event.pointerId) return;
-        const start = hold.current;
-        if (start) {
-            if (Math.hypot(event.clientX - start.x, event.clientY - start.y) <= holdSlop) return;
-            cancelHold();
-        }
+        if (!last.current || last.current.pointerId !== event.pointerId || hold.move(event)) return;
         const at = read(event);
         const changes = stroke(last.current, at);
         last.current = { ...at, pointerId: event.pointerId };
         change(changes);
     };
     const onPointerEnd = (event: PointerEvent<HTMLDivElement>) => {
-        cancelHold();
+        hold.cancel();
         if (last.current?.pointerId === event.pointerId) last.current = null;
     };
 

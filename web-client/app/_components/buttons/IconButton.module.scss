@@ -1,16 +1,22 @@
 @use "../../_styles/mixins" as mixins;
 
+// Set from outside through --icon-button-size, --icon-button-color,
+// --icon-button-background and --icon-button-pressed (the background while
+// pressed), as Icon is.
 .iconButton {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 48px;
-    height: 48px;
+    width: var(--icon-button-size, 48px);
+    height: var(--icon-button-size, 48px);
     border-radius: 50%;
-    color: var(--color-text);
+    color: var(--icon-button-color, var(--color-text));
+    background: var(--icon-button-background, none);
     user-select: none;
     -webkit-touch-callout: none;
-    transition: background-color 0.15s;
+    transition:
+        background-color 0.15s,
+        opacity 0.15s;
 
     @include mixins.hover-capable {
         &:hover:not(:disabled) {
@@ -20,7 +26,7 @@
 
     &:active:not(:disabled),
     &[data-pressed] {
-        background: var(--color-pressed);
+        background: var(--icon-button-pressed, var(--color-pressed));
     }
 
     &:disabled {

@@ -11,7 +11,6 @@
 class IAIMPCore;
 class IAIMPPlaylist;
 class IAIMPPlaylistItem;
-class PlaylistItemContext;
 
 namespace player
 {

@@ -14,8 +14,8 @@ npm run e2e:ui       # the client at three screen sizes
 npm run e2e:report   # the HTML report of the last run
 ```
 
-One spec, or one size: the scripts end in `--project`, which would take a
-file name for a project, so call Playwright itself:
+One spec, or one size: `e2e:api` and `e2e:ui` end in `--project`, which would
+take a file name for a project, so call Playwright itself:
 
 ```
 npx playwright test --config e2e/playwright.config.ts --project=ui-mobile ui/queue
@@ -25,6 +25,7 @@ What a run needs:
 
 - Windows with AIMP installed (`C:\Program Files\AIMP`, or `AIMP_DIR`).
 - The plugin built for x64 (`build-windows.ps1 -Arch x64` in the repo root).
+- Node 24 or newer (the tests use `RegExp.escape`).
 - For the UI: the client built (`npm run build`) and Google Chrome installed —
   the tests drive the installed Chrome instead of downloading a browser.
 - **Your own AIMP closed.** The player runs one instance, and the tests start
@@ -38,7 +39,7 @@ written. The copy is closed when the run ends and rebuilt from scratch on the
 next one; it stays in `runtime/` for a look in between.
 
 Everything a run creates is under `e2e/runtime/` (ignored by git):
-`aimp/` the throwaway player and its profile, `media/` the generated tracks
+`aimp/` the throwaway player and its profile (`aimp.pid` its process), `media/` the generated tracks
 (a passed test's are removed after it, a failed test's stay for a look),
 `uploads/` the player's upload folder, `test-results/` traces and screenshots
 of failed tests, `report/` the HTML report. The one exception: the tests that
@@ -66,7 +67,7 @@ e2e/
   playwright.config.ts   projects: api, ui-mobile (400×800), ui-desktop (1400×900), ui-desktop-wide (1920×1080)
   global-setup.ts        starts the throwaway player; global-teardown.ts closes it
   fixtures.ts            what a test asks for: api, events, media, streams, playlists, presets;
-                         withPluginSettings for the specs that restart the player
+                         playerReset after every test; withPluginSettings for the specs that restart the player
   lib/
     aimp.ts              the throwaway player: copy, seed, start, restart, stop
     api.ts               the web API and /RPC_JSON over Playwright's request context
@@ -97,7 +98,8 @@ e2e/
   loads it earlier acts on a stale revision and is refused.
 - **Order-independent.** A test puts the player into the state it needs
   (`api.resetEffects()`, a playlist of its own) rather than counting on the
-  tests before it.
+  tests before it; the `playerReset` fixture stops playback and clears the
+  queue, the timer, repeat and shuffle after every test.
 - **Controls by role and name**, as a user or a screen reader finds them:
   buttons, menu items, fields, sliders, dialogs
   (`getByRole('slider', { name: t('effects.preamp') })`). A control that loses

@@ -144,9 +144,11 @@ std::vector<player::FileRoot> player::GetFileRoots()
 std::optional<player::FolderListing> player::ListFolder(const std::string &pathUtf8, const FileFormats &formats, const FileFilter &filter,
 														const FileSort &sort)
 {
-	const std::filesystem::path folder = PathFromUtf8(pathUtf8);
+	const std::optional<std::filesystem::path> folder = TryPathFromUtf8(pathUtf8);
+	if (!folder)
+		return std::nullopt;
 	std::error_code ec;
-	std::filesystem::directory_iterator it(folder, std::filesystem::directory_options::skip_permission_denied, ec);
+	std::filesystem::directory_iterator it(*folder, std::filesystem::directory_options::skip_permission_denied, ec);
 	if (ec)
 		return std::nullopt;
 
@@ -181,8 +183,8 @@ std::optional<player::FolderListing> player::ListFolder(const std::string &pathU
 	Sort(listing.Files, sort);
 
 	// A drive or the file system root is its own parent.
-	const std::filesystem::path parent = folder.parent_path();
-	if (!parent.empty() && parent != folder)
+	const std::filesystem::path parent = folder->parent_path();
+	if (!parent.empty() && parent != *folder)
 		listing.Parent = PathToUtf8(parent);
 	return listing;
 }

@@ -2,6 +2,7 @@ import { test as base, expect } from '@playwright/test';
 import path from 'node:path';
 import {
     defaultPlayerProfile,
+    defaultPlayerUrl,
     defaultPluginSettings,
     restartThrowawayPlayer,
     type PlayerProfile,
@@ -67,7 +68,7 @@ const settleTime = 1000;
 const fileName = (text: string) => text.replace(/[^\w.-]+/g, '-').slice(0, 60);
 
 export const test = base.extend<Fixtures, Options>({
-    playerUrl: ['http://127.0.0.1:3333', { option: true, scope: 'worker' }],
+    playerUrl: [defaultPlayerUrl, { option: true, scope: 'worker' }],
 
     api: async ({ playerUrl, playwright }, use) => {
         const context = await playwright.request.newContext({ baseURL: playerUrl });

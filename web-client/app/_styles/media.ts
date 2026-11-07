@@ -7,5 +7,4 @@ export const media = {
     drawerModal: `(max-width: ${drawerDockedFrom - 1}px)`,
     drawerDocked: `(min-width: ${drawerDockedFrom}px)`,
     playerDocked: `(min-width: ${playerDockedFrom}px)`,
-    playerSheet: `(max-width: ${playerDockedFrom - 1}px)`,
 };

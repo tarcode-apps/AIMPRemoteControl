@@ -5,36 +5,11 @@
 #include "apiCore.h"
 #include "apiPlaylists.h"
 #include "aimpHelper.h"
-#include "crc32.h"
 #include "playerFeatures.h"
 
 namespace
 {
-	std::uint32_t ContentCrc32(IAIMPPlaylist *playlist)
-	{
-		IAIMPObjectList *files = nullptr;
-		if (Failed(playlist->GetFiles(0, &files)) || !files)
-			return 0;
-
-		std::uint32_t crc = 0;
-		const INT32 count = files->GetCount();
-		for (INT32 i = 0; i < count; ++i)
-		{
-			IAIMPString *name = nullptr;
-			if (Succeeded(files->GetObject(i, IID_IAIMPString, reinterpret_cast<void **>(&name))) && name)
-			{
-				const std::string utf8 = IAIMPStringToString(name);
-				if (!utf8.empty())
-					crc = Crc32Update(crc, utf8.data(), utf8.size());
-				name->Release();
-			}
-		}
-		files->Release();
-		return crc;
-	}
-
-	std::optional<player::PlaylistInfo> Describe(IAIMPPlaylist *playlist, const player::PlayerFeatures &features,
-												 bool withContentCrc32)
+	std::optional<player::PlaylistInfo> Describe(IAIMPPlaylist *playlist, const player::PlayerFeatures &features)
 	{
 		IAIMPPlaylistProperties *props = nullptr;
 		if (Failed(playlist->QueryInterface(IID_IAIMPPlaylistProperties, reinterpret_cast<void **>(&props))) || !props)
@@ -70,13 +45,34 @@ namespace
 		props->Release();
 
 		info.ItemCount = playlist->GetItemCount();
-		if (withContentCrc32)
-			info.ContentCrc32 = ContentCrc32(playlist);
 		return info;
 	}
 }
 
-std::vector<player::PlaylistInfo> player::GetPlaylists(IAIMPCore *core, bool withContentCrc32)
+void player::VisitPlaylistFiles(IAIMPCore *core, const std::string &playlistId, const std::function<void(const std::string &file)> &visit)
+{
+	IAIMPPlaylist *playlist = LoadedPlaylistByAIMPId(core, playlistId);
+	if (!playlist)
+		return;
+	IAIMPObjectList *files = nullptr;
+	if (Succeeded(playlist->GetFiles(0, &files)) && files)
+	{
+		const INT32 count = files->GetCount();
+		for (INT32 i = 0; i < count; ++i)
+		{
+			IAIMPString *name = nullptr;
+			if (Succeeded(files->GetObject(i, IID_IAIMPString, reinterpret_cast<void **>(&name))) && name)
+			{
+				visit(IAIMPStringToString(name));
+				name->Release();
+			}
+		}
+		files->Release();
+	}
+	playlist->Release();
+}
+
+std::vector<player::PlaylistInfo> player::GetPlaylists(IAIMPCore *core)
 {
 	std::vector<PlaylistInfo> result;
 
@@ -91,7 +87,7 @@ std::vector<player::PlaylistInfo> player::GetPlaylists(IAIMPCore *core, bool wit
 		IAIMPPlaylist *playlist = nullptr;
 		if (Succeeded(mgr->GetLoadedPlaylist(i, &playlist)) && playlist)
 		{
-			if (std::optional<PlaylistInfo> info = Describe(playlist, features, withContentCrc32))
+			if (std::optional<PlaylistInfo> info = Describe(playlist, features))
 				result.push_back(std::move(*info));
 			playlist->Release();
 		}

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '../fixtures';
 import { uploadDir } from '../lib/aimp';
+import { startUpload, statusForHeaders } from '../lib/http';
 import { writeWav } from '../lib/media';
 
 const encode = encodeURIComponent;
@@ -79,5 +80,28 @@ test.describe('files', () => {
             { multipart: { file: { name: 'x.wav', mimeType: 'audio/wav', buffer: Buffer.from('RIFF') } } },
         );
         expect(unknown.status()).toBe(404);
+    });
+
+    test('refuses an upload before its body, however large', async ({ playerUrl }) => {
+        const path = `/api/v1/playlists/${encode('{00000000-0000-0000-0000-000000000000}')}/upload`;
+        const headers = { 'Content-Type': 'multipart/form-data; boundary=x', 'Content-Length': 1_500_000_000 };
+        expect(await statusForHeaders(playerUrl, path, headers)).toBe(404);
+    });
+
+    test('writes an upload to disk as it arrives, and keeps none of a body that breaks off', async ({
+        api,
+        playerUrl,
+        playlists,
+    }) => {
+        const playlist = await playlists.create();
+        const first = `rc-e2e first ${Date.now()}.wav`;
+        const second = `rc-e2e second ${Date.now()}.wav`;
+        const upload = startUpload(playerUrl, `/api/v1/playlists/${encode(playlist.id)}/upload`, first, second);
+        // On disk while the body is still coming.
+        await expect.poll(() => fs.existsSync(path.join(uploadDir, first))).toBe(true);
+        upload.breakOff();
+        await expect.poll(() => fs.existsSync(path.join(uploadDir, first))).toBe(false);
+        expect(fs.existsSync(path.join(uploadDir, second))).toBe(false);
+        expect(await api.playlistItemCount(playlist.id)).toBe(0);
     });
 });

@@ -17,10 +17,15 @@ struct Settings
 		bool Enabled = false;
 		std::string Username;
 		std::string Ha1;
+		// Signs the Digest nonces. Random rather than derived from the password,
+		// so a challenge tells nothing about it, and kept in the profile, so a
+		// nonce stays valid across restarts as the app needs.
+		std::string NonceKey;
 
 		bool IsActive() const { return Enabled && !Username.empty() && !Ha1.empty(); }
 
 		static std::string ComputeHa1(const std::string &username, const std::string &password);
+		static std::string NewNonceKey();
 	};
 
 	struct FeatureSettings

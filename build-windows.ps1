@@ -51,15 +51,17 @@ function Assert-EntryPointExported([string]$Dll)
     # so check the export table rather than trusting the linker.
     if (-not (Get-Command dumpbin -ErrorAction SilentlyContinue)) { return }
 
-    # Incremental (Debug) linking prints the export as
-    # "AIMPPluginGetHeader = @ILT+NNN(AIMPPluginGetHeader)"; the leading \s
-    # still rejects the decorated _AIMPPluginGetHeader@4.
-    $exports = & dumpbin /nologo /exports $Dll
-    foreach ($line in $exports)
+    # The table lists "ordinal hint RVA name"; incremental (Debug) linking adds
+    # " = @ILT+NNN(name)" after the name. Nothing else may be exported.
+    $names = @()
+    foreach ($line in & dumpbin /nologo /exports $Dll)
     {
-        if ($line -match '\sAIMPPluginGetHeader(\s*=.*)?\s*$') { return }
+        if ($line -match '^\s+\d+\s+[0-9A-Fa-f]+\s+[0-9A-Fa-f]+\s+(\S+)') { $names += $Matches[1] }
     }
-    throw "AIMPPluginGetHeader is not exported (undecorated) from '$Dll'."
+    if (($names -join ', ') -ne 'AIMPPluginGetHeader')
+    {
+        throw "'$Dll' must export AIMPPluginGetHeader (undecorated) and nothing else; it exports: $($names -join ', ')"
+    }
 }
 
 $vsPath = Find-VisualStudio

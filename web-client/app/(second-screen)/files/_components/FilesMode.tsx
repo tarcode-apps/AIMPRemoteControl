@@ -15,7 +15,7 @@ import { usePersistedState } from '@/app/_hooks/usePersistedState';
 import { secondScreenDepth, useNavigation } from '@/app/_state/Navigation';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import { useSearchParams } from 'next/navigation';
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react';
 
 export type FilesModeContextValue = {
     // The playlist the picked files go to.
@@ -146,14 +146,15 @@ export function FilesModeProvider({ children }: { children: ReactNode }) {
 
     // Back and forward move through the folders; the steps of a navigation away
     // from the screen, and its landing elsewhere, are not the user's folder changes.
-    useEffect(() => {
-        const onPopState = () => {
-            if (walking() || entryDepth() !== secondScreenDepth) return;
-            showFolder(shownFolder());
-        };
-        window.addEventListener('popstate', onPopState);
-        return () => window.removeEventListener('popstate', onPopState);
+    const onPopState = useEffectEvent(() => {
+        if (walking() || entryDepth() !== secondScreenDepth) return;
+        showFolder(shownFolder());
     });
+    useEffect(() => {
+        const listener = () => onPopState();
+        window.addEventListener('popstate', listener);
+        return () => window.removeEventListener('popstate', listener);
+    }, []);
 
     // Shown at once; the entries popped carry the same folders.
     const home = () => {
@@ -211,6 +212,7 @@ export function FilesModeProvider({ children }: { children: ReactNode }) {
     };
     const addSelected = () => {
         if (!playlist || add.isPending || selected.size === 0) return;
+        // A failure stays on the screen, in its notice (addError).
         add.mutate({ playlistId: playlist.id, files: [...selected] }, { onSuccess: leave });
     };
 

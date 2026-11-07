@@ -2,6 +2,7 @@ import type { ItemDetailsResponse, LocateResponse, Lyrics, PlaylistItemsPage, Tr
 import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '../fixtures';
+import { unreachableStreamUrl } from '../lib/streams';
 
 const encode = encodeURIComponent;
 const unknownId = '{00000000-0000-0000-0000-000000000000}';
@@ -359,7 +360,7 @@ test.describe('items', () => {
             expectItems: 4,
         });
         const items = `/playlists/${encode(playlist.id)}/items`;
-        await api.post(items, { urls: ['http://127.0.0.1:9/radio'] });
+        await api.post(items, { urls: [unreachableStreamUrl] });
         await expect.poll(() => api.playlistItemCount(playlist.id)).toBe(5);
         const route = (uri: string) => `${items}/file?uri=${encode(uri)}`;
         const download = (uri: string, headers?: Record<string, string>) =>

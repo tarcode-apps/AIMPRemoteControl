@@ -4,7 +4,6 @@
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 
 struct PlaylistItemKey
 {
@@ -29,23 +28,19 @@ class RemoteControlIdManager
 public:
 	std::int32_t PlaylistGetOrGeneratePluginId(const std::string &aimpPlaylistId);
 	std::string PlaylistGetKey(std::int32_t pluginId) const;
-	void PlaylistRemoveByKey(const std::string &aimpPlaylistId);
 
 	std::int32_t PlaylistItemGetOrGeneratePluginId(
 		const std::string &aimpPlaylistId, std::int32_t aimpPlaylistIndex);
 	PlaylistItemKey PlaylistItemGetKey(std::int32_t pluginId) const;
-	void PlaylistItemsRemoveByPlaylistKey(const std::string &aimpPlaylistId);
 
 private:
-	void PlaylistRemoveByKeyUnlocked(const std::string &aimpPlaylistId);
-	void PlaylistItemsRemoveByPlaylistKeyUnlocked(const std::string &aimpPlaylistId);
-
 	mutable std::shared_mutex FMutex;
 
+	// Ids are never taken back: the app may hold one of a removed playlist, and
+	// the tables are bounded by the items ever listed.
 	std::unordered_map<std::string, std::int32_t> FPlaylistByAIMPId;
 	std::unordered_map<std::int32_t, std::string> FPlaylistByPluginId;
 
 	std::unordered_map<PlaylistItemKey, std::int32_t, PlaylistItemKeyHash> FItemByAIMPKey;
 	std::unordered_map<std::int32_t, PlaylistItemKey> FItemByPluginId;
-	std::unordered_map<std::string, std::unordered_set<std::int32_t>> FItemsByPlaylist;
 };

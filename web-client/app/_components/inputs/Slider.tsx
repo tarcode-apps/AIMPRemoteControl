@@ -1,7 +1,8 @@
 'use client';
 
+import { useHoldInPlace } from '@/app/_hooks/useHold';
 import clsx from 'clsx';
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { useState, type CSSProperties, type PointerEvent } from 'react';
 import styles from './Slider.module.scss';
 
 export type SliderProps = {
@@ -25,7 +26,6 @@ export type SliderProps = {
     onHold?(): void;
 };
 
-const holdDelay = 500;
 // A pointer that travels further is dragging, not holding.
 const holdSlop = 6;
 
@@ -60,33 +60,19 @@ export function Slider({
         if (local !== null) onCommit(local);
     };
 
-    const hold = useRef<{ timer: number; x: number; y: number } | null>(null);
-    const cancelHold = () => {
-        if (hold.current) window.clearTimeout(hold.current.timer);
-        hold.current = null;
-    };
-    useEffect(() => cancelHold, []);
+    const hold = useHoldInPlace(holdSlop);
 
     const onPointerDown = (event: PointerEvent<HTMLInputElement>) => {
         // The sheet must not start dragging from the thumb.
         event.stopPropagation();
-        cancelHold();
+        hold.cancel();
         if (!onHold || event.button !== 0) return;
-        hold.current = {
-            x: event.clientX,
-            y: event.clientY,
-            // What the press moved is dropped: the hold decides the value.
-            timer: window.setTimeout(() => {
-                hold.current = null;
-                setEditing(false);
-                setLocal(null);
-                onHold();
-            }, holdDelay),
-        };
-    };
-    const onPointerMove = (event: PointerEvent<HTMLInputElement>) => {
-        const start = hold.current;
-        if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > holdSlop) cancelHold();
+        // What the press moved is dropped: the hold decides the value.
+        hold.start(event, () => {
+            setEditing(false);
+            setLocal(null);
+            onHold();
+        });
     };
 
     const percent = (at: number) => (max > min ? ((at - min) / (max - min)) * 100 : 0);
@@ -111,12 +97,12 @@ export function Slider({
                 onChange?.(next);
             }}
             onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
+            onPointerMove={event => hold.move(event)}
             onPointerUp={() => {
-                cancelHold();
+                hold.cancel();
                 commit();
             }}
-            onPointerCancel={cancelHold}
+            onPointerCancel={hold.cancel}
             onContextMenu={event => onHold && event.preventDefault()}
             onKeyUp={commit}
             onBlur={commit}

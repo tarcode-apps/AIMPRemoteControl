@@ -16,6 +16,7 @@ import { Dialog } from '@/app/_components/dialogs';
 import dialogStyles from '@/app/_components/dialogs/Dialog.module.scss';
 import { Icon } from '@/app/_components/icons';
 import { Radio } from '@/app/_components/inputs';
+import { useErrorToast } from '@/app/_components/toast';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { useRef, useState } from 'react';
@@ -38,6 +39,7 @@ export type PresetsDialogProps = {
 // a preset can take the equalizer's curve, be renamed or be deleted.
 export function PresetsDialog({ equalizer, onClose }: PresetsDialogProps) {
     const { t } = useTranslation();
+    const showError = useErrorToast();
     const client = useQueryClient();
     const { data: presets, error } = useEqualizerPresets();
     const apply = useApplyPreset();
@@ -65,6 +67,7 @@ export function PresetsDialog({ equalizer, onClose }: PresetsDialogProps) {
     const choose = (name: string) => {
         setChosen(name);
         tried.current = true;
+        // Its error shows in the dialog (apply.error); the chain only orders the requests.
         applying.current = applying.current.then(() => apply.mutateAsync(name)).catch(() => undefined);
     };
 
@@ -83,7 +86,8 @@ export function PresetsDialog({ equalizer, onClose }: PresetsDialogProps) {
         if (closed.current) return;
         closed.current = true;
         onClose();
-        if (!keep) void restore();
+        // The dialog is gone by then, so the toast tells of a curve left changed.
+        if (!keep) void restore().catch(showError);
     };
 
     // Managing works on the curve the dialog opened on, so a preset that takes
@@ -96,7 +100,9 @@ export function PresetsDialog({ equalizer, onClose }: PresetsDialogProps) {
         setManaging(true);
         setChosen(original.preset);
         setRestoring(true);
-        void restore().finally(() => setRestoring(false));
+        void restore()
+            .catch(showError)
+            .finally(() => setRestoring(false));
     };
 
     const confirm = () => {

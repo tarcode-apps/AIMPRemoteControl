@@ -10,16 +10,12 @@
 #include "apiPlayer.h"
 #include "apiPlaylists.h"
 #include "aimpHelper.h"
+#include "helpers/legacyErrors.h"
 #include "helpers/idLookup.h"
 #include "getPlayerControlPanelStateCommand.h"
 #include "helpers/jsonHelper.h"
 #include "mainThreadRunner.h"
 #include "helpers/remoteControlIdManager.h"
-
-namespace
-{
-	constexpr int ErrorTrackNotFound = 21;
-}
 
 void rpcapi::PlayCommand::Register(IEndpointRouteBuilder &endpoints)
 {

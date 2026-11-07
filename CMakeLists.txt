@@ -139,7 +139,9 @@ target_link_libraries(AIMPRemoteControlCode PUBLIC
   $<$<BOOL:${WIN32}>:powrprof>
   # GetAdaptersAddresses for the address list in the options dialog.
   $<$<BOOL:${WIN32}>:iphlpapi>
-  $<$<BOOL:${WIN32}>:ws2_32>)
+  $<$<BOOL:${WIN32}>:ws2_32>
+  # BCryptGenRandom for the key that signs the Digest nonces.
+  $<$<BOOL:${WIN32}>:bcrypt>)
 
 target_include_directories(AIMPRemoteControlCode PUBLIC
   "${CMAKE_SOURCE_DIR}/src"

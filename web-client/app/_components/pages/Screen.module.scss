@@ -149,7 +149,7 @@
 
 .noticeIcon {
     @include mixins.drawer-modal {
-        display: none;
+        --icon-display: none;
     }
 }
 

@@ -4,6 +4,7 @@ import type { ItemsSummary } from '@/app/_api/types';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { media } from '@/app/_styles/media';
 import { formatDuration, formatSize } from '@/app/_utils/format';
+import { noItems } from '@/app/_utils/summary';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SearchField } from '../inputs';
@@ -30,8 +31,6 @@ export type ListHeading = {
     search: ReactNode;
 };
 
-const nothing: ItemsSummary = { count: 0, duration: 0, size: 0 };
-
 // The app bar of a list: its name and totals, or, while selecting, the selection
 // and its totals, which start from zero.
 export function useListHeading({
@@ -45,7 +44,7 @@ export function useListHeading({
     const { t, i18n } = useTranslation();
     const docked = useMediaQuery(media.drawerDocked);
     const mobileSearch = !docked && (externalSearch ? mode.mode !== 'select' : mode.query !== null);
-    const shown = mode.selecting && !mode.nothingSelected ? selectedTotals : mode.mode === 'select' ? nothing : totals;
+    const shown = mode.selecting && !mode.nothingSelected ? selectedTotals : mode.mode === 'select' ? noItems : totals;
 
     return {
         title: mode.mode === 'select' ? t('selection.title') : name,

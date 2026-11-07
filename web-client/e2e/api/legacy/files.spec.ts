@@ -3,6 +3,7 @@ import path from 'node:path';
 import { expect, test } from '../../fixtures';
 import { uploadDir } from '../../lib/aimp';
 import { legacyPlaylistId } from '../../lib/legacy';
+import { unreachableStreamUrl } from '../../lib/streams';
 
 test.describe('frozen protocol: files', () => {
     test('GetFormats names the playable extensions', async ({ api }) => {
@@ -32,7 +33,7 @@ test.describe('frozen protocol: files', () => {
         expect(await api.rpcResult('AddFiles', { playlist_id: legacyId, files: [file] })).toEqual({ success: true });
         await expect.poll(() => api.playlistItemCount(playlist.id)).toBe(1);
         expect(
-            (await api.rpc('AddURLToPlaylist', { playlist_id: legacyId, url: 'http://127.0.0.1:9/radio' })).result,
+            (await api.rpc('AddURLToPlaylist', { playlist_id: legacyId, url: unreachableStreamUrl })).result,
         ).toBeNull();
         await expect.poll(() => api.playlistItemCount(playlist.id)).toBe(2);
         expect((await api.rpc('AddFiles', { playlist_id: 5, files: [file] })).error?.code).toBe(20);

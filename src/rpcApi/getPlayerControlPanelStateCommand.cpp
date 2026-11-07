@@ -27,25 +27,6 @@ namespace
 		}
 	}
 
-	bool IsUrl(IAIMPCore *core, IAIMPPlaylistItem *item)
-	{
-		IAIMPString *fileName = nullptr;
-		if (Failed(item->GetValueAsObject(AIMP_PLAYLISTITEM_PROPID_FILENAME, IID_IAIMPString,
-										  reinterpret_cast<void **>(&fileName))) ||
-			!fileName)
-			return false;
-
-		bool result = false;
-		IAIMPServiceFileURI *uriService = nullptr;
-		if (Succeeded(core->QueryInterface(IID_IAIMPServiceFileURI, reinterpret_cast<void **>(&uriService))) && uriService)
-		{
-			result = uriService->IsURL(fileName) == S_OK;
-			uriService->Release();
-		}
-		fileName->Release();
-		return result;
-	}
-
 	// The app cannot show an empty player, so a stopped player reports the focused
 	// item, then the playback cursor, then the first item.
 	IAIMPPlaylistItem *CurrentItemOf(IAIMPCore *core, IAIMPServicePlayer *player)
@@ -107,7 +88,7 @@ namespace
 		{
 			state["track_length"] = static_cast<std::int64_t>(std::ceil(playerState.Duration)); // AIMP rounds duration up
 			state["track_position"] = static_cast<std::int64_t>(playerState.Position);
-			state["current_track_source_radio"] = IsUrl(core, item);
+			state["current_track_source_radio"] = playerState.Track && playerState.Track->IsUrl;
 		}
 
 		item->Release();

@@ -13,15 +13,15 @@
 #include "apiPlaylists.h"
 #include "aimpHelper.h"
 #include "albumArt.h"
+#include "helpers/legacyErrors.h"
 #include "helpers/idLookup.h"
 #include "crc32.h"
 #include "mainThreadRunner.h"
 #include "helpers/remoteControlIdManager.h"
+#include "parseInt32.h"
 
 namespace
 {
-	constexpr int ErrorCoverNotFound = 22;
-
 	IAIMPFileInfo *TrackFileInfo(IAIMPCore *core, RemoteControlIdManager &idManager, std::int32_t trackId)
 	{
 		return RunOnMainThread(core, [&]() -> IAIMPFileInfo *
@@ -78,9 +78,10 @@ void rpcapi::GetCoverCommand::Register(IEndpointRouteBuilder &endpoints)
 	endpoints.MapGet(R"(/album_covers_cache/cover_0_(\d+)_\d+x\d+_\d+\.(?:png|jpg|gif))",
 			   [core, &idManager](const ApiRequest &request) -> std::optional<HttpContent>
 			   {
-				   if (request.PathMatches.empty())
+				   const std::optional<std::int32_t> trackId = ParseInt32(request.PathMatches.at(0));
+				   if (!trackId)
 					   return std::nullopt;
-				   std::optional<albumArt::Cover> cover = LoadCover(core, idManager, static_cast<std::int32_t>(std::stol(request.PathMatches[0])));
+				   std::optional<albumArt::Cover> cover = LoadCover(core, idManager, *trackId);
 				   if (!cover)
 					   return std::nullopt;
 				   HttpContent content;

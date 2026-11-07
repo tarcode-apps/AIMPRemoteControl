@@ -1,9 +1,10 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <optional>
-#include <string_view>
 #include <string>
 #include <utility>
 #include <vector>
@@ -21,15 +22,31 @@ struct HttpContent
 	int Status = 200;
 };
 
-struct HttpUploadedFile
+// A file part of a multipart upload, as its headers name it.
+struct UploadPart
 {
 	std::string Name;
 	std::string FileName;
 	std::string ContentType;
-	std::string_view Content;
 };
 
-using HttpUploadHandler = std::function<int(const std::vector<std::string> &pathMatches, const std::vector<HttpUploadedFile> &files)>;
+// The body of an upload, read from the connection only when the handler asks:
+// a refusal reads nothing, and the files go where the handler writes them as
+// they arrive instead of through memory.
+class IUploadBody
+{
+public:
+	virtual ~IUploadBody() = default;
+	// The size the client declared, 0 when it did not.
+	virtual std::uint64_t DeclaredSize() const = 0;
+	// Hands every file part to `begin`, then its content to `write` piece by
+	// piece; either may refuse, which stops the reading. False when the body
+	// could not be read to its end.
+	virtual bool ReadFiles(const std::function<bool(const UploadPart &part)> &begin,
+						   const std::function<bool(const char *data, std::size_t size)> &write) = 0;
+};
+
+using HttpUploadHandler = std::function<int(const std::vector<std::string> &pathMatches, IUploadBody &body)>;
 
 struct ApiRequest
 {
@@ -40,8 +57,8 @@ struct ApiRequest
 
 using ApiHandler = std::function<nlohmann::json(const ApiRequest &request)>;
 
-// The files of a multipart upload; an ApiError is answered like one of an ApiHandler.
-using ApiUploadHandler = std::function<nlohmann::json(const ApiRequest &request, const std::vector<HttpUploadedFile> &files)>;
+// A multipart upload; an ApiError is answered like one of an ApiHandler.
+using ApiUploadHandler = std::function<nlohmann::json(const ApiRequest &request, IUploadBody &body)>;
 
 // Nullopt is a plain 404; an ApiError is answered like one of an ApiHandler.
 using HttpGetHandler = std::function<std::optional<HttpContent>(const ApiRequest &request)>;

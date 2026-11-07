@@ -225,7 +225,6 @@ export function TrackInfoScreen() {
             notice={gone ? t('trackInfo.gone') : undefined}
             toolbar={toolbar}
         >
-            {toast.toast}
             <CoverViewer
                 src={info && viewing ? originalCoverUrl(info) : null}
                 label={t('trackInfo.cover')}

@@ -23,8 +23,10 @@ const invalidations: Record<string, QueryKey> = {
 // two of those is dead, whatever the browser says of it: a sleeping mobile
 // loses its connections without a word.
 const silenceLimit = 75_000;
-// As the server's `retry:` hint, which only the browser's own reconnection obeys.
-const retryDelay = 3000;
+// The first retry as the server's `retry:` hint, which only the browser's own
+// reconnection obeys; each failure in a row doubles it, up to the cap.
+const firstRetryDelay = 3000;
+const maxRetryDelay = 30_000;
 
 // Kept outside React on purpose: it must survive remounts and die with the page,
 // so a differing version on reconnect can only mean the plugin was replaced.
@@ -61,6 +63,7 @@ export function useEventStream(client: QueryClient) {
         let timer: ReturnType<typeof setTimeout> | undefined;
         let heardAt = 0;
         let opened = false;
+        let failures = 0;
 
         const reconnect = (delay: number) => {
             source?.close();
@@ -86,13 +89,14 @@ export function useEventStream(client: QueryClient) {
 
             source.onopen = () => {
                 heard();
+                failures = 0;
                 if (opened) client.invalidateQueries();
                 opened = true;
             };
             // The browser reopens a dropped stream by itself, but gives up for good on
             // an answer that is no stream, such as a proxy's 500 while the player
             // restarts; one path for both.
-            source.onerror = () => reconnect(retryDelay);
+            source.onerror = () => reconnect(Math.min(firstRetryDelay * 2 ** failures++, maxRetryDelay));
             on<Hello>('hello', ({ pluginVersion }) => {
                 if (knownPluginVersion !== undefined && knownPluginVersion !== pluginVersion) location.reload();
                 knownPluginVersion = pluginVersion;
@@ -106,9 +110,10 @@ export function useEventStream(client: QueryClient) {
                 on(name, () => client.invalidateQueries({ queryKey }));
         };
 
-        // Timers stand still while a mobile sleeps; the clock does not.
+        // Timers stand still while a mobile sleeps; the clock does not. A retry
+        // still waiting out its delay is not worth the wait once the page is back.
         const checkSilence = () => {
-            if (Date.now() - heardAt > silenceLimit) reconnect(0);
+            if (!source || Date.now() - heardAt > silenceLimit) reconnect(0);
         };
         const onVisibilityChange = () => {
             if (document.visibilityState === 'visible') checkSilence();

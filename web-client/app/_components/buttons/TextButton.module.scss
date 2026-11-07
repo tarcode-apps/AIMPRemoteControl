@@ -1,10 +1,11 @@
 @use "../../_styles/mixins" as mixins;
 
+// Widened from outside through --text-button-min-width, as Icon is sized.
 .textButton {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 64px;
+    min-width: var(--text-button-min-width, 64px);
     height: 36px;
     padding: 0 12px;
     border-radius: 18px;

@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { t, textPattern } from '../strings';
-import { waitForViewport } from './app';
+import type { App } from './app';
 
 // As EqualizerView lays the plot out: equal slots for the bands along one axis,
 // the gain range along the other with room for a point at either end.
@@ -14,33 +14,37 @@ export type Point = { x: number; y: number };
 
 // The sound effects screen: the equalizer with its presets and the effects.
 export class EffectsPage {
+    readonly page: Page;
     readonly heading: Locator;
     readonly subtitle: Locator;
     // The screen's area, which says what it shows: equalizer, effects or combined.
     readonly area: Locator;
+    // The equalizer's box, which says which way it lays the bands out.
+    readonly equalizer: Locator;
     readonly plot: Locator;
     readonly equalizerSwitch: Locator;
     readonly autoButton: Locator;
     readonly moreButton: Locator;
+    // The presets dialog, and one opened from it, as a preset's rename or delete is.
     readonly dialog: Locator;
-    // A dialog opened from another one, as a preset's rename or delete is.
     readonly topDialog: Locator;
 
-    constructor(readonly page: Page) {
-        this.heading = page.getByRole('heading', { level: 1 });
-        this.subtitle = page.getByTestId('screen-subtitle');
-        this.area = page.locator('[data-view]');
-        this.plot = page.getByTestId('equalizer-plot');
-        this.equalizerSwitch = page.getByRole('switch', { name: t('effects.enable') });
-        this.autoButton = page.getByRole('button', { name: t('effects.auto') });
-        this.moreButton = page.getByRole('button', { name: t('effects.more') });
-        this.dialog = page.getByRole('dialog').first();
-        this.topDialog = page.getByRole('dialog').last();
+    constructor(readonly app: App) {
+        this.page = app.page;
+        this.heading = app.heading;
+        this.subtitle = app.subtitle;
+        this.area = app.main.getByTestId('effects-area');
+        this.equalizer = app.main.getByTestId('equalizer');
+        this.plot = app.main.getByTestId('equalizer-plot');
+        this.equalizerSwitch = app.main.getByRole('switch', { name: t('effects.enable') });
+        this.autoButton = app.main.getByRole('button', { name: t('effects.auto') });
+        this.moreButton = app.main.getByRole('button', { name: t('effects.more') });
+        this.dialog = app.dialog.first();
+        this.topDialog = app.dialog.last();
     }
 
     async open() {
-        await this.page.goto('/effects/');
-        await waitForViewport(this.page);
+        await this.app.goto('/effects/');
         await expect(this.area).toHaveAttribute('data-view', /^(equalizer|combined)$/);
         await expect(this.plot).toBeVisible();
     }
@@ -53,13 +57,13 @@ export class EffectsPage {
 
     async showEffects() {
         if (await this.isCombined()) return;
-        await this.page.getByRole('button', { name: t('effects.showEffects') }).click();
+        await this.app.main.getByRole('button', { name: t('effects.showEffects') }).click();
         await expect(this.area).toHaveAttribute('data-view', 'effects');
     }
 
     async showEqualizer() {
         if (await this.isCombined()) return;
-        await this.page.getByRole('button', { name: t('effects.showEqualizer') }).click();
+        await this.app.main.getByRole('button', { name: t('effects.showEqualizer') }).click();
         await expect(this.area).toHaveAttribute('data-view', 'equalizer');
     }
 
@@ -82,7 +86,7 @@ export class EffectsPage {
         await expect(this.plot).toBeVisible();
         const box = await this.plot.boundingBox();
         if (!box) throw new Error('the plot is not on screen');
-        const horizontal = (await this.page.locator('[data-layout]').getAttribute('data-layout')) === 'horizontal';
+        const horizontal = (await this.equalizer.getAttribute('data-layout')) === 'horizontal';
         const slot = (index + 0.5) / bandCount;
         const fraction = (gain + gainRange) / (2 * gainRange);
         return horizontal
@@ -128,8 +132,7 @@ export class EffectsPage {
     }
 
     async chooseMenuItem(name: string) {
-        await this.moreButton.click();
-        await this.page.getByRole('menuitem', { name }).click();
+        await this.app.chooseFromMenu(this.moreButton, name);
     }
 
     async openPresets() {

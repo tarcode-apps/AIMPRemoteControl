@@ -74,19 +74,16 @@ if [ "$CONFIG" = Release ] && command -v strip >/dev/null 2>&1; then
     strip --strip-unneeded "$DIST_DIR/$ARTIFACT"
 fi
 
-# The plugin is useless to AIMP if its entry point stopped being exported:
-# cheap guard against a visibility or linker-flag regression.
-# No pipe into `grep -q` here: it exits on the first match, and the SIGPIPE that
-# gives nm would trip `set -o pipefail`.
+# The plugin is useless to AIMP if its entry point stopped being exported, and
+# must export nothing else: cheap guard against a visibility or linker-flag
+# regression.
 if command -v nm >/dev/null 2>&1; then
-    exported=$(nm -D --defined-only "$DIST_DIR/$ARTIFACT")
-    case "$exported" in
-        *" AIMPPluginGetHeader"*) ;;
-        *)
-            echo "error: AIMPPluginGetHeader is not exported from $ARTIFACT" >&2
-            exit 1
-            ;;
-    esac
+    exported=$(nm -D --defined-only "$DIST_DIR/$ARTIFACT" | awk '{ print $NF }')
+    if [ "$exported" != "AIMPPluginGetHeader" ]; then
+        echo "error: $ARTIFACT must export AIMPPluginGetHeader and nothing else; it exports:" >&2
+        printf '%s\n' "$exported" >&2
+        exit 1
+    fi
 fi
 
 step "Done"

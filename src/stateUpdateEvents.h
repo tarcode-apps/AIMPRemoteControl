@@ -41,11 +41,16 @@ public:
 	void Start(IAIMPCore *core);
 	void Stop();
 
-	bool Wait(Kind kind, std::chrono::milliseconds timeout);
+	// Waits end early, without a change, once `cancelled` says so; it is asked
+	// every CancelCheckInterval.
+	using Cancellation = std::function<bool()>;
+	static constexpr std::chrono::milliseconds CancelCheckInterval{500};
+
+	bool Wait(Kind kind, std::chrono::milliseconds timeout, const Cancellation &cancelled = {});
 
 	using Versions = std::array<std::uint64_t, KindCount>;
 	Versions Current();
-	std::bitset<KindCount> WaitAny(Versions &seen, std::chrono::milliseconds timeout);
+	std::bitset<KindCount> WaitAny(Versions &seen, std::chrono::milliseconds timeout, const Cancellation &cancelled = {});
 
 	// Per-playlist change counters keyed by AIMP playlist id; a playlist that is not
 	// loaded has no entry.

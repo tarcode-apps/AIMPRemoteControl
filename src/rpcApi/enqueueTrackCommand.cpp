@@ -9,16 +9,11 @@
 #include "apiCore.h"
 #include "apiPlaylists.h"
 #include "aimpHelper.h"
+#include "helpers/legacyErrors.h"
 #include "helpers/idLookup.h"
 #include "mainThreadRunner.h"
 #include "helpers/remoteControlIdManager.h"
 #include "player/queue.h"
-
-namespace
-{
-	constexpr int ErrorTrackNotFound = 21;
-	constexpr int ErrorEnqueueFailed = 18;
-}
 
 void rpcapi::EnqueueTrackCommand::Register(IEndpointRouteBuilder &endpoints)
 {
@@ -29,18 +24,15 @@ void rpcapi::EnqueueTrackCommand::Register(IEndpointRouteBuilder &endpoints)
 		const std::int32_t trackId = params["track_id"].get<std::int32_t>();
 		const bool atBeginning = params.value("insert_at_queue_beginning", false);
 
-		const HRESULT result = RunOnMainThread(core, [&]() -> HRESULT
+		const player::MutationResult result = RunOnMainThread(core, [&]
 		{
 			IAIMPPlaylistItem *item = FindPlaylistItem(core, idManager, trackId);
 			if (!item)
-				return E_INVALIDARG;
-			const HRESULT hr = player::EnqueueItem(core, item, atBeginning) == player::MutationResult::Ok ? S_OK : E_FAIL;
+				return player::MutationResult::ItemNotFound;
+			const player::MutationResult enqueued = player::EnqueueItem(core, item, atBeginning);
 			item->Release();
-			return hr;
+			return enqueued;
 		});
-		if (result == E_INVALIDARG)
-			throw LocalizedRpcError(ErrorTrackNotFound, "enqueueTrackNotFound");
-		if (Failed(result))
-			throw LocalizedRpcError(ErrorEnqueueFailed, "enqueueFailed");
+		ThrowUnlessOk(result, {ErrorTrackNotFound, "enqueueTrackNotFound"}, {ErrorEnqueueFailed, "enqueueFailed"});
 		return nullptr; });
 }

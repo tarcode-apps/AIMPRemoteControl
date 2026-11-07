@@ -112,11 +112,11 @@ export function useSetPlayer() {
 export function useSeekBy() {
     const client = useQueryClient();
     const setPlayer = useSetPlayer();
-    return (seconds: number) => {
+    return (seconds: number, onError: (error: Error) => void) => {
         const state = client.getQueryData<PlayerSnapshot>(playerKeys.state);
         if (!state || state.state === 'stopped') return;
         const position = Math.max(0, positionOf(state) + seconds);
-        setPlayer.mutate({ position: state.duration > 0 ? Math.min(position, state.duration) : position });
+        setPlayer.mutate({ position: state.duration > 0 ? Math.min(position, state.duration) : position }, { onError });
     };
 }
 

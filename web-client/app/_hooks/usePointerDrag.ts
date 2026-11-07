@@ -9,9 +9,13 @@ import {
 
 export type DragRelease = {
     delta: number;
+    // Pixels per millisecond at the release.
     velocity: number;
     cancelled: boolean;
 };
+
+// A release faster than this carries on in its direction, however short the drag.
+export const flingVelocity = 0.5;
 
 export type PointerDragOptions = {
     axis: 'x' | 'y';

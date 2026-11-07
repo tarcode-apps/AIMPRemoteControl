@@ -15,7 +15,7 @@ import {
 } from 'react';
 
 // The route group of the screens that sit over a main one and show a back arrow.
-export const secondScreenSegment = '(second-screen)';
+const secondScreenSegment = '(second-screen)';
 // The route group of the screens about one thing, such as a track, which open
 // over any screen, the player included, and go back to it.
 export const detailScreenSegment = '(detail-screen)';

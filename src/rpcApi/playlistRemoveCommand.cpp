@@ -6,18 +6,10 @@
 
 #include <nlohmann/json.hpp>
 
-#include "apiCore.h"
-#include "apiPlaylists.h"
-#include "aimpHelper.h"
-#include "helpers/idLookup.h"
+#include "helpers/legacyErrors.h"
 #include "mainThreadRunner.h"
 #include "helpers/remoteControlIdManager.h"
-
-namespace
-{
-	constexpr int ErrorPlaylistNotFound = 20;
-	constexpr int ErrorPlaylistRemoveFailed = 31;
-}
+#include "player/playlists.h"
 
 void rpcapi::PlaylistRemoveCommand::Register(IEndpointRouteBuilder &endpoints)
 {
@@ -27,18 +19,8 @@ void rpcapi::PlaylistRemoveCommand::Register(IEndpointRouteBuilder &endpoints)
 			throw RpcError(-32602, "playlist_id is required");
 		const std::int32_t playlistId = params["playlist_id"].get<std::int32_t>();
 
-		const HRESULT result = RunOnMainThread(core, [&]() -> HRESULT
-		{
-			IAIMPPlaylist *playlist = FindPlaylist(core, idManager, playlistId);
-			if (!playlist)
-				return E_INVALIDARG;
-			const HRESULT hr = playlist->Close(AIMP_PLAYLIST_CLOSE_FLAGS_FORCE_REMOVE);
-			playlist->Release();
-			return hr;
-		});
-		if (result == E_INVALIDARG)
-			throw LocalizedRpcError(ErrorPlaylistNotFound, "removePlaylistNotFound");
-		if (Failed(result))
-			throw LocalizedRpcError(ErrorPlaylistRemoveFailed, "removePlaylistFailed");
+		ThrowUnlessOk(RunOnMainThread(core, [&]
+									  { return player::RemovePlaylist(core, idManager.PlaylistGetKey(playlistId)); }),
+					  {ErrorPlaylistNotFound, "removePlaylistNotFound"}, {ErrorPlaylistRemoveFailed, "removePlaylistFailed"});
 		return {{"success", true}}; });
 }

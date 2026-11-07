@@ -5,12 +5,14 @@ import { useClearQueue, useQueue, useRemoveFromQueue, useSetQueueSuspended } fro
 import { ToolbarButton } from '@/app/_components/buttons';
 import { Icon } from '@/app/_components/icons';
 import { ListToolbar } from '@/app/_components/lists';
+import { useErrorToast } from '@/app/_components/toast';
 import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
 import { useTranslation } from 'react-i18next';
 import { useQueueMode } from './QueueMode';
 
 export function QueueToolbar() {
     const { t } = useTranslation();
+    const showError = useErrorToast();
     const mode = useQueueMode();
     const { data: queue } = useQueue();
     const { data: playlists } = usePlaylists();
@@ -33,7 +35,7 @@ export function QueueToolbar() {
 
     const removeSelected = () => {
         const positions = mode.items.filter(item => mode.isSelected(item.position)).map(item => item.position);
-        if (positions.length) remove.mutate({ positions, revision: queue?.revision });
+        if (positions.length) remove.mutate({ positions, revision: queue?.revision }, { onError: showError });
         // The positions renumber, so the selection cannot stay.
         if (mode.mode === 'select') mode.setMode(null);
         else mode.clearSelection();
@@ -61,13 +63,13 @@ export function QueueToolbar() {
                     label: t(queue?.suspended ? 'queue.resume' : 'queue.suspend'),
                     icon: queue?.suspended ? 'play_circle' : 'pause_circle',
                     disabled: !queue,
-                    onSelect: () => suspend.mutate(!queue?.suspended),
+                    onSelect: () => suspend.mutate(!queue?.suspended, { onError: showError }),
                 },
                 {
                     label: t('queue.clear'),
                     icon: 'delete_sweep',
                     disabled: !queue?.items.length,
-                    onSelect: () => clear.mutate(queue?.revision),
+                    onSelect: () => clear.mutate(queue?.revision, { onError: showError }),
                 },
             ]}
             selectedActions={[
@@ -75,7 +77,7 @@ export function QueueToolbar() {
                     label: t('favorites.add'),
                     icon: 'heart_plus',
                     disabled: mode.nothingSelected,
-                    onSelect: () => void addSelectedToFavorites(),
+                    onSelect: () => void addSelectedToFavorites().catch(showError),
                 },
                 { label: t('queue.remove'), icon: 'delete', disabled: mode.nothingSelected, onSelect: removeSelected },
             ]}

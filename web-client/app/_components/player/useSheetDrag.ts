@@ -1,7 +1,5 @@
-import { usePointerDrag } from '@/app/_hooks/usePointerDrag';
+import { flingVelocity, usePointerDrag } from '@/app/_hooks/usePointerDrag';
 import { useRef, type RefObject } from 'react';
-
-const flingVelocity = 0.5;
 
 // Whether `target` lies in an element below `panel` that has something to scroll.
 function insideScrollable(target: Element | null, panel: HTMLElement | null): boolean {

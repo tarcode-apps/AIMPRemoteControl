@@ -99,7 +99,7 @@ if pgrep -x 'aimp|AIMP' >/dev/null; then
 fi
 
 step "Linking"
-mkdir -p "$DIST_DIR"
+mkdir -p "$DIST_DIR" "$PLAYER_DIR/Plugins"
 link "$PLAYER_DIR/Plugins/aimp_remote_control" "$DIST_DIR"
 link "$DIST_DIR/wwwroot" "$REPO_ROOT/web-client/out"
 

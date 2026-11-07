@@ -62,7 +62,7 @@ export function FastScroll({ scrollRef, label, children }: FastScrollProps) {
     });
 
     return (
-        <div className={styles.frame}>
+        <div className={styles.frame} data-testid="fast-scroll">
             {children}
             <div ref={trackRef} className={styles.track} aria-hidden>
                 {progress !== null && (

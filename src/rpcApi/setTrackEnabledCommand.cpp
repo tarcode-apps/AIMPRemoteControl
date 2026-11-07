@@ -6,17 +6,10 @@
 
 #include <nlohmann/json.hpp>
 
-#include "apiCore.h"
-#include "apiPlaylists.h"
-#include "aimpHelper.h"
-#include "helpers/idLookup.h"
+#include "helpers/legacyErrors.h"
 #include "mainThreadRunner.h"
 #include "helpers/remoteControlIdManager.h"
-
-namespace
-{
-	constexpr int ErrorTrackNotFound = 21;
-}
+#include "player/playlistItems.h"
 
 void rpcapi::SetTrackEnabledCommand::Register(IEndpointRouteBuilder &endpoints)
 {
@@ -29,16 +22,11 @@ void rpcapi::SetTrackEnabledCommand::Register(IEndpointRouteBuilder &endpoints)
 		const std::int32_t trackId = params["track_id"].get<std::int32_t>();
 		const bool enabled = params["enabled"].get<bool>();
 
-		const bool found = RunOnMainThread(core, [&]
-		{
-			IAIMPPlaylistItem *item = FindPlaylistItem(core, idManager, trackId);
-			if (!item)
-				return false;
-			item->SetValueAsInt32(AIMP_PLAYLISTITEM_PROPID_PLAYINGSWITCH, enabled ? 1 : 0);
-			item->Release();
-			return true;
-		});
-		if (!found)
+		const PlaylistItemKey key = idManager.PlaylistItemGetKey(trackId);
+		const player::MutationResult result = RunOnMainThread(core, [&]
+															  { return player::SetItemEnabled(core, key.AIMPPlaylistId, key.Index, enabled); });
+		if (result == player::MutationResult::PlaylistNotFound || result == player::MutationResult::ItemNotFound)
 			throw LocalizedRpcError(ErrorTrackNotFound, "setTrackEnabledTrackNotFound");
-		return {{"success", true}}; });
+		// The protocol has no code for a refusal, as ShowMessage has none.
+		return {{"success", result == player::MutationResult::Ok}}; });
 }

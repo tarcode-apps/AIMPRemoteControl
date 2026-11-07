@@ -104,31 +104,60 @@ the app never requests them.
 |---|---|
 | `realm` | `AIMP Remote Control` (fixed) |
 | `algorithm` | `MD5` |
-| `qop` | `auth` (legacy RFC 2069 without `qop` is accepted too) |
-| `nonce` | `<unix-time>:<MD5(unix-time ":" secret)>` — stateless, verifiable by the server |
+| `qop` | `auth`, required: a request without it (RFC 2069) is refused, as it has no `nc` to tell a replay by; neither the app nor its DownloadManager sends one |
+| `nonce` | `<unix-time>:<MD5(unix-time ":" key)>` — stateless, verifiable by the server |
 
 An unauthenticated request gets `401 Unauthorized` with
 `WWW-Authenticate: Digest realm="AIMP Remote Control", qop="auth", algorithm=MD5, nonce="…"`.
-When the credentials are right but the nonce is older than **24 hours**, the
+When the credentials are right but the nonce is older than **15 minutes**
+(longer than the 10-minute long poll, so a poll never outlives its nonce), the
 server answers `401` with `stale=true` so the client can retry with the fresh
 nonce without asking the user again.
 
 Implementation notes that matter for compatibility:
 
-- The nonce is derived from the configured credentials and the time only, so it
-  stays valid across player restarts. The app caches the nonce for days and
-  does **not** retry every request after a `401`; a nonce that changed on
-  restart would break it.
+- The nonce is the time signed with a random key kept in the plugin's
+  settings, so it stays valid across player restarts and tells nothing about
+  the password (`AIMPRemoteControl\Auth\NonceKey`, made on first start). The
+  app keeps a nonce for days and does **not** retry every request after a
+  `401`; it relies on `stale=true`, and a nonce that changed on restart would
+  break it.
+- What the app sends (Apache HttpClient, from a capture): always `qop=auth`
+  with `algorithm=MD5`; one `cnonce` per Digest session, whose `nc` counts up
+  from `00000001`; on `stale=true` it retries at once with the new nonce, a new
+  `cnonce` and `nc` from 1, without asking the user. Its parallel requests
+  arrive with their `nc` out of order and now and then with the **same** `nc`
+  twice.
+- Replays: the server remembers the `nc` each nonce and `cnonce` have signed
+  with while the nonce is valid, in any order, and answers one used twice with
+  `401` and `stale=true` without running the request. A replayed header gets no
+  further: signing for the new nonce takes the password. The app resends the
+  request at once with the new nonce, as it does for an aged one (65 of 65 in a
+  capture, long polls and commands included, none run twice); a plain `401`
+  instead makes it fail with "Unauthorized" and reconnect, so a repeat must
+  never be answered that way. To download a track the app reads the headers
+  itself, then hands Android's DownloadManager an `Authorization` header it
+  made in advance (`qop=auth`, an `nc` of its session, the absolute URL as
+  `uri`); the DownloadManager cannot sign anew, so a download it resumes after
+  a dropped connection fails with authentication on. That is accepted: on a
+  local network a download rarely breaks off. This is an addition to the
+  original plugin.
 - Failed credentials are rate-limited to **one verification per second per
   client address**. A credential-bearing request that arrives inside that window
   gets the ordinary `401` challenge without being checked, so it is
-  indistinguishable from a wrong password. Correct credentials are never
-  throttled and a request without an `Authorization` header is not an attempt,
+  indistinguishable from a wrong password. Correct credentials never start a
+  window, but a correct request arriving inside one from the same address is
+  challenged unchecked too and must retry; a request without an `Authorization` header is not an attempt,
   so a well-behaved client never notices. This is an addition to the original
   plugin, which had no limit.
 - The `uri` in the `Authorization` header may be an absolute URL
   (`http://host:3333/downloadTrack/…`) — Android's DownloadManager signs it that
-  way. The server compares only the path part.
+  way. As RFC 7616 asks, the server checks that it names the resource of the
+  request line rather than the same text, since a proxy may rewrite that line:
+  the path is compared decoded and the query as a set of parameters, so an empty
+  `?` a proxy dropped or `%7b` for `%7B` still passes. A `uri` naming another
+  resource gets `400 Bad Request`, which is neither a challenge nor a failed
+  attempt for the rate limit.
 
 ---
 
@@ -157,7 +186,7 @@ JSON-RPC errors look like `{"code": 21, "message": "Getting info about track fai
 | Code | Meaning |
 |---|---|
 | `-32602` | invalid params: required field missing, unknown `status_id`, unknown event name, etc. |
-| `-32000` | server is stopping (returned to pending long polls on shutdown) |
+| `-32000` | server is stopping (returned to pending long polls on shutdown), or too many long polls pending |
 | `-1` | scheduler not available (timer functions disabled in settings) |
 | `18` | enqueue failed |
 | `19` | removing from queue failed |
@@ -172,7 +201,8 @@ JSON-RPC errors look like `{"code": 21, "message": "Getting info about track fai
 | `33` | path inaccessible (`BrowseFiles`) |
 | `35` | lyrics not available |
 
-HTTP endpoints use HTTP status codes (`401`, `403`, `404`, `400`, `500`).
+HTTP endpoints use HTTP status codes (`401`, `403`, `404`, `400`, `413`,
+`500`; `206` for a satisfied `Range`).
 
 ---
 
@@ -238,8 +268,10 @@ always `true`; `allowed` follows the settings.
 ```
 
 When `playback_state` is `"stopped"`, `playlist_id`/`track_id` still describe
-the track the player would start (the focused item of the active playlist), and
-`track_length`, `track_position`, `current_track_source_radio` are absent.
+the track the player would start: the focused item of the playing playlist,
+else of the active one, or its playback cursor, or its first item. Both keys are
+absent when no playlist has an item. `track_length`, `track_position` and
+`current_track_source_radio` are absent.
 
 ### 7.2 Playlists and entries
 
@@ -289,6 +321,10 @@ Two forms:
   search over title, artist, album, genre and folder name across **all**
   playlists (include `"playlist_id"` in `fields` to know where a hit lives); no
   `total_entries_count`.
+
+An unknown `playlist_id` gives an empty result (`count_of_found_entries` and
+`total_entries_count` both 0), not error `20`. Both parameters together search
+within that playlist; `total_entries_count` is still the playlist's full count.
 
 `→ {"count_of_found_entries": int, "total_entries_count"?: int, "entries": [[…], …]}`
 
@@ -484,8 +520,9 @@ the player.
 `{"active"?: bool, "bands"?: [int × 18]} → {"active": bool, "bands": [int × 18]}`
 
 Reads the equalizer; if `active` and/or `bands` are given they are applied
-first. Bands use the same 0..100 scale as `Status` 11–28 (50 = 0 dB). `bands`
-with a length other than 18 → `-32602`.
+first. Bands use the same 0..100 scale as `Status` 11–28 (50 = 0 dB). A
+non-empty `bands` of a length other than 18 → `-32602`; an empty one counts as
+not given.
 
 ### 7.4 Tracks
 
@@ -496,7 +533,8 @@ result is the value after setting. Error `21`.
 
 #### `SetTrackEnabled`
 
-`{"track_id": int, "enabled": bool} → {"success": true}` — error `21`.
+`{"track_id": int, "enabled": bool} → {"success": bool}` — error `21`;
+`false` when the player refused the change.
 
 #### `EnqueueTrack`
 
@@ -512,6 +550,7 @@ to the play queue (at the end by default). Errors `21`, `18`.
 
 `{"playlist_id": int, "track_id": int, "physically": bool} → {"success": true}`
 
+`playlist_id` is accepted but not needed: the track id names the entry.
 Removes the entry from the playlist; with `"physically": true` the file is also
 deleted from disk, which is allowed only if enabled in the plugin settings
 (otherwise error `28`). Errors `21`, `28`.
@@ -544,7 +583,8 @@ player's own order; synced lyrics come without their times. Lines are separated 
 - `{}` → roots: `{"labels": ["", "Data", "Music"], "paths": ["C:\\", "D:\\"]}`
   (Windows drives with volume labels; `/` on Linux).
 - `{"path": string}` → `{"files": [name, …], "folders": [name, …]}` — names
-  only, sorted case-insensitively. Files are filtered to playable extensions
+  only, in the system file manager's natural order (`Track 9` before
+  `Track 10`), a deliberate difference from the original's plain sort. Files are filtered to playable extensions
   (`GetFormats`) and exclude hidden/system files; all folders are listed.
 
 Error `33` if the path cannot be read, or if file browsing is not allowed in
@@ -571,8 +611,8 @@ paths come from there.
 
 #### `ShowMessage`
 
-`{"message": string} → {"success": true}` — shows the text in the player's
-notification area. The app sends `"<phone name> connected"` on connect.
+`{"message": string} → {"success": bool}` — shows the text in the player's
+notification area; `false` when the player refused. The app sends `"<phone name> connected"` on connect.
 
 #### `Scheduler`
 
@@ -600,7 +640,7 @@ Sleep timer.
 }
 // result
 {
-  "supported_actions": ["player_shutdown", "pause_playback", "machine_shutdown", "machine_sleep", "machine_hibernate"],
+  "supported_actions": ["pause_playback", "player_shutdown", "machine_shutdown", "machine_sleep", "machine_hibernate"],
   "current_timer": {
     "actions": ["pause_playback"],
     "expires_in": 900
@@ -637,7 +677,16 @@ immediately after each response. Unknown event name → `-32602`.
 Position ticks (once a second while playing) are **not** events. If nothing
 happens for 10 minutes the server answers with the current snapshot anyway, so
 the client can refresh its connection; on server shutdown pending polls fail
-with `-32000`.
+with `-32000`. A poll pending on a network interface that goes away is answered
+the same way as one that timed out, within a second, so the interface's port
+can close; one whose client closed the connection ends as soon.
+
+Each pending poll holds a worker thread of the server, so a client address may
+keep at most 16 polls and event streams of the web API open together, and all
+clients of an interface together 56 (of its 64 workers). A poll beyond that
+fails at once with `-32000` "too many pending requests". The app keeps four,
+but it starts with two Digest sessions and leaves the four polls of the first
+pending until they time out, so it holds eight for its first ten minutes.
 
 ```json
 // request
@@ -687,7 +736,8 @@ re-encoded to PNG). `404` for an unknown track or a track without cover.
 
 `GET /downloadTrack/playlist_id/<playlist_id>/track_id/<track_id>`
 
-Returns the audio file with `Content-Type` by extension (`audio/x-mp3`, …) and
+Returns the audio file with `Content-Type` by extension (`audio/mpeg`,
+`audio/flac`, …; the original sent `audio/x-mp3`, which the app ignores) and
 `Content-Disposition: attachment; filename="<file name>"`. The file name is
 **raw UTF‑8 inside the quotes**, without an RFC 5987 `filename*` — this is what
 the original plugin sent and what the app's download manager understands (it
@@ -717,7 +767,7 @@ the playlist.
 | Status | Meaning |
 |---|---|
 | `200` | saved and added |
-| `400` | no file parts |
+| `400` | no file parts, or a body that broke off (none of its files is kept) |
 | `403` | uploading is disabled in the plugin settings |
 | `404` | unknown playlist (checked before anything is written) |
 | `500` | could not write the file or add it to the playlist |
@@ -729,8 +779,12 @@ Notes:
 - The app encodes part names in ISO‑8859‑1 and replaces every other character
   with `?` (e.g. `"?????.mp3"` for a Cyrillic name). When the name
   contains `?` the server renames the saved file to `<Artist> - <Title>.<ext>`
-  from the tags; without tags the `?` become `_`.
-- Request bodies up to 2 GB are accepted.
+  from the tags, or `<Title>.<ext>` without an artist; without a title the file
+  keeps its name, in which `?` becomes `_` on Windows (Linux allows it).
+- Request bodies up to 2 GB are accepted. Files go to disk as they arrive; a
+  request refused before its body (`403`, `404`, or `500` when the drive has no
+  room for the declared size) is answered at once and the connection closed,
+  without reading the body.
 
 ---
 

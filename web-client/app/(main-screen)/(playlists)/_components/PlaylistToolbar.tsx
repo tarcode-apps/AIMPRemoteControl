@@ -12,6 +12,7 @@ import { ListToolbar } from '@/app/_components/lists';
 import toolbarStyles from '@/app/_components/lists/ListToolbar.module.scss';
 import { Menu, menuSeparator, type MenuEntry } from '@/app/_components/menus';
 import { AddUrlDialog, useItemRemoval, usePlaylistActions } from '@/app/_components/playlists';
+import { useErrorToast } from '@/app/_components/toast';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { useNavigation } from '@/app/_state/Navigation';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
@@ -24,12 +25,13 @@ import { usePlaylistMode } from './PlaylistMode';
 import { PlaylistSortDialog } from './SortDialog';
 
 // The address of the file browser, adding to `playlistId` what it picks.
-export function filesScreenHref(playlistId: string, type: FileType) {
+function filesScreenHref(playlistId: string, type: FileType) {
     return `/files/?to=${encodeURIComponent(playlistId)}&types=${type}`;
 }
 
 export function PlaylistToolbar() {
     const { t } = useTranslation();
+    const showError = useErrorToast();
     const { openSecondScreen } = useNavigation();
     const docked = useMediaQuery(media.drawerDocked);
     const { selected, showTrack } = usePlaylistSelection();
@@ -48,12 +50,17 @@ export function PlaylistToolbar() {
     const enqueueSelected = (atBeginning: boolean) => {
         const selection = mode.itemSelection();
         if (selected && selection)
-            enqueue.mutate({ playlistId: selected.id, revision: selected.revision, atBeginning, ...selection });
+            enqueue.mutate(
+                { playlistId: selected.id, revision: selected.revision, atBeginning, ...selection },
+                { onError: showError },
+            );
     };
     const addSelectedToFavorites = () => {
         const selection = mode.itemSelection();
         if (selected && selection)
-            void favoriteActions.addSelections([{ playlistId: selected.id, revision: selected.revision, selection }]);
+            void favoriteActions
+                .addSelections([{ playlistId: selected.id, revision: selected.revision, selection }])
+                .catch(showError);
     };
     const selectedRemoval = () => {
         const selection = mode.itemSelection();
@@ -65,7 +72,10 @@ export function PlaylistToolbar() {
     const switchSelected = (enabled: boolean) => {
         const selection = mode.itemSelection();
         if (selected && selection)
-            setItemsEnabled.mutate({ playlistId: selected.id, revision: selected.revision, enabled, ...selection });
+            setItemsEnabled.mutate(
+                { playlistId: selected.id, revision: selected.revision, enabled, ...selection },
+                { onError: showError },
+            );
     };
     // Only while the playlist shows its switch column: hidden, the player plays
     // every track.

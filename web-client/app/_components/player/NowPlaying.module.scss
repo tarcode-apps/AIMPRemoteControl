@@ -82,7 +82,7 @@
 // Recording: the glyph beats in the accent colour, as the player's own button
 // does: it rests lit and unlit, and the change between them is quick.
 .capturing {
-    color: var(--color-accent);
+    --icon-button-color: var(--color-accent);
     animation: capture-beat 1.5s ease-in-out infinite;
 
     @media (prefers-reduced-motion: reduce) {
@@ -193,8 +193,7 @@
 // the icon buttons elsewhere, and placed so that the icon's outer edge lines up
 // with the cover's while the circle reaches a little past it.
 .sideButton {
-    width: 40px;
-    height: 40px;
+    --icon-button-size: 40px;
 }
 
 .sideStart {
@@ -264,7 +263,7 @@ $lyrics-page-height: 6 * 22px;
 }
 
 .unfilled {
-    font-variation-settings: "FILL" 0;
+    --icon-fill: 0;
 }
 
 .title {
@@ -298,19 +297,13 @@ $lyrics-page-height: 6 * 22px;
 }
 
 .controls .big {
-    width: 72px;
-    height: 72px;
-    background: var(--color-surface-raised);
-
-    &:active,
-    &[data-pressed] {
-        background: var(--color-selection);
-    }
+    --icon-button-size: 72px;
+    --icon-button-background: var(--color-surface-raised);
+    --icon-button-pressed: var(--color-selection);
 }
 
 .controls .wide {
-    width: 56px;
-    height: 56px;
+    --icon-button-size: 56px;
 }
 
 // The mode toggles are drawn a little smaller than the transport, as in the player.
@@ -323,11 +316,11 @@ $lyrics-page-height: 6 * 22px;
 }
 
 .toggle {
-    color: var(--color-text-dim);
+    --icon-button-color: var(--color-text-dim);
 }
 
 .on {
-    color: var(--color-accent);
+    --icon-button-color: var(--color-accent);
 }
 
 .times {

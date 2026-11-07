@@ -2,10 +2,10 @@
 
 import { usePlayer, usePlayerCommand, usePlayerPosition, useSetPlayer } from '@/app/_api/player';
 import { usePlaylists, useSetItemMark } from '@/app/_api/playlists';
-import type { RepeatMode } from '@/app/_api/types';
+import type { PlayerCommand, PlayerPatch, RepeatMode } from '@/app/_api/types';
 import { useElementSize } from '@/app/_hooks/useElementSize';
 import { usePersistedState } from '@/app/_hooks/usePersistedState';
-import { usePointerDrag } from '@/app/_hooks/usePointerDrag';
+import { flingVelocity, usePointerDrag } from '@/app/_hooks/usePointerDrag';
 import { useFavorites } from '@/app/_state/Favorites';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
@@ -22,6 +22,7 @@ import { Menu, menuSeparator, type MenuEntry } from '../menus';
 import { useItemRemoval, useTrackDownload } from '../playlists';
 import { Rating } from '../rating';
 import { useDrawer } from '../sidenav';
+import { useErrorToast } from '../toast';
 import { Lyrics } from './Lyrics';
 import { Marquee } from './Marquee';
 import styles from './NowPlaying.module.scss';
@@ -38,7 +39,6 @@ const repeatCycle: Record<RepeatMode, RepeatMode> = { off: 'playlist', playlist:
 // The lyrics get the room under the cover when it holds the six lines of 22px a
 // small screen shows them on, in the title block's place, and the gap above them.
 const lyricsRoom = 6 * 22 + 16;
-const flingVelocity = 0.5;
 // The pages slide the rest of the way at this pace, in px per ms, and for no
 // less than the minimum: the further they have to go, the longer it takes.
 const slideSpeed = 0.6;
@@ -60,6 +60,10 @@ export function NowPlaying() {
     const command = usePlayerCommand();
     const setPlayer = useSetPlayer();
     const setMark = useSetItemMark();
+    // Every control here reports a refusal in the toast.
+    const showError = useErrorToast();
+    const runCommand = (name: PlayerCommand) => command.mutate(name, { onError: showError });
+    const patchPlayer = (patch: PlayerPatch) => setPlayer.mutate(patch, { onError: showError });
     const shown = expanded || docked;
     const position = usePlayerPosition(player, shown);
 
@@ -208,7 +212,7 @@ export function NowPlaying() {
         const now = performance.now();
         if (!commit && now - lastVolumeAt.current < volumeInterval) return;
         lastVolumeAt.current = now;
-        setPlayer.mutate(mute ? { volume: value, mute: false } : { volume: value });
+        patchPlayer(mute ? { volume: value, mute: false } : { volume: value });
     };
 
     const numbers = () => {
@@ -243,7 +247,12 @@ export function NowPlaying() {
                         mark={track.mark}
                         rating={track.rating}
                         displayingMark={track.displayingMark}
-                        onChange={mark => setMark.mutate({ playlistId: track.playlistId, index: track.index, mark })}
+                        onChange={mark =>
+                            setMark.mutate(
+                                { playlistId: track.playlistId, index: track.index, mark },
+                                { onError: showError },
+                            )
+                        }
                     />
                 )}
                 <div className={clsx(styles.actions, volumeOpen && styles.volumeOpen)}>
@@ -253,7 +262,7 @@ export function NowPlaying() {
                             className={clsx(styles.capture, capturing && styles.capturing)}
                             aria-pressed={capturing}
                             disabled={!track?.isUrl}
-                            onClick={() => setPlayer.mutate({ radioCapture: !capturing })}
+                            onClick={() => patchPlayer({ radioCapture: !capturing })}
                         >
                             <Icon>sensors</Icon>
                         </IconButton>
@@ -266,7 +275,7 @@ export function NowPlaying() {
                                     className={clsx(styles.toggle, mute && styles.on)}
                                     onClick={() => {
                                         adjust({ volume: mute ? lastVolume.current : volume, mute: !mute });
-                                        setPlayer.mutate({ mute: !mute });
+                                        patchPlayer({ mute: !mute });
                                     }}
                                 >
                                     <Icon>no_sound</Icon>
@@ -368,7 +377,7 @@ export function NowPlaying() {
                 <IconButton
                     title={t('player.shuffle')}
                     className={clsx(styles.toggle, styles.sideButton, styles.sideStart, player?.shuffle && styles.on)}
-                    onClick={() => player && setPlayer.mutate({ shuffle: !player.shuffle })}
+                    onClick={() => player && patchPlayer({ shuffle: !player.shuffle })}
                 >
                     <Icon>shuffle</Icon>
                 </IconButton>
@@ -378,21 +387,21 @@ export function NowPlaying() {
                         <IconButton
                             title={t('player.stop')}
                             className={clsx(transport.button, styles.wide)}
-                            onClick={() => command.mutate('stop')}
+                            onClick={() => runCommand('stop')}
                         >
                             <Icon>stop</Icon>
                         </IconButton>
                         <IconButton
                             title={t('player.play')}
                             className={clsx(transport.button, styles.big)}
-                            onClick={() => command.mutate('play')}
+                            onClick={() => runCommand('play')}
                         >
                             <Icon>play_arrow</Icon>
                         </IconButton>
                         <IconButton
                             title={t('player.pause')}
                             className={clsx(transport.button, styles.wide)}
-                            onClick={() => command.mutate('pause')}
+                            onClick={() => runCommand('pause')}
                         >
                             <Icon>pause</Icon>
                         </IconButton>
@@ -410,7 +419,7 @@ export function NowPlaying() {
                         styles.sideEnd,
                         repeat !== 'off' && styles.on,
                     )}
-                    onClick={() => setPlayer.mutate({ repeat: repeatCycle[repeat] })}
+                    onClick={() => patchPlayer({ repeat: repeatCycle[repeat] })}
                 >
                     {/* The font has no crossed-out repeat, so the stroke is drawn over it. */}
                     <span className={clsx(styles.repeatIcon, repeat === 'off' && styles.struck)}>
@@ -424,7 +433,7 @@ export function NowPlaying() {
                 max={duration}
                 // A stream has no length to seek in.
                 disabled={duration <= 0}
-                onCommit={value => setPlayer.mutate({ position: value })}
+                onCommit={value => patchPlayer({ position: value })}
             />
             <div className={styles.times}>
                 <span>{track ? formatDuration(position) : t('player.noTime')}</span>

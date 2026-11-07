@@ -107,6 +107,15 @@ test.describe('playlist', () => {
         await expect(screen.row('Charlie').getByTitle(t('playlist.inQueue'))).toHaveText('[2]');
     });
 
+    test('a refused action says why in the toast', async ({ app, page }) => {
+        const message = 'The queue is busy.';
+        await page.route('**/api/v1/queue/items', route =>
+            route.fulfill({ status: 500, json: { error: { code: 'enqueueFailed', message } } }),
+        );
+        await screen.rowAction('Charlie', t('playlist.enqueue'));
+        await expect(app.toast).toHaveText(message);
+    });
+
     test('a switch takes a track out of playback', async ({ api, app }) => {
         const enabled = async () => (await api.items(playlist.id)).items.map(item => item.enabled);
         if (app.drawerDocked) {

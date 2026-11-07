@@ -10,6 +10,7 @@
 #include "apiFileManager.h"
 #include "apiPlaylists.h"
 #include "aimpHelper.h"
+#include "helpers/legacyErrors.h"
 #include "helpers/idLookup.h"
 #include "mainThreadRunner.h"
 #include "helpers/playlistEntryJson.h"
@@ -17,8 +18,6 @@
 
 namespace
 {
-	constexpr int ErrorTrackNotFound = 21;
-
 	const char *const InfoFields[] = {"album", "artist", "bitrate", "channels_count", "date", "duration", "filesize",
 									  "genre", "id", "playlist_id", "rating", "samplerate", "title"};
 }

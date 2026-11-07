@@ -5,6 +5,7 @@ import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '../buttons';
 import { Icon } from '../icons';
+import { useErrorToast } from '../toast';
 import styles from './TransportButton.module.scss';
 
 const stopHoldDelay = 500;
@@ -14,6 +15,7 @@ export function PlayButton({ className }: { className?: string }) {
     const { t } = useTranslation();
     const { data: player } = usePlayer();
     const command = usePlayerCommand();
+    const showError = useErrorToast();
     const playing = player?.state === 'playing';
 
     return (
@@ -23,10 +25,10 @@ export function PlayButton({ className }: { className?: string }) {
             hold={{
                 delay: stopHoldDelay,
                 action: () => {
-                    if (player && player.state !== 'stopped') command.mutate('stop');
+                    if (player && player.state !== 'stopped') command.mutate('stop', { onError: showError });
                 },
             }}
-            onClick={() => command.mutate(playing ? 'pause' : 'play')}
+            onClick={() => command.mutate(playing ? 'pause' : 'play', { onError: showError })}
         >
             <Icon>{playing ? 'pause' : 'play_arrow'}</Icon>
         </IconButton>

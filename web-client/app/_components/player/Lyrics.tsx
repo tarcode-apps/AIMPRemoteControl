@@ -1,12 +1,15 @@
 'use client';
 
+import { errorMessage } from '@/app/_api/helpers/errors';
 import { positionOf, usePlayer, useSetPlayer, type PlayerSnapshot } from '@/app/_api/player';
 import { useLyrics } from '@/app/_api/playlists';
 import type { LyricsLine } from '@/app/_api/types';
+import { useHoldInPlace } from '@/app/_hooks/useHold';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import clsx from 'clsx';
 import { useEffect, useEffectEvent, useRef, useState, type PointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useErrorToast } from '../toast';
 import styles from './Lyrics.module.scss';
 
 // After the reader scrolls the lines, they stay where they are this long
@@ -14,9 +17,8 @@ import styles from './Lyrics.module.scss';
 const followResumeDelay = 3000;
 // How long the lines take to glide to the next current one.
 const scrollDuration = 700;
-// A press held this long on a line seeks to it; a finger that wanders further
+// A press held on a line seeks to it; a finger that wanders further
 // than the slop is scrolling.
-const holdDelay = 500;
 const holdSlop = 8;
 // The lines this many seconds ahead are highlighted, with the current one and those before it; the
 // rest of the text is there in grey. Nothing is highlighted through an intro,
@@ -88,6 +90,7 @@ export function Lyrics({ playlistId, fileUri, enabled, className }: LyricsProps)
     const { data: lyrics, error } = useLyrics(playlistId, fileUri, enabled, true);
     const { data: player } = usePlayer();
     const setPlayer = useSetPlayer();
+    const showError = useErrorToast();
     const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
     const synced = lyrics?.type === 'synced';
     const lines = lyrics?.lines ?? noLines;
@@ -182,33 +185,15 @@ export function Lyrics({ playlistId, fileUri, enabled, className }: LyricsProps)
 
     const seek = (line: LyricsLine) => {
         setSuspendedAt(0);
-        setPlayer.mutate({ position: line.time ?? 0 });
+        setPlayer.mutate({ position: line.time ?? 0 }, { onError: showError });
     };
 
-    const hold = useRef<{ timer: number; x: number; y: number } | null>(null);
-    const cancelHold = () => {
-        if (hold.current) window.clearTimeout(hold.current.timer);
-        hold.current = null;
-    };
-    useEffect(() => cancelHold, []);
+    const hold = useHoldInPlace(holdSlop);
     const pressLine = (event: PointerEvent, line: LyricsLine) => {
-        if (event.button !== 0) return;
-        cancelHold();
-        hold.current = {
-            x: event.clientX,
-            y: event.clientY,
-            timer: window.setTimeout(() => {
-                hold.current = null;
-                seek(line);
-            }, holdDelay),
-        };
-    };
-    const moveOverLine = (event: PointerEvent) => {
-        if (hold.current && Math.hypot(event.clientX - hold.current.x, event.clientY - hold.current.y) > holdSlop)
-            cancelHold();
+        if (event.button === 0) hold.start(event, () => seek(line));
     };
 
-    if (error) return <p className={clsx(styles.note, className)}>{error.message}</p>;
+    if (error) return <p className={clsx(styles.note, className)}>{errorMessage(error, t)}</p>;
     if (!lyrics) return <div className={className} />;
     if (lyrics.type === 'none') return <p className={clsx(styles.note, className)}>{t('player.noLyrics')}</p>;
     return (
@@ -236,10 +221,10 @@ export function Lyrics({ playlistId, fileUri, enabled, className }: LyricsProps)
                     aria-current={synced && i === current ? 'true' : undefined}
                     {...(synced && {
                         onPointerDown: (event: PointerEvent) => pressLine(event, line),
-                        onPointerMove: moveOverLine,
-                        onPointerUp: cancelHold,
-                        onPointerCancel: cancelHold,
-                        onPointerLeave: cancelHold,
+                        onPointerMove: (event: PointerEvent) => hold.move(event),
+                        onPointerUp: hold.cancel,
+                        onPointerCancel: hold.cancel,
+                        onPointerLeave: hold.cancel,
                         onDoubleClick: () => seek(line),
                     })}
                 >

@@ -1,6 +1,5 @@
 #include "versionCommand.h"
 
-#include <functional>
 
 #include <nlohmann/json.hpp>
 

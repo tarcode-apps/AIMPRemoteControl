@@ -7,15 +7,10 @@
 
 #include <nlohmann/json.hpp>
 
+#include "helpers/legacyErrors.h"
 #include "helpers/idLookup.h"
 #include "helpers/remoteControlIdManager.h"
 #include "player/lyrics.h"
-
-namespace
-{
-	constexpr int ErrorTrackNotFound = 21;
-	constexpr int ErrorLyricsNotAvailable = 35;
-}
 
 void rpcapi::LyricsCommand::Register(IEndpointRouteBuilder &endpoints)
 {

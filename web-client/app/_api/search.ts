@@ -35,7 +35,7 @@ function searchUrl({ search, fields, playlists }: SearchParams, { offset, limit 
     return `/search?${query}`;
 }
 
-export function searchQuery(params: SearchParams, range: PageRange) {
+function searchQuery(params: SearchParams, range: PageRange) {
     return queryOptions({
         queryKey: searchKeys.page(params, range),
         queryFn: ({ signal }) => request<SearchPage>('GET', searchUrl(params, range), { signal }),

@@ -9,6 +9,7 @@
 #include "helpers/idLookup.h"
 #include "mainThreadRunner.h"
 #include "helpers/remoteControlIdManager.h"
+#include "parseInt32.h"
 #include "player/trackFile.h"
 #include "settings.h"
 #include "utf8Path.h"
@@ -18,12 +19,12 @@ void rpcapi::DownloadTrackCommand::Register(IEndpointRouteBuilder &endpoints)
 	endpoints.MapGet(R"(/downloadTrack/playlist_id/-?\d+/track_id/(-?\d+))",
 			   [core = FCore, &idManager = FIdManager, &settings = FSettings](const ApiRequest &request) -> std::optional<HttpContent>
 			   {
-				   if (request.PathMatches.empty())
+				   const std::optional<std::int32_t> trackId = ParseInt32(request.PathMatches.at(0));
+				   if (!trackId)
 					   return std::nullopt;
-				   const auto trackId = static_cast<std::int32_t>(std::stol(request.PathMatches[0]));
 				   const std::string file = RunOnMainThread(core, [&]() -> std::string
 															{
-					   IAIMPPlaylistItem *item = FindPlaylistItem(core, idManager, trackId);
+					   IAIMPPlaylistItem *item = FindPlaylistItem(core, idManager, *trackId);
 					   if (!item)
 						   return {};
 					   std::string result = player::TrackFile(core, item);

@@ -8,6 +8,7 @@ import { Icon } from '@/app/_components/icons';
 import { ListToolbar } from '@/app/_components/lists';
 import toolbarStyles from '@/app/_components/lists/ListToolbar.module.scss';
 import { useItemRemoval } from '@/app/_components/playlists';
+import { useErrorToast } from '@/app/_components/toast';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { favoritesSortModes, useFavorites } from '@/app/_state/Favorites';
 import { media } from '@/app/_styles/media';
@@ -18,6 +19,7 @@ import { GroupingDialog } from './GroupingDialog';
 
 export function FavoritesToolbar() {
     const { t } = useTranslation();
+    const showError = useErrorToast();
     const docked = useMediaQuery(media.drawerDocked);
     const mode = useFavoritesMode();
     const favorites = useFavorites();
@@ -99,13 +101,13 @@ export function FavoritesToolbar() {
                         label: t('playlist.enqueue'),
                         icon: 'playlist_add',
                         disabled: mode.nothingSelected,
-                        onSelect: () => void enqueueSelected(false),
+                        onSelect: () => void enqueueSelected(false).catch(showError),
                     },
                     {
                         label: t('playlist.enqueueFirst'),
                         icon: 'playlist_play',
                         disabled: mode.nothingSelected,
-                        onSelect: () => void enqueueSelected(true),
+                        onSelect: () => void enqueueSelected(true).catch(showError),
                     },
                     {
                         label: t('favorites.remove'),

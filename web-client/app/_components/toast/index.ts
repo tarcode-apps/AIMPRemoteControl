@@ -1,1 +1,1 @@
-export { useToast } from './Toast';
+export { ToastProvider, useErrorToast, useToast } from './Toast';

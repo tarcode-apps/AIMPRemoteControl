@@ -269,15 +269,13 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 									  { return player::AddFiles(core, playlistId, uris); }));
 		return nlohmann::json::object(); });
 
-	endpoints.MapApiUpload(R"(/api/v1/playlists/([^/]+)/upload)", [core = FCore, &settings = FSettings](const ApiRequest &request, const std::vector<HttpUploadedFile> &files) -> nlohmann::json
+	endpoints.MapApiUpload(R"(/api/v1/playlists/([^/]+)/upload)", [core = FCore, &settings = FSettings](const ApiRequest &request, IUploadBody &body) -> nlohmann::json
 			   {
 		const std::string playlistId = request.PathMatches.at(0);
 		const Settings::FeatureSettings features = settings.Get().Features;
 		if (!features.UploadTracks)
 			throw ApiError(403, "uploadDisabled");
-		if (files.empty())
-			throw ApiError(400, "invalidBody");
-		// Nothing is written for a playlist that cannot take the files.
+		// Nothing is read or written for a playlist that cannot take the files.
 		ThrowUnlessOk(RunOnMainThread(core, [&]
 									  {
 			IAIMPPlaylist *playlist = nullptr;
@@ -285,14 +283,23 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 			if (playlist)
 				playlist->Release();
 			return writable; }));
-		std::vector<player::UploadedFile> uploads;
-		for (const HttpUploadedFile &file : files)
-			uploads.push_back({file.FileName.empty() ? file.Name : file.FileName, file.Content});
-		const player::SavedUploads saved = player::SaveUploads(features.EffectiveUploadFolder(), uploads);
+		player::UploadWriter writer(features.EffectiveUploadFolder());
+		if (!writer.HasRoomFor(body.DeclaredSize()))
+			throw ApiError(507, "uploadNoSpace");
+		const bool whole = body.ReadFiles([&](const UploadPart &part)
+										  { return writer.Begin(part.FileName); },
+										  [&](const char *data, std::size_t size)
+										  { return writer.Write(data, size); });
+		const player::SavedUploads saved = writer.Finish();
 		if (saved.Failure == player::UploadFailure::NoSpace)
 			throw ApiError(507, "uploadNoSpace");
 		if (saved.Failure != player::UploadFailure::None)
 			throw ApiError(500, "uploadFailed");
+		if (!whole || saved.Paths.empty())
+		{
+			writer.Abandon();
+			throw ApiError(400, "invalidBody");
+		}
 		ThrowUnlessOk(RunOnMainThread(core, [&]
 									  { return player::AddFiles(core, playlistId, saved.Paths); }));
 		return nlohmann::json::object(); });
@@ -334,7 +341,7 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 	endpoints.MapApi(HttpMethod::Patch, R"(/api/v1/playlists/([^/]+)/items/(\d+)/mark)", [core = FCore](const ApiRequest &request) -> nlohmann::json
 			   {
 		const std::string playlistId = request.PathMatches.at(0);
-		const std::int32_t index = std::stoi(request.PathMatches.at(1));
+		const std::int32_t index = PathNumber(request, 1, "itemNotFound");
 		const nlohmann::json &body = request.Body;
 		if (!body.is_object() || !body.contains("mark") || !body["mark"].is_number_unsigned() || body["mark"].get<std::int32_t>() > 5)
 			throw ApiError(400, "invalidBody");
@@ -346,7 +353,7 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 	endpoints.MapApi(HttpMethod::Patch, R"(/api/v1/playlists/([^/]+)/items/(\d+)/enabled)", [core = FCore](const ApiRequest &request) -> nlohmann::json
 			   {
 		const std::string playlistId = request.PathMatches.at(0);
-		const std::int32_t index = std::stoi(request.PathMatches.at(1));
+		const std::int32_t index = PathNumber(request, 1, "itemNotFound");
 		const bool enabled = EnabledBody(request.Body);
 		ThrowUnlessOk(RunOnMainThread(core, [&]
 									  { return player::SetItemEnabled(core, playlistId, index, enabled); }));
@@ -464,7 +471,7 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 			   { return ApplyGroupPatch(core, events, request, request.PathMatches.at(0), std::nullopt); });
 
 	endpoints.MapApi(HttpMethod::Patch, R"(/api/v1/playlists/([^/]+)/groups/(\d+))", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
-			   { return ApplyGroupPatch(core, events, request, request.PathMatches.at(0), std::stoi(request.PathMatches.at(1))); });
+			   { return ApplyGroupPatch(core, events, request, request.PathMatches.at(0), PathNumber(request, 1, "groupNotFound")); });
 
 	endpoints.MapApi(HttpMethod::Post, R"(/api/v1/playlists/([^/]+)/sort)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {

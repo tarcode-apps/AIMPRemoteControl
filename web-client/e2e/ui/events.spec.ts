@@ -13,6 +13,7 @@ test.describe('events', () => {
         playlists,
     }) => {
         test.skip(!!process.env.E2E_PLAYER_URL, 'needs the throwaway player, which E2E_PLAYER_URL replaces');
+        test.setTimeout(120_000);
         const before = await playlists.create({ name: 'rc-e2e Gannet' });
         await new PlaylistScreen(app, before.name).open();
 
@@ -26,6 +27,7 @@ test.describe('events', () => {
 
         const after = await playlists.create({ name: 'rc-e2e Gannet 2' });
         await app.openDrawer();
-        await expect(app.playlistLink(after.name)).toBeVisible();
+        // The retries during the restart may have grown to their cap of 30 s.
+        await expect(app.playlistLink(after.name)).toBeVisible({ timeout: 35_000 });
     });
 });

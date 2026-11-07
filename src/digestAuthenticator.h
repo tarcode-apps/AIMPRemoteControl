@@ -1,9 +1,11 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <mutex>
+#include <set>
 #include <string>
 
 #include "settings.h"
@@ -31,9 +33,9 @@ private:
 	static constexpr std::chrono::minutes FailedAttemptRetention{5};
 
 	std::int64_t NowSeconds() const;
-	std::string NonceSecret() const;
+	std::string NonceMac(const std::string &ts) const;
 	std::string MakeNonce() const;
-	// 0 = invalid, 1 = valid, 2 = well-formed but expired (challenge with stale=true)
+	// 0 = invalid, 1 = valid, 2 = expired (challenge with stale=true)
 	int CheckNonce(const std::string &nonce) const;
 	void Challenge(httplib::Response &res, bool stale) const;
 
@@ -47,4 +49,16 @@ private:
 
 	mutable std::mutex FAttemptsMutex;
 	mutable std::map<std::string, std::chrono::steady_clock::time_point> FLastFailure;
+
+	// The nonce counts each (nonce, cnonce) has signed with, kept while the nonce
+	// is valid; a count used twice is refused.
+	bool FirstUse(const std::string &nonce, const std::string &cnonce, std::uint32_t nc) const;
+	struct SeenCounts
+	{
+		std::int64_t Issued = 0;
+		std::set<std::uint32_t> Counts;
+	};
+	mutable std::mutex FSeenMutex;
+	mutable std::map<std::string, SeenCounts> FSeen;
+	mutable std::int64_t FLastSeenPrune = 0;
 };

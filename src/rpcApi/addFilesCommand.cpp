@@ -10,17 +10,12 @@
 
 #include "apiCore.h"
 #include "aimpHelper.h"
+#include "helpers/legacyErrors.h"
 #include "helpers/idLookup.h"
 #include "helpers/permissions.h"
 #include "mainThreadRunner.h"
 #include "helpers/remoteControlIdManager.h"
 #include "settings.h"
-
-namespace
-{
-	constexpr int ErrorPlaylistNotFound = 20;
-	constexpr int ErrorAddFailed = 27;
-}
 
 void rpcapi::AddFilesCommand::Register(IEndpointRouteBuilder &endpoints)
 {

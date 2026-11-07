@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -30,10 +31,12 @@ namespace player
 		bool Grouped = false;
 		std::string GroupingTemplate;
 		bool GroupAutoMerge = false;
-		std::optional<std::uint32_t> ContentCrc32;
 	};
 
-	std::vector<PlaylistInfo> GetPlaylists(IAIMPCore *core, bool withContentCrc32 = false);
+	std::vector<PlaylistInfo> GetPlaylists(IAIMPCore *core);
+
+	// The file of every item of a loaded playlist, in order, as the player lists them.
+	void VisitPlaylistFiles(IAIMPCore *core, const std::string &playlistId, const std::function<void(const std::string &file)> &visit);
 
 	// The new playlist's id, empty when the player refused. With an empty name the
 	// player names the playlist itself, by its content once it has some.

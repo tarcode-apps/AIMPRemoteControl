@@ -8,6 +8,7 @@
 #include "getPlayerControlPanelStateCommand.h"
 #include "getPlaylistsCommand.h"
 #include "mainThreadRunner.h"
+#include "requestScope.h"
 #include "schedulerCommand.h"
 #include "stateUpdateEvents.h"
 
@@ -36,7 +37,12 @@ void rpcapi::SubscribeOnAIMPStateUpdateEventCommand::Register(IEndpointRouteBuil
 			{
 				const StateUpdateEvents::Kind kind = KindFor(params.value("event", std::string()));
 
-				if (!events.Wait(kind, LongPollTimeout) && events.IsStopped())
+				const auto slot = requestScope::TakeLongRequestSlot();
+				if (!slot)
+					throw RpcError(-32000, "too many pending requests");
+				// A client that went away or a listener that closes ends the wait
+				// early, answered as a timeout is.
+				if (!events.Wait(kind, LongPollTimeout, requestScope::Cancelled) && events.IsStopped())
 					throw RpcError(-32000, "server is stopping");
 
 				switch (kind)

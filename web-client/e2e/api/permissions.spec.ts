@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { expect, test, withPluginSettings } from '../fixtures';
 import { legacyPlaylistId, legacyTrackIds } from '../lib/legacy';
+import { unreachableStreamUrl } from '../lib/streams';
 
 const encode = encodeURIComponent;
 
@@ -112,7 +113,7 @@ test.describe('with browsing disallowed', () => {
         const refused = await api.post(route, { files: [file] });
         expect(refused.status).toBe(403);
         expect(refused.error?.code).toBe('browseFilesDisabled');
-        expect((await api.post(route, { urls: ['http://127.0.0.1:9/radio'] })).status).toBe(200);
+        expect((await api.post(route, { urls: [unreachableStreamUrl] })).status).toBe(200);
         await expect.poll(() => api.playlistItemCount(playlist.id)).toBe(1);
 
         const legacyId = await legacyPlaylistId(api, playlist.name);

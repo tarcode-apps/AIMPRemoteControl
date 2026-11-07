@@ -17,7 +17,7 @@ real-time push of player state. The protocol is documented in
 
 Security is opt-in and configured in the player: HTTP Digest authentication,
 per-feature permissions (browsing the computer's files, deleting tracks from
-disk, uploading tracks, timer), and per-interface listening — an excluded
+disk, downloading and uploading tracks, timer), and per-interface listening — an excluded
 network interface has no open port at all. Browsing and uploading are separate
 permissions for the web client; the Android app reaches the file browser
 through its upload menu, so there it needs both.
@@ -36,7 +36,8 @@ targets the app's last released version (2.0.31).
 ## Installation
 
 1. Download `aimp_remote_control.aimppack` from [Releases](../../releases) (or
-   the artifact of a build in [Actions](../../actions)).
+   the artifact of a build in [Actions](../../actions); CI builds on `v*` tags
+   and on request).
 2. Open it with AIMP: double-click it or drop it onto the player. If
    double-clicking does nothing, open *Options → Plugins* and click *install*.
    The package contains the builds for all platforms; AIMP picks the right one.
@@ -55,7 +56,7 @@ Open *Options → Plugins → Remote Control*:
   an interface to stop listening on it.
 - **Client permissions** — what the app is allowed to do beyond playback.
   Everything here is off by default, including browsing the computer's files
-  from the app.
+  from the app, except downloading tracks to the client.
 - **Require authentication** — username and password the app must use. It
   guards the API, not the pages: `wwwroot/` is served to anyone, while every
   command, cover and track transfer needs the credentials. Recommended on any
@@ -144,7 +145,11 @@ so build with `--debug`.
 | `src/plugin.cpp` | AIMP plugin entry point, wiring of servers and commands |
 | `src/remoteControlServer.*` | HTTP/JSON‑RPC server (one listener per allowed address) |
 | `src/serviceDiscoveryServer.*` | UDP discovery responder |
-| `src/rpcApi/` | one class per RPC method / HTTP endpoint |
+| `src/digestAuthenticator.*` | HTTP Digest authentication and the failed-attempt limiter |
+| `src/stateUpdateEvents.*` | what changes in the player, for the long polls of the app and the events of the web client |
+| `src/player/` | protocol-neutral operations on the player, shared by both protocols |
+| `src/rpcApi/` | the frozen protocol of the app: one class per RPC method / HTTP endpoint |
+| `src/webApi/` | the `/api/v1` of the web client: one controller per resource |
 | `src/helpers/` | AIMP SDK helpers, network interface enumeration and watcher, JSON helpers |
 | `src/optionsFrame.*`, `Langs/` | options page and its localization |
 | `src/sleepTimer.*` | sleep timer behind the `Scheduler` command and `/api/v1/timer` |
@@ -152,7 +157,8 @@ so build with `--debug`.
 | `web-client/` | the web client (Next.js, static export); builds into `web-client/out/` |
 | `web-client/e2e/` | end-to-end tests of the API and the client against a throwaway AIMP (Playwright) |
 | `tests/` | unit tests of the code that needs no player; `test-windows.ps1` / `test-linux.sh` run them |
-| `docs/remote-control-protocol.md` | protocol reference |
+| `docs/remote-control-protocol.md` | the app's protocol, frozen |
+| `docs/web-api.md` | the web client's `/api/v1` |
 | `docs/catalog/` | files for the entry in the AIMP addons catalog |
 
 ## License

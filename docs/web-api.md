@@ -14,7 +14,7 @@ with the client that ships in the same package.
 | Identifiers | a playlist `id` is AIMP's own playlist id (string), stable across player restarts |
 | Field names | camelCase |
 | Errors | HTTP status plus `{"error": {"code": string, "message": string}}`; `code` is stable, `message` is for humans and comes in the language of the player's interface (`Langs/*.lng`, section `[AIMPRemoteControlErrors]`, keyed by `code`). An error may carry more fields, which its description names |
-| Limits | request bodies above 16 MB are refused with `413`; only the [upload](#post-apiv1playlistsidupload) takes up to 2 GB |
+| Limits | request bodies above 16 MB, and chunked ones, whose size is unknown, are refused with `413`; only the [upload](#post-apiv1playlistsidupload) takes up to 2 GB |
 
 Error codes so far:
 
@@ -41,7 +41,7 @@ Error codes so far:
 | `403` | `downloadDisabled` | downloading tracks is not allowed in the plugin settings |
 | `403` | `uploadDisabled` | uploading tracks is not allowed in the plugin settings |
 | `507` | `uploadNoSpace` | the drive of the upload folder has no room for the uploaded file |
-| `500` | `uploadFailed` | the uploaded file could not be written into the upload folder; nothing of it is left behind |
+| `500` | `uploadFailed` | a file could not be written into the upload folder; nothing of that file is left behind, the files of the parts before it stay, not added |
 | `403` | `schedulerDisabled` | timer functions are not allowed in the plugin settings |
 | `404` | `presetNotFound` | the player's equalizer library has no preset of this name |
 | `409` | `presetExists` | another equalizer preset already has the new name |
@@ -78,7 +78,9 @@ All loaded playlists in the player's order.
 by the plugin: it starts at 1 when the playlist is loaded, grows on every
 change of its name, content, tags, statistics, read-only flag, track switches
 or view and grouping settings, and is
-not stable across player restarts. The bookkeeping the player does when it
+not stable across player restarts. Saving any of the player's options moves
+the revision of every playlist, since the view settings live there and the
+player does not say which changed. The bookkeeping the player does when it
 starts a track is not counted; a change of content, tags or marks counts
 within a second of being made. A player older than v6.00 build 3090 does not
 report changes of its view, formatting and grouping settings, so there they
@@ -223,8 +225,11 @@ Errors: `400 invalidBody`, `403 browseFilesDisabled`, `404 playlistNotFound`,
 to the playlist. Only the file name part of the name is used; characters the
 file system refuses become `_`, a clash gets a ` (2)`, ` (3)`… suffix. The
 playlist is checked before anything is written. Needs the permission to
-upload tracks. The body may be up to 2 GB; the web client sends one file per
-request. The response is an empty object.
+upload tracks. The body may be up to 2 GB; the files go to disk as they
+arrive, a body that breaks off leaves none of them behind (`400 invalidBody`),
+and a request refused before its body is answered at once with the connection
+closed. The web client sends one file per request. The response is an empty
+object.
 
 Errors: `400 invalidBody` (no file parts), `403 uploadDisabled`,
 `404 playlistNotFound`, `403 playlistReadOnly`, `507 uploadNoSpace`,
@@ -1201,8 +1206,9 @@ change; the payload is a JSON object.
 
 A track switch raises several player changes within a few milliseconds, with
 a stopped player in between, and a slider dragged in the player's window raises
-an effects change per step; the stream waits for a 100 ms lull and sends one
-`player` or `effects` event with the state after the burst.
+an effects change per step, as one queue request raises a queue change per
+item; the stream waits for a 100 ms lull and sends one `player`, `queue` or
+`effects` event with the state after the burst.
 
 The `ping` keeps intermediaries from closing an idle connection, lets the
 server notice a client that went away, and lets a client notice a connection
@@ -1215,4 +1221,12 @@ up for good — a client that wants to outlive a restart reopens the stream
 itself.
 
 Each open stream occupies one worker thread of the HTTP server, like the
-long polls of the frozen protocol.
+long polls of the frozen protocol, so they are capped together: at most 16 per
+client address, and 56 for all clients of a network interface (of its 64
+workers). A stream
+beyond that is answered `503` with `Retry-After: 3`, which a browser's
+`EventSource` takes as final; the web client reopens it itself, 3 s after a
+failure and twice as long after each further one in a row, up to 30 s. A stream whose
+client went away, or on an interface that goes away, ends within a second and
+gives its place back. Connections that find every
+worker busy wait in a queue of 64, beyond which they are closed.

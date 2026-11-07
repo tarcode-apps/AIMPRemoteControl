@@ -1,6 +1,10 @@
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 
+// A station nothing answers at: port 9 is the discard service, closed on a
+// desktop. The player lists it like any other and fails to play it.
+export const unreachableStreamUrl = 'http://127.0.0.1:9/radio';
+
 const sampleRate = 22050;
 // A second of 16-bit mono silence.
 const second = Buffer.alloc(sampleRate * 2);

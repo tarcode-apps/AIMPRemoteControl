@@ -137,7 +137,7 @@
     flex: none;
     // The glyph sits a pixel right of its box; moved back onto the text's edge.
     margin-left: -1px;
-    font-size: 18px;
+    --icon-size: 18px;
     // As the filled stars beside it.
     color: var(--color-text-secondary);
 }
@@ -198,14 +198,13 @@
 }
 
 .menuButton {
+    --icon-button-size: 32px;
     flex: none;
-    width: 32px;
-    height: 32px;
     margin: 0 -8px;
 }
 
 .menuButtonOpen {
-    background: var(--color-hover);
+    --icon-button-background: var(--color-hover);
 }
 
 .message {

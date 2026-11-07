@@ -110,7 +110,7 @@ export function usePlaylistGroups(id: string, enabled: boolean, search = '') {
         queryFn: ({ signal }) =>
             request<PlaylistGroups>(
                 'GET',
-                `/playlists/${encodeURIComponent(id)}/groups?${searchParam(search).slice(1)}`,
+                `/playlists/${encodeURIComponent(id)}/groups${searchParam(search).replace('&', '?')}`,
                 {
                     signal,
                 },
@@ -137,22 +137,21 @@ export function useSetGroupExpanded(id: string) {
             ),
         onMutate: async ({ index, expanded }) => {
             await client.cancelQueries({ queryKey: key });
-            const previous = client.getQueriesData<PlaylistGroups>({ queryKey: key });
-            client.setQueriesData<PlaylistGroups>(
-                { queryKey: key },
-                data =>
-                    data && {
+            const predictions: Prediction[] = [];
+            for (const [queryKey, data] of client.getQueriesData<PlaylistGroups>({ queryKey: key })) {
+                if (!data) continue;
+                predictions.push(
+                    predict(client, queryKey, data, {
                         ...data,
                         groups: data.groups.map(group =>
                             index === undefined || group.index === index ? { ...group, expanded } : group,
                         ),
-                    },
-            );
-            return { previous };
+                    }),
+                );
+            }
+            return predictions;
         },
-        onError: (_error, _variables, context) => {
-            for (const [queryKey, data] of context?.previous ?? []) client.setQueryData(queryKey, data);
-        },
+        onError: (_error, _variables, predictions) => revert(client, predictions ?? []),
     });
 }
 

@@ -1,3 +1,4 @@
+import { clamp } from '@/app/_utils/math';
 import { useEffect, useEffectEvent, useRef, type CSSProperties, type PointerEvent } from 'react';
 
 type View = { scale: number; x: number; y: number };
@@ -19,7 +20,6 @@ const flingWindow = 80; // ms
 const flingTimeConstant = 325; // ms
 const minFlingSpeed = 0.05; // px per ms
 
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const middle = (points: Point[]): Point => ({
     x: points.reduce((sum, p) => sum + p.x, 0) / points.length,
     y: points.reduce((sum, p) => sum + p.y, 0) / points.length,

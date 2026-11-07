@@ -1,14 +1,30 @@
 #include "getPlaylistsCommand.h"
 
+#include <cstdint>
+#include <string>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
 
+#include "crc32.h"
 #include "mainThreadRunner.h"
 #include "player/playlists.h"
 #include "helpers/remoteControlIdManager.h"
+
+namespace
+{
+	// What the app compares to tell a playlist's content changed: the CRC32 of
+	// its file names run together.
+	std::uint32_t ContentCrc32(IAIMPCore *core, const std::string &playlistId)
+	{
+		std::uint32_t crc = 0;
+		player::VisitPlaylistFiles(core, playlistId, [&](const std::string &file)
+								   { crc = Crc32Update(crc, file.data(), file.size()); });
+		return crc;
+	}
+}
 
 nlohmann::json rpcapi::GetPlaylistsCommand::BuildPlaylists(IAIMPCore *core, RemoteControlIdManager &idManager,
 												   const std::vector<std::string> &fields)
@@ -17,7 +33,7 @@ nlohmann::json rpcapi::GetPlaylistsCommand::BuildPlaylists(IAIMPCore *core, Remo
 	const bool withCrc32 = fieldSet.count("crc32") > 0;
 
 	nlohmann::json result = nlohmann::json::array();
-	for (const player::PlaylistInfo &playlist : player::GetPlaylists(core, withCrc32))
+	for (const player::PlaylistInfo &playlist : player::GetPlaylists(core))
 	{
 		nlohmann::json out = nlohmann::json::object();
 		if (fieldSet.count("id"))
@@ -29,7 +45,7 @@ nlohmann::json rpcapi::GetPlaylistsCommand::BuildPlaylists(IAIMPCore *core, Remo
 		if (fieldSet.count("entries_count"))
 			out["entries_count"] = playlist.ItemCount;
 		if (withCrc32)
-			out["crc32"] = *playlist.ContentCrc32;
+			out["crc32"] = ContentCrc32(core, playlist.Id);
 		result.push_back(std::move(out));
 	}
 	return result;

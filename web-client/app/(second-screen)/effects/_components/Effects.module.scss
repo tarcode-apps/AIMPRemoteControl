@@ -338,7 +338,7 @@
 }
 
 .active {
-    color: var(--color-accent);
+    --toolbar-button-color: var(--color-accent);
 }
 
 .auto {
@@ -385,10 +385,10 @@ dialog.translucent {
 .manageButton {
     flex: none;
     margin-top: 16px;
-    color: var(--color-text-secondary);
+    --icon-button-color: var(--color-text-secondary);
 
     &[aria-pressed="true"] {
-        color: var(--color-accent);
+        --icon-button-color: var(--color-accent);
     }
 }
 
@@ -417,11 +417,10 @@ dialog.translucent {
 
 .presetAction {
     --icon-size: 20px;
+    --icon-button-size: 40px;
+    --icon-button-color: var(--color-text-secondary);
 
     flex: none;
-    width: 40px;
-    height: 40px;
-    color: var(--color-text-secondary);
 }
 
 .fieldLabel {

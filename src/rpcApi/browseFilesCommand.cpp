@@ -7,6 +7,7 @@
 
 #include <nlohmann/json.hpp>
 #include "apiCore.h"
+#include "helpers/legacyErrors.h"
 #include "helpers/permissions.h"
 #include "mainThreadRunner.h"
 #include "player/files.h"
@@ -14,8 +15,6 @@
 
 namespace
 {
-	constexpr int ErrorPathInaccessible = 33;
-
 	nlohmann::json Roots()
 	{
 		nlohmann::json labels = nlohmann::json::array(), paths = nlohmann::json::array();

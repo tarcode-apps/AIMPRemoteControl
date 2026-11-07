@@ -80,8 +80,8 @@ player::MutationResult player::GetCoverTarget(IAIMPCore *core, const std::string
 	IAIMPFileInfo *info = nullptr;
 	{
 		const PlaylistItemContext ctx(fileUriService, item);
-		const bool isUrl = fileUriService && ctx.FileUri && fileUriService->IsURL(ctx.FileUri) == S_OK;
-		if (isUrl && ctx.FileUri)
+		const bool isUrl = ItemIsUrl(ctx);
+		if (isUrl)
 			info = PlayingFileInfoFor(core, IAIMPStringToString(ctx.FileUri));
 		if (!info && ctx.FileInfo)
 		{

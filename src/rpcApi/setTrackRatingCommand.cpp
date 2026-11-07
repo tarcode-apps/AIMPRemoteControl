@@ -10,14 +10,10 @@
 #include "apiCore.h"
 #include "apiPlaylists.h"
 #include "aimpHelper.h"
+#include "helpers/legacyErrors.h"
 #include "helpers/idLookup.h"
 #include "mainThreadRunner.h"
 #include "helpers/remoteControlIdManager.h"
-
-namespace
-{
-	constexpr int ErrorTrackNotFound = 21;
-}
 
 void rpcapi::SetTrackRatingCommand::Register(IEndpointRouteBuilder &endpoints)
 {

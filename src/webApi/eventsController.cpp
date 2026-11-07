@@ -10,6 +10,7 @@
 #include "helpers/coverIndex.h"
 #include "playerController.h"
 #include "pluginInfo.h"
+#include "requestScope.h"
 #include "settings.h"
 #include "settingsController.h"
 #include "stateUpdateEvents.h"
@@ -88,7 +89,11 @@ void webapi::EventsController::Register(IEndpointRouteBuilder &endpoints)
 		StateUpdateEvents::Versions seen = events.Current();
 		while (!events.IsStopped())
 		{
-			std::bitset<StateUpdateEvents::KindCount> changed = events.WaitAny(seen, KeepAliveInterval);
+			std::bitset<StateUpdateEvents::KindCount> changed = events.WaitAny(seen, KeepAliveInterval, requestScope::Cancelled);
+			// The client went away, or the listener is closing and the client
+			// reconnects wherever it still can.
+			if (requestScope::Cancelled())
+				return;
 			if (changed.none())
 			{
 				if (!events.IsStopped() && !stream.Ping())

@@ -7,18 +7,10 @@
 
 #include <nlohmann/json.hpp>
 
-#include "apiCore.h"
-#include "apiPlaylists.h"
-#include "aimpHelper.h"
-#include "helpers/idLookup.h"
+#include "helpers/legacyErrors.h"
 #include "mainThreadRunner.h"
 #include "helpers/remoteControlIdManager.h"
-
-namespace
-{
-	constexpr int ErrorPlaylistNotFound = 20;
-	constexpr int ErrorRenameFailed = 29;
-}
+#include "player/playlists.h"
 
 void rpcapi::PlaylistRenameCommand::Register(IEndpointRouteBuilder &endpoints)
 {
@@ -31,28 +23,8 @@ void rpcapi::PlaylistRenameCommand::Register(IEndpointRouteBuilder &endpoints)
 		const std::int32_t playlistId = params["playlist_id"].get<std::int32_t>();
 		const std::string newName = params["new_name"].get<std::string>();
 
-		const HRESULT result = RunOnMainThread(core, [&]() -> HRESULT
-		{
-			IAIMPPlaylist *playlist = FindPlaylist(core, idManager, playlistId);
-			if (!playlist)
-				return E_INVALIDARG;
-			HRESULT hr = E_FAIL;
-			IAIMPPlaylistProperties *props = nullptr;
-			if (Succeeded(playlist->QueryInterface(IID_IAIMPPlaylistProperties, reinterpret_cast<void **>(&props))) && props)
-			{
-				if (IAIMPString *name = StringToIAIMPString(core, newName))
-				{
-					hr = props->SetValueAsObject(AIMP_PLAYLIST_PROPID_NAME, name);
-					name->Release();
-				}
-				props->Release();
-			}
-			playlist->Release();
-			return hr;
-		});
-		if (result == E_INVALIDARG)
-			throw LocalizedRpcError(ErrorPlaylistNotFound, "renamePlaylistNotFound");
-		if (Failed(result))
-			throw LocalizedRpcError(ErrorRenameFailed, "renamePlaylistFailed");
+		ThrowUnlessOk(RunOnMainThread(core, [&]
+									  { return player::RenamePlaylist(core, idManager.PlaylistGetKey(playlistId), newName); }),
+					  {ErrorPlaylistNotFound, "renamePlaylistNotFound"}, {ErrorRenameFailed, "renamePlaylistFailed"});
 		return {{"success", true}}; });
 }

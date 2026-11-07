@@ -238,7 +238,13 @@ void rpcapi::StatusCommand::Register(IEndpointRouteBuilder &endpoints)
 		const int id = params["status_id"].get<int>();
 		std::optional<int> value;
 		if (params.contains("value") && params["value"].is_number())
-			value = static_cast<int>(std::lround(params["value"].get<double>()));
+		{
+			const double raw = params["value"].get<double>();
+			// Every status is a small number; rounding a huge one is undefined.
+			if (!std::isfinite(raw) || std::fabs(raw) > 1e6)
+				throw RpcError(-32602, "value out of range");
+			value = static_cast<int>(std::lround(raw));
+		}
 
 		const std::optional<int> result = RunOnMainThread(core, [&] { return Access(core, id, value); });
 		if (!result)

@@ -47,11 +47,19 @@ export class PlaylistScreen extends ListScreen {
     // The thumb beside the list, which drags it through, and the group name it
     // shows meanwhile.
     get scrollThumb(): Locator {
-        return this.list.locator('..').getByTestId('scroll-thumb');
+        return this.fastScroll.getByTestId('scroll-thumb');
     }
 
     get scrollLabel(): Locator {
-        return this.list.locator('..').getByTestId('scroll-label');
+        return this.fastScroll.getByTestId('scroll-label');
+    }
+
+    // The frame around this list and its thumb; a mobile keeps the neighbouring
+    // playlists' frames around too.
+    private get fastScroll(): Locator {
+        return this.app.main
+            .getByTestId('fast-scroll')
+            .filter({ has: this.app.page.getByRole('listbox', { name: this.name, exact: true }) });
     }
 
     // The three-state switch of a group's header.

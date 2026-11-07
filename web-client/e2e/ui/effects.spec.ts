@@ -5,9 +5,9 @@ import { t } from './strings';
 test.describe('equalizer', () => {
     let effects: EffectsPage;
 
-    test.beforeEach(async ({ api, page }) => {
+    test.beforeEach(async ({ api, app }) => {
         await api.resetEffects();
-        effects = new EffectsPage(page);
+        effects = new EffectsPage(app);
         await effects.open();
     });
 
@@ -107,9 +107,9 @@ test.describe('equalizer', () => {
 test.describe('equalizer presets', () => {
     let effects: EffectsPage;
 
-    test.beforeEach(async ({ api, page }) => {
+    test.beforeEach(async ({ api, app }) => {
         await api.resetEffects();
-        effects = new EffectsPage(page);
+        effects = new EffectsPage(app);
         await effects.open();
     });
 

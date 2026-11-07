@@ -7,17 +7,19 @@ import { useMoveQueueItems, useQueue, useRemoveFromQueue } from '@/app/_api/queu
 import type { QueueItem } from '@/app/_api/types';
 import {
     FastScroll,
+    fixedRowView,
     ItemRow,
+    overscanRows,
     PlaylistRows,
     SkeletonRow,
     thumbnailMargin,
     twoLineRowHeight,
     useActiveRow,
     usePlaylistDrag,
-    type RowView,
 } from '@/app/_components/lists';
 import styles from '@/app/_components/lists/ListPage.module.scss';
 import { useRowMenu } from '@/app/_components/menus';
+import { useErrorToast } from '@/app/_components/toast';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
 import { useTrackActions } from '@/app/_state/useTrackActions';
@@ -28,19 +30,11 @@ import { useId, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type Mouse
 import { useTranslation } from 'react-i18next';
 import { useQueueMode } from './QueueMode';
 
-const overscanRows = 6;
 const pendingRows = 6;
-const view: RowView = {
-    showNumbers: true,
-    showThumbnails: true,
-    showSecondLine: true,
-    showDuration: true,
-    showMarks: false,
-    showSwitches: false,
-};
 
 export function QueuePage() {
     const { t } = useTranslation();
+    const showError = useErrorToast();
     const docked = useMediaQuery(media.drawerDocked);
     const scrollRef = useRef<HTMLDivElement>(null);
     const listId = useId();
@@ -77,7 +71,8 @@ export function QueuePage() {
         {
             label: t('queue.remove'),
             icon: 'delete',
-            onSelect: () => remove.mutate({ positions: [item.position], revision: queue?.revision }),
+            onSelect: () =>
+                remove.mutate({ positions: [item.position], revision: queue?.revision }, { onError: showError }),
         },
     ]);
 
@@ -96,7 +91,12 @@ export function QueuePage() {
             active.select({ kind: 'item', position: target });
             move.mutate(
                 { positions: [items[row].position], target, revision: queue?.revision },
-                { onError: () => drag.reset() },
+                {
+                    onError: error => {
+                        drag.reset();
+                        showError(error);
+                    },
+                },
             );
         },
     });
@@ -136,7 +136,7 @@ export function QueuePage() {
     const rowId = (row: number) => `${listId}-${row}`;
     const widestNumber = `${'0'.repeat(Math.max(1, String(items.length).length))}.`;
     const rowProps = {
-        view,
+        view: fixedRowView,
         docked,
         thumbnailSize: twoLineRowHeight - 2 * thumbnailMargin,
         widestNumber,

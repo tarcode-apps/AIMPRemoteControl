@@ -3,6 +3,7 @@
 import { usePlayTrack } from '@/app/_api/player';
 import { useEnqueue } from '@/app/_api/queue';
 import type { MenuItem } from '@/app/_components/menus';
+import { useErrorToast } from '@/app/_components/toast';
 import { useTranslation } from 'react-i18next';
 import { useNavigation } from './Navigation';
 import { usePlaylistSelection } from './PlaylistSelection';
@@ -15,7 +16,7 @@ export type TrackRef = {
 };
 
 // A track by its file, which outlives the playlist's revisions.
-export type TrackFile = {
+type TrackFile = {
     playlistId: string;
     fileUri: string;
 };
@@ -26,6 +27,7 @@ function trackInfoHref({ playlistId, fileUri }: TrackFile): string {
 
 export function useTrackActions() {
     const { t } = useTranslation();
+    const showError = useErrorToast();
     const enqueue = useEnqueue();
     const playTrack = usePlayTrack();
     const { goToTrack, showTrack } = usePlaylistSelection();
@@ -34,12 +36,12 @@ export function useTrackActions() {
     return {
         // From a screen other than its playlist: the playlist opens on it later.
         play(track: TrackRef) {
-            playTrack.mutate(track);
+            playTrack.mutate(track, { onError: showError });
             goToTrack(track);
         },
         enqueueItems: ({ playlistId, index, revision }: TrackRef): MenuItem[] => {
             const enqueueTrack = (atBeginning: boolean) =>
-                enqueue.mutate({ playlistId, indexes: [index], atBeginning, revision });
+                enqueue.mutate({ playlistId, indexes: [index], atBeginning, revision }, { onError: showError });
             return [
                 { label: t('playlist.enqueue'), icon: 'playlist_add', onSelect: () => enqueueTrack(false) },
                 { label: t('playlist.enqueueFirst'), icon: 'playlist_play', onSelect: () => enqueueTrack(true) },

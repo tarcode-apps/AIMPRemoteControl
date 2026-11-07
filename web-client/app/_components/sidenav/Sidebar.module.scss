@@ -124,14 +124,10 @@
 }
 
 .menuButton {
+    --icon-button-size: 32px;
     position: absolute;
     top: 8px;
     right: 8px;
-    width: 32px;
-    height: 32px;
-    transition:
-        opacity 0.15s,
-        background-color 0.15s;
 
     @include mixins.hover-capable {
         opacity: 0;
@@ -145,7 +141,7 @@
 }
 
 .menuButtonOpen {
-    background: var(--color-hover);
+    --icon-button-background: var(--color-hover);
 }
 
 .error {

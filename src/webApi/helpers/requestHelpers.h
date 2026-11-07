@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cctype>
-#include <charconv>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -13,6 +12,7 @@
 #include <nlohmann/json.hpp>
 
 #include "apiErrors.h"
+#include "parseInt32.h"
 #include "player/playlistItems.h"
 #include "stateUpdateEvents.h"
 
@@ -79,14 +79,13 @@ namespace webapi
 		return values;
 	}
 
-	// The whole text as a number, or nothing.
-	inline std::optional<std::int32_t> ParseInt32(std::string_view text)
+	// A `\d+` capture of the route as a number; one too long for the type names nothing.
+	inline std::int32_t PathNumber(const ApiRequest &request, std::size_t match, const char *notFoundCode)
 	{
-		std::int32_t value = 0;
-		const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
-		if (error != std::errc() || end != text.data() + text.size())
-			return std::nullopt;
-		return value;
+		const std::optional<std::int32_t> value = ParseInt32(request.PathMatches.at(match));
+		if (!value)
+			throw ApiError(404, notFoundCode);
+		return *value;
 	}
 
 	inline std::int32_t QueryInt(const ApiRequest &request, const char *name, std::int32_t fallback, std::int32_t min, std::int32_t max)

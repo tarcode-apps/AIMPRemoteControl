@@ -18,8 +18,11 @@ import {
     DragHandle,
     FastScroll,
     GroupRow,
+    groupRowHeight,
     ItemRow,
     oneLineRowHeight,
+    overscanRows,
+    pageRange,
     pagesAround,
     pageSize,
     RowMenuIcon,
@@ -34,6 +37,7 @@ import {
 import styles from '@/app/_components/lists/ListPage.module.scss';
 import { menuSeparator, useRowMenu } from '@/app/_components/menus';
 import { useItemRemoval, useTrackDownload } from '@/app/_components/playlists';
+import { useErrorToast } from '@/app/_components/toast';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
@@ -46,8 +50,6 @@ import { useTranslation } from 'react-i18next';
 import { usePlaylistMode } from './PlaylistMode';
 import { usePlaylistLayout } from './usePlaylistLayout';
 
-const groupRowHeight = 40;
-const overscanRows = 6;
 const pendingRows = 12;
 const noFolding: ReadonlyMap<number, boolean> = new Map();
 // Where each playlist's list was scrolled to when it last left the screen: the
@@ -61,6 +63,7 @@ export type PlaylistPageProps = {
 
 export function PlaylistPage({ playlist }: PlaylistPageProps) {
     const { t } = useTranslation();
+    const showError = useErrorToast();
     const docked = useMediaQuery(media.drawerDocked);
     const scrollRef = useRef<HTMLDivElement>(null);
     const listId = useId();
@@ -157,7 +160,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
     );
     const queries = usePlaylistItems(
         playlist.id,
-        pages.map(page => ({ offset: page * pageSize, limit: pageSize, search: text })),
+        pages.map(page => ({ ...pageRange(page), search: text })),
     );
     const loaded = new Map(queries.flatMap((query, i) => (query.data ? [[pages[i], query.data] as const] : [])));
     const failed = [...layout.queries, ...queries].find(query => query.isError && !query.data);
@@ -200,7 +203,15 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
             const indexes = Array.from({ length: count }, (_, i) => firstIndex + i);
             // The cursor follows what was dragged to where it lands.
             active.select({ kind: 'item', position: target });
-            moveItems.mutate({ indexes, target, revision: playlist.revision }, { onError: () => drag.reset() });
+            moveItems.mutate(
+                { indexes, target, revision: playlist.revision },
+                {
+                    onError: error => {
+                        drag.reset();
+                        showError(error);
+                    },
+                },
+            );
         },
     });
     collapsed.current = drag.hidden;
@@ -229,11 +240,15 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
 
     const playTrack = usePlayTrack();
     const play = (item: PlaylistItem) =>
-        playTrack.mutate({ playlistId: playlist.id, index: item.index, revision: playlist.revision });
+        playTrack.mutate(
+            { playlistId: playlist.id, index: item.index, revision: playlist.revision },
+            { onError: showError },
+        );
     // The stars are too small for a finger; a phone rates in the player.
     const setMark = useSetItemMark();
     const onRate = docked
-        ? (item: PlaylistItem, mark: number) => setMark.mutate({ playlistId: playlist.id, index: item.index, mark })
+        ? (item: PlaylistItem, mark: number) =>
+              setMark.mutate({ playlistId: playlist.id, index: item.index, mark }, { onError: showError })
         : undefined;
     // The switches exist only while the playlist shows its column: hidden, the
     // player plays every track. Docked, the column is in the rows; a mobile
@@ -243,23 +258,30 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
     const setItemsEnabled = useSetItemsEnabled();
     const onSwitch = docked
         ? (item: PlaylistItem, enabled: boolean) =>
-              setItemEnabled.mutate({ playlistId: playlist.id, index: item.index, enabled })
+              setItemEnabled.mutate({ playlistId: playlist.id, index: item.index, enabled }, { onError: showError })
         : undefined;
     const switchMenuItem = (item: PlaylistItem) => ({
         // The icon shows the switch as it is, the label what the item does to it.
         label: t(item.enabled ? 'playlist.disable' : 'playlist.enable'),
         icon: item.enabled ? 'check_box' : 'check_box_outline_blank',
-        onSelect: () => setItemEnabled.mutate({ playlistId: playlist.id, index: item.index, enabled: !item.enabled }),
+        onSelect: () =>
+            setItemEnabled.mutate(
+                { playlistId: playlist.id, index: item.index, enabled: !item.enabled },
+                { onError: showError },
+            ),
     });
     const switchGroup = (group: PlaylistGroup, enabled: boolean) =>
-        setItemsEnabled.mutate({
-            playlistId: playlist.id,
-            revision: playlist.revision,
-            search: text,
-            groups: [group.index],
-            except: [],
-            enabled,
-        });
+        setItemsEnabled.mutate(
+            {
+                playlistId: playlist.id,
+                revision: playlist.revision,
+                search: text,
+                groups: [group.index],
+                except: [],
+                enabled,
+            },
+            { onError: showError },
+        );
     const { data: player } = usePlayer();
     const playingTrack = player?.track;
     // The index is only valid for the revision it was read at, and the snapshot and
@@ -287,7 +309,11 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
         if (searching || sorting) return;
         if (foldingHere)
             setFolded({ revision: playlist.revision, groups: new Map(folding).set(group.index, !group.expanded) });
-        else setExpanded.mutate({ index: group.index, expanded: !group.expanded, revision: playlist.revision });
+        else
+            setExpanded.mutate(
+                { index: group.index, expanded: !group.expanded, revision: playlist.revision },
+                { onError: showError },
+            );
     };
 
     const queuePositions = useQueuePositions();
@@ -322,17 +348,17 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
             {
                 label: t('playlist.enqueue'),
                 icon: 'playlist_add',
-                onSelect: () => void enqueueSelections([groupSelection(group)], false),
+                onSelect: () => void enqueueSelections([groupSelection(group)], false).catch(showError),
             },
             {
                 label: t('playlist.enqueueFirst'),
                 icon: 'playlist_play',
-                onSelect: () => void enqueueSelections([groupSelection(group)], true),
+                onSelect: () => void enqueueSelections([groupSelection(group)], true).catch(showError),
             },
             {
                 label: t('favorites.add'),
                 icon: 'heart_plus',
-                onSelect: () => void favoriteActions.addSelections([groupSelection(group)]),
+                onSelect: () => void favoriteActions.addSelections([groupSelection(group)]).catch(showError),
             },
             ...(switches && !docked
                 ? [
@@ -358,13 +384,15 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                 label: t('playlist.collapseAll'),
                 icon: 'unfold_less',
                 disabled: !foldable,
-                onSelect: () => setExpanded.mutate({ expanded: false, revision: playlist.revision }),
+                onSelect: () =>
+                    setExpanded.mutate({ expanded: false, revision: playlist.revision }, { onError: showError }),
             },
             {
                 label: t('playlist.expandAll'),
                 icon: 'unfold_more',
                 disabled: !foldable,
-                onSelect: () => setExpanded.mutate({ expanded: true, revision: playlist.revision }),
+                onSelect: () =>
+                    setExpanded.mutate({ expanded: true, revision: playlist.revision }, { onError: showError }),
             },
             menuSeparator,
             ...removal.selectionItems(() => ({ parts: [groupSelection(group)] }), playlist.readOnly),

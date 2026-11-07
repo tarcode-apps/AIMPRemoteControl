@@ -48,8 +48,8 @@ a missing header. Then, from the repo root:
 
 Artifacts land in `dist/<platform>/`: the binary plus `Langs/` and
 `THIRD-PARTY-NOTICES.txt` (generated at configure time from the submodules'
-license files). CI (`.github/workflows/build.yml`) runs the same scripts and
-packages everything into an `.aimppack`.
+license files). CI (`.github/workflows/build.yml`, on `v*` tags and manual
+dispatch) runs the same scripts and packages everything into an `.aimppack`.
 
 Notes:
 
@@ -146,7 +146,10 @@ Things that bite:
 - **Long polling.** The app keeps up to four `SubscribeOnAIMPStateUpdateEvent`
   requests pending (~10 min each) and opens a new TCP connection per request.
   Related: the digest-auth nonce lifetime (15 min) is deliberately longer than
-  the long-poll timeout.
+  the long-poll timeout. Long polls and SSE streams each hold a worker, so they
+  take a `requestScope::LongRequestSlot` (capped per client and per listener)
+  and wait with `requestScope::Cancelled`, which ends them when their listener
+  closes; `src/requestScope.h` explains the thread-local request context.
 - **Limits are asymmetric.** JSON-RPC bodies are capped at 16 MB, only
   registered upload endpoints may receive up to 2 GB. The cap is checked after
   authentication so an unauthorized client learns nothing about the limits;
@@ -157,11 +160,19 @@ Things that bite:
   answers 404 instead of a Digest challenge. Existence is deliberately not part
   of that test: gating it on the file would turn every unknown path into a login
   prompt, which is what browsers hit on `/.well-known/…` and
-  `/apple-touch-icon.png`. `/RPC_JSON`, the uploads and the registered `AddGet`
+  `/apple-touch-icon.png`. `/RPC_JSON`, the uploads and the registered `MapGet`
   endpoints stay authenticated. Failed credentials are limited to one verification per second
   per client address (`FailedAttemptInterval`); the limiter deliberately
   re-challenges instead of sleeping, because a sleep would tie up a worker
-  thread from the same httplib pool the long polls already draw on.
+  thread from the same httplib pool the long polls already draw on. Digest
+  takes `qop=auth` only, and an `nc` used twice is answered with `stale=true`,
+  never a plain `401`: the app sends repeats of its own, resends silently on
+  `stale` and fails with "Unauthorized" on a plain challenge (verified against
+  captures of the app). A download Android's DownloadManager resumes with the
+  app's one header fails; that was accepted. The signed `uri` is compared to
+  the request as a resource, not as text (the Next dev proxy drops an empty
+  `?`), and a mismatch is a `400`, never a challenge: a challenge makes a
+  browser ask for the password again.
 - **The web client.** `web-client/` is a Next.js app (App Router,
   `output: 'export'`), built separately from the plugin: `npm run build` writes
   `web-client/out/`, and the `web-client` job in CI packages that as the plugin's
@@ -172,14 +183,25 @@ Things that bite:
   Licenses of the npm packages it bundles land in
   `out/_next/static/third-party-licenses.txt`; CI appends them to the
   `.aimppack`'s `THIRD-PARTY-NOTICES.txt` (the one in `dist/` covers
-  `third_party/` only).
+  `third_party/` only). Every mutation call handles its failure where it is
+  made: a form or dialog shows `mutation.error`; an action without one passes
+  `{ onError: showError }` from `useErrorToast()` (`.catch(showError)` for an
+  async helper), which shows it in the one toast; a call that may fail unnoticed
+  says why in a comment. There is no global error handler on purpose.
+  A class passed to a shared component never sets a property the component's
+  own root class sets: which of two rules of equal specificity wins depends on
+  the order the bundler gives the stylesheets, which differs between dev and
+  build. The components take custom properties instead (`--icon-size`,
+  `--icon-fill`, `--icon-button-size`, `--icon-button-color`, …; each module
+  names its own at the top).
 - **Localization.** `Langs/*.lng` are UTF-16LE with BOM and CRLF line endings
   — preserve both, git treats them as binary. Keys used in code must exist in
   every language file; format placeholders (`{0}`) must survive translation.
   Error messages of both protocols share `[AIMPRemoteControlErrors]`, keyed
   by the `LocalizedRpcError` key or the `ApiError` code (camelCase, as on the
   wire); the English text lives only in `english.lng`.
-  The options page reloads localized captions via `ApplyLocalization`.
+  The options page takes its captions from `[AIMPRemoteControlOptionsForm]`
+  by control name when it is built.
 
 ## Code conventions
 

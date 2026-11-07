@@ -64,7 +64,7 @@ export default function Effects() {
                 />
             }
         >
-            <div ref={area} className={styles.area} data-view={combined ? 'combined' : view}>
+            <div ref={area} className={styles.area} data-view={combined ? 'combined' : view} data-testid="effects-area">
                 {state ? (
                     combined ? (
                         <div className={styles.combined}>

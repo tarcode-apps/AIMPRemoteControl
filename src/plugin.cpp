@@ -88,7 +88,8 @@ HRESULT WINAPI AIMPPlugin::Initialize(IAIMPCore *Core)
 {
 	if (!HasService(Core, IID_IAIMPServicePlayer) ||
 		!HasService(Core, IID_IAIMPServicePlaylistManager) ||
-		!HasService(Core, IID_IAIMPServiceMessageDispatcher))
+		!HasService(Core, IID_IAIMPServiceMessageDispatcher) ||
+		!HasService(Core, IID_IAIMPServiceThreads))
 		return E_FAIL;
 
 	FCore = Core;
@@ -193,12 +194,13 @@ HRESULT WINAPI AIMPPlugin::Finalize()
 	FNetworkWatcher.Stop();
 	FSleepTimer.Stop();
 	FStateEvents.Stop();
-	FCoverIndex.reset();
+	// The handlers use the cover index until the server has joined its workers.
 	if (FRemoteControlServer)
 	{
 		FRemoteControlServer->Stop();
 		FRemoteControlServer.reset();
 	}
+	FCoverIndex.reset();
 	FDiscoveryServer.Stop();
 	if (FOptionsFrame)
 	{

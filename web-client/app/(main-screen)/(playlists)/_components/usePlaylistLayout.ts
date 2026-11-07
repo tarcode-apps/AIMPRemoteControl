@@ -1,6 +1,6 @@
 import { playlistItemsQuery, usePlaylistGroups } from '@/app/_api/playlists';
 import type { ItemsSummary, Playlist } from '@/app/_api/types';
-import { pageSize, PlaylistRows } from '@/app/_components/lists';
+import { pageRange, PlaylistRows } from '@/app/_components/lists';
 import { sumSummaries } from '@/app/_utils/summary';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
@@ -14,7 +14,7 @@ export function usePlaylistView(playlist: Playlist | undefined, text: string) {
     const groupsQuery = usePlaylistGroups(id, grouped, text);
     const groups = grouped ? groupsQuery.data?.groups : undefined;
     const firstResults = useQuery({
-        ...playlistItemsQuery(id, { offset: 0, limit: pageSize, search: text }),
+        ...playlistItemsQuery(id, { ...pageRange(0), search: text }),
         enabled: playlist !== undefined && searching && !grouped,
     });
 

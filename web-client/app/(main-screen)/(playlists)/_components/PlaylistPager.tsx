@@ -1,7 +1,7 @@
 'use client';
 
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
-import { usePointerDrag } from '@/app/_hooks/usePointerDrag';
+import { flingVelocity, usePointerDrag } from '@/app/_hooks/usePointerDrag';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import { media } from '@/app/_styles/media';
 import clsx from 'clsx';
@@ -10,7 +10,6 @@ import { usePlaylistMode } from './PlaylistMode';
 import { PlaylistPage } from './PlaylistPage';
 import styles from './PlaylistPager.module.scss';
 
-const flingVelocity = 0.5;
 const edgeResistance = 0.3;
 
 export function PlaylistPager() {

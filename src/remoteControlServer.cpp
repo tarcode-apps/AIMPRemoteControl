@@ -1,15 +1,17 @@
 #include "remoteControlServer.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstdlib>
 #include <filesystem>
+#include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <regex>
 #include <set>
 #include <stdexcept>
 #include <string>
-#include <string_view>
 #include <thread>
 
 #include <httplib.h>
@@ -20,14 +22,81 @@
 #include "joinPumpingMessages.h"
 #include "moduleDirectory.h"
 #include "networkWatcher.h"
+#include "requestScope.h"
+#include "utf8Path.h"
 #include "apiController.h"
 #include "apiErrors.h"
+
+namespace
+{
+	// Workers httplib starts with and may grow to, per listener; grown on demand.
+	const std::size_t BaseWorkers = CPPHTTPLIB_THREAD_POOL_COUNT;
+	constexpr std::size_t MaxWorkers = 64;
+	// Kept free of long requests, for everything else.
+	constexpr std::size_t ReservedWorkers = 8;
+	// The app keeps four long polls, but starts with two Digest sessions and holds
+	// eight for its first ten minutes (seen in a capture); a browser adds a stream
+	// per tab.
+	constexpr std::size_t MaxLongRequestsPerClient = 16;
+	// Connections waiting for a worker beyond this are closed instead of queued.
+	constexpr std::size_t MaxQueuedConnections = 64;
+
+	// What the requests of one listener share.
+	struct ListenerState
+	{
+		std::atomic<bool> Closing{false};
+		std::mutex Mutex;
+		std::map<std::string, std::size_t> LongRequests; // by client address
+		std::size_t LongRequestCount = 0;
+	};
+
+	// The request a worker thread is answering; see requestScope.h.
+	struct CurrentRequest
+	{
+		std::shared_ptr<ListenerState> Listener;
+		std::string ClientAddress;
+		std::function<bool()> ConnectionClosed;
+	};
+	thread_local CurrentRequest Current;
+}
+
+bool requestScope::Cancelled()
+{
+	return (Current.Listener && Current.Listener->Closing.load()) || (Current.ConnectionClosed && Current.ConnectionClosed());
+}
+
+std::optional<requestScope::LongRequestSlot> requestScope::TakeLongRequestSlot()
+{
+	if (!Current.Listener)
+		throw std::logic_error("a long request slot is taken outside a request");
+	std::shared_ptr<ListenerState> state = Current.Listener;
+	const std::string address = Current.ClientAddress;
+	{
+		std::lock_guard lock(state->Mutex);
+		std::size_t &mine = state->LongRequests[address];
+		if (mine >= MaxLongRequestsPerClient || state->LongRequestCount >= MaxWorkers - ReservedWorkers)
+		{
+			if (mine == 0)
+				state->LongRequests.erase(address);
+			return std::nullopt;
+		}
+		++mine;
+		++state->LongRequestCount;
+	}
+	return LongRequestSlot([state, address]
+						   {
+		std::lock_guard lock(state->Mutex);
+		--state->LongRequestCount;
+		if (--state->LongRequests[address] == 0)
+			state->LongRequests.erase(address); });
+}
 
 struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 {
 	struct Listener
 	{
 		std::string Address;
+		std::shared_ptr<ListenerState> State = std::make_shared<ListenerState>();
 		std::unique_ptr<httplib::Server> Http;
 		std::thread Thread;
 	};
@@ -158,36 +227,80 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 		res.set_content(nlohmann::json{{"error", std::move(error)}}.dump(), "application/json");
 	}
 
-	static std::vector<HttpUploadedFile> UploadedFiles(const httplib::Request &req)
+	class UploadBody : public IUploadBody
 	{
-		std::vector<HttpUploadedFile> files;
-		for (const auto &[name, part] : req.form.files)
-			files.push_back({name, part.filename, part.content_type, part.content});
-		return files;
-	}
+	public:
+		UploadBody(const httplib::Request &req, const httplib::ContentReader &reader) : FRequest(req), FReader(reader) {}
+
+		std::uint64_t DeclaredSize() const override
+		{
+			return FRequest.has_header("Content-Length") ? std::strtoull(FRequest.get_header_value("Content-Length").c_str(), nullptr, 10) : 0;
+		}
+
+		bool ReadFiles(const std::function<bool(const UploadPart &)> &begin,
+					   const std::function<bool(const char *, std::size_t)> &write) override
+		{
+			FRead = true;
+			if (!FRequest.is_multipart_form_data())
+				return false;
+			// Text fields are skipped; parts are capped as httplib caps a buffered form.
+			bool isFile = false;
+			std::size_t parts = 0;
+			return FReader(
+				[&](const httplib::FormData &part)
+				{
+					if (++parts > CPPHTTPLIB_MULTIPART_FORM_DATA_FILE_MAX_COUNT)
+						return false;
+					isFile = !part.filename.empty();
+					return !isFile || begin({part.name, part.filename, part.content_type});
+				},
+				[&](const char *data, std::size_t size)
+				{ return !isFile || write(data, size); });
+		}
+
+		// A body left unread is not drained: the connection closes instead, so a
+		// refusal does not wait for gigabytes it is going to throw away.
+		void CloseIfUnread(httplib::Response &res) const
+		{
+			if (!FRead)
+				res.set_header("Connection", "close");
+		}
+
+	private:
+		const httplib::Request &FRequest;
+		const httplib::ContentReader &FReader;
+		bool FRead = false;
+	};
 
 	void MapUpload(const std::string &pathPattern, HttpUploadHandler handler) override
 	{
 		UploadPaths.emplace_back(pathPattern);
 		Routes.push_back([pathPattern, handler = std::move(handler)](httplib::Server &http)
-						 { http.Post(pathPattern, [handler](const httplib::Request &req, httplib::Response &res)
-									 { res.status = handler(ParseRequest(req).PathMatches, UploadedFiles(req)); }); });
+						 { http.Post(pathPattern, httplib::Server::HandlerWithContentReader(
+													  [handler](const httplib::Request &req, httplib::Response &res, const httplib::ContentReader &reader)
+													  {
+				UploadBody body(req, reader);
+				res.status = handler(ParseRequest(req).PathMatches, body);
+				body.CloseIfUnread(res); })); });
 	}
 
 	void MapApiUpload(const std::string &pathPattern, ApiUploadHandler handler) override
 	{
 		UploadPaths.emplace_back(pathPattern);
 		Routes.push_back([this, pathPattern, handler = std::move(handler)](httplib::Server &http)
-						 { http.Post(pathPattern, [this, handler](const httplib::Request &req, httplib::Response &res)
-									 {
+						 { http.Post(pathPattern, httplib::Server::HandlerWithContentReader(
+													  [this, handler](const httplib::Request &req, httplib::Response &res, const httplib::ContentReader &reader)
+													  {
+				UploadBody body(req, reader);
 				try
 				{
-					res.set_content(handler(ParseRequest(req), UploadedFiles(req)).dump(), "application/json");
+					res.set_content(handler(ParseRequest(req), body).dump(), "application/json");
 				}
 				catch (const ApiError &e)
 				{
 					SetApiError(res, e);
-				} }); });
+				}
+				body.CloseIfUnread(res); })); });
 	}
 
 	using HttpRoute = httplib::Server &(httplib::Server::*)(const std::string &, httplib::Server::Handler);
@@ -271,11 +384,19 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 		Routes.push_back([pathPattern, handler = std::move(handler)](httplib::Server &http)
 						 { http.Get(pathPattern, [handler](const httplib::Request &, httplib::Response &res)
 									{
+				// Held until the response is done: the provider below goes with it.
+				auto slot = requestScope::TakeLongRequestSlot();
+				if (!slot)
+				{
+					res.status = 503;
+					res.set_header("Retry-After", "3");
+					return;
+				}
 				// no-transform keeps compressing proxies from buffering the stream; the Next dev
 				// server gzips proxied responses and would hold events back until its buffer fills.
 				res.set_header("Cache-Control", "no-cache, no-transform");
 				res.set_header("X-Accel-Buffering", "no");
-				res.set_chunked_content_provider("text/event-stream", [handler](std::size_t, httplib::DataSink &sink)
+				res.set_chunked_content_provider("text/event-stream", [handler, held = std::make_shared<requestScope::LongRequestSlot>(std::move(*slot))](std::size_t, httplib::DataSink &sink)
 												 {
 					EventStream stream(sink);
 					if (stream.Write("retry: 3000\n\n"))
@@ -330,9 +451,10 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 		if (ec || root.empty())
 			return std::nullopt;
 
-		const std::u8string relative(path.begin() + 1, path.end());
-		const std::filesystem::path target =
-			std::filesystem::weakly_canonical(root / std::filesystem::path(relative), ec);
+		const std::optional<std::filesystem::path> relative = TryPathFromUtf8(path.substr(1));
+		if (!relative)
+			return std::nullopt;
+		const std::filesystem::path target = std::filesystem::weakly_canonical(root / *relative, ec);
 		if (ec || !IsInside(root, target))
 			return std::nullopt;
 
@@ -419,6 +541,12 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 		Listener listener;
 		listener.Address = address;
 		listener.Http = std::make_unique<httplib::Server>();
+		listener.Http->new_task_queue = []
+		{ return new httplib::ThreadPool(BaseWorkers, MaxWorkers, MaxQueuedConnections); };
+		listener.Http->set_pre_request_handler([state = listener.State](const httplib::Request &req, httplib::Response &)
+											   {
+			Current = {state, req.remote_addr, req.is_connection_closed};
+			return httplib::Server::HandlerResponse::Unhandled; });
 		for (const auto &route : Routes)
 			route(*listener.Http);
 		if (!listener.Http->bind_to_port(address, Port))
@@ -432,6 +560,7 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 
 	static void Close(Listener &listener)
 	{
+		listener.State->Closing = true;
 		listener.Http->stop();
 		if (listener.Thread.joinable())
 			JoinPumpingMessages(listener.Thread);

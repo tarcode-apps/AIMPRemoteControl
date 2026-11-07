@@ -7,8 +7,11 @@ import { useSearchPages } from '@/app/_api/search';
 import type { PlaylistGroup, SearchHit } from '@/app/_api/types';
 import { ListCheckbox } from '@/app/_components/inputs';
 import {
+    fixedRowView,
     GroupRow,
+    groupRowHeight,
     ItemRow,
+    overscanRows,
     pageRange,
     pagesAround,
     pageSize,
@@ -17,11 +20,11 @@ import {
     twoLineRowHeight,
     useActiveRow,
     type PlaylistRow,
-    type RowView,
 } from '@/app/_components/lists';
 import styles from '@/app/_components/lists/ListPage.module.scss';
 import { menuSeparator, useRowMenu } from '@/app/_components/menus';
 import { useItemRemoval } from '@/app/_components/playlists';
+import { useErrorToast } from '@/app/_components/toast';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { useFavoriteRelink } from '@/app/_state/Favorites';
 import { useNavigation } from '@/app/_state/Navigation';
@@ -34,20 +37,11 @@ import { useId, useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent } f
 import { useTranslation } from 'react-i18next';
 import { useSearchMode } from './SearchMode';
 
-const groupRowHeight = 40;
-const overscanRows = 6;
 const pendingRows = 12;
-const view: RowView = {
-    showNumbers: true,
-    showThumbnails: true,
-    showSecondLine: true,
-    showDuration: true,
-    showMarks: false,
-    showSwitches: false,
-};
 
 export function SearchPage() {
     const { t } = useTranslation();
+    const showError = useErrorToast();
     const docked = useMediaQuery(media.drawerDocked);
     const scrollRef = useRef<HTMLDivElement>(null);
     const listId = useId();
@@ -92,9 +86,15 @@ export function SearchPage() {
     // track to the record and goes back.
     const { relinking, finishRelink } = useFavoriteRelink();
     const favoriteActions = useFavoriteActions();
+    // A failure leaves the picker open, to try another track or go back.
     const relinkTo = async (hit: SearchHit) => {
         if (!relinking) return;
-        await favoriteActions.relink(relinking, hit);
+        try {
+            await favoriteActions.relink(relinking, hit);
+        } catch (error) {
+            showError(error);
+            return;
+        }
         finishRelink();
         goBack();
     };
@@ -166,7 +166,7 @@ export function SearchPage() {
         ),
     )}.`;
     const rowProps = {
-        view,
+        view: fixedRowView,
         docked,
         thumbnailSize: twoLineRowHeight - 2 * thumbnailMargin,
         widestNumber,

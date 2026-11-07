@@ -1,3 +1,4 @@
+import { unreachableStreamUrl } from '../lib/streams';
 import { expect, test, withPluginSettings } from './fixtures';
 import { PlaylistScreen } from './pages/playlist-screen';
 import { t } from './strings';
@@ -19,7 +20,7 @@ test.describe('with every permission off', () => {
     }) => {
         // Files cannot be added by path now; a stream can.
         const playlist = await playlists.create();
-        await api.post(`/playlists/${encodeURIComponent(playlist.id)}/items`, { urls: ['http://127.0.0.1:9/radio'] });
+        await api.post(`/playlists/${encodeURIComponent(playlist.id)}/items`, { urls: [unreachableStreamUrl] });
         await expect.poll(() => api.playlistItemCount(playlist.id)).toBe(1);
         const screen = new PlaylistScreen(app, playlist.name);
         await screen.open();

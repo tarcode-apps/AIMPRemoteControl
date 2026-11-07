@@ -9,16 +9,11 @@
 #include "apiCore.h"
 #include "apiPlaylists.h"
 #include "aimpHelper.h"
+#include "helpers/legacyErrors.h"
 #include "helpers/idLookup.h"
 #include "mainThreadRunner.h"
 #include "helpers/remoteControlIdManager.h"
 #include "player/queue.h"
-
-namespace
-{
-	constexpr int ErrorTrackNotFound = 21;
-	constexpr int ErrorDequeueFailed = 19;
-}
 
 void rpcapi::RemoveTrackFromPlayQueueCommand::Register(IEndpointRouteBuilder &endpoints)
 {
@@ -28,18 +23,15 @@ void rpcapi::RemoveTrackFromPlayQueueCommand::Register(IEndpointRouteBuilder &en
 			throw RpcError(-32602, "track_id is required");
 		const std::int32_t trackId = params["track_id"].get<std::int32_t>();
 
-		const HRESULT result = RunOnMainThread(core, [&]() -> HRESULT
+		const player::MutationResult result = RunOnMainThread(core, [&]
 		{
 			IAIMPPlaylistItem *item = FindPlaylistItem(core, idManager, trackId);
 			if (!item)
-				return E_INVALIDARG;
-			const HRESULT hr = player::DequeueItem(core, item) == player::MutationResult::Ok ? S_OK : E_FAIL;
+				return player::MutationResult::ItemNotFound;
+			const player::MutationResult dequeued = player::DequeueItem(core, item);
 			item->Release();
-			return hr;
+			return dequeued;
 		});
-		if (result == E_INVALIDARG)
-			throw LocalizedRpcError(ErrorTrackNotFound, "dequeueTrackNotFound");
-		if (Failed(result))
-			throw LocalizedRpcError(ErrorDequeueFailed, "dequeueFailed");
+		ThrowUnlessOk(result, {ErrorTrackNotFound, "dequeueTrackNotFound"}, {ErrorDequeueFailed, "dequeueFailed"});
 		return nullptr; });
 }

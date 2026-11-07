@@ -3,8 +3,8 @@
 Что требует каталог — в правилах раздела *Plugins*:
 [Публикация плагинов в каталоге](https://www.aimp.ru/forum/index.php?topic=32363.msg183948).
 Здесь лежат исходники этих файлов; готовый комплект собирает
-[GitHub Actions](../../.github/workflows/build.yml) (job `catalog`, артефакт
-`aimp_remote_control-catalog`).
+[GitHub Actions](../../.github/workflows/build.yml) (job `package`, шаг
+«Build the catalog bundle», артефакт `aimp_remote_control-catalog`).
 
 | Файл | Что это | Откуда берётся |
 |---|---|---|
@@ -66,7 +66,7 @@
 без суффикса — `%plugin_name%.png`.
 
 Превью здесь — не кроп скриншота, а логотип из
-[wwwroot/favicon.svg](../../wwwroot/favicon.svg) на прозрачном фоне, 130 px по
+[web-client/public/logo.svg](../../web-client/public/logo.svg) на прозрачном фоне, 130 px по
 центру. Пересобрать из
 [aimp_remote_control_sm.html](aimp_remote_control_sm.html) (Chromium или Edge), из этой папки:
 

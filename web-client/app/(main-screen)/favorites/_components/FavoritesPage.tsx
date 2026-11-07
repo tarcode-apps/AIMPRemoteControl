@@ -6,9 +6,12 @@ import type { LocatedItem, PlaylistGroup, PlaylistItem } from '@/app/_api/types'
 import { ListCheckbox } from '@/app/_components/inputs';
 import {
     FastScroll,
+    fixedRowView,
     groupPositions,
     GroupRow,
+    groupRowHeight,
     ItemRow,
+    overscanRows,
     positionsCheckState,
     SkeletonRow,
     thumbnailMargin,
@@ -17,7 +20,6 @@ import {
     useActiveRow,
     usePlaylistDrag,
     type PlaylistRow,
-    type RowView,
 } from '@/app/_components/lists';
 import styles from '@/app/_components/lists/ListPage.module.scss';
 import { menuSeparator, useRowMenu } from '@/app/_components/menus';
@@ -32,17 +34,6 @@ import clsx from 'clsx';
 import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFavoritesMode, type FavoriteEntry } from './FavoritesMode';
-
-const groupRowHeight = 40;
-const overscanRows = 6;
-const view: RowView = {
-    showNumbers: true,
-    showThumbnails: true,
-    showSecondLine: true,
-    showDuration: true,
-    showMarks: false,
-    showSwitches: false,
-};
 
 // What a row shows of a favorite that is not in its playlist: its snapshot.
 function snapshotItem(record: FavoriteRecord): PlaylistItem {
@@ -222,7 +213,7 @@ export function FavoritesPage() {
     const rowId = (row: number) => `${listId}-${row}`;
     const widestNumber = `${'0'.repeat(Math.max(1, String(entries.length).length))}.`;
     const rowProps = {
-        view,
+        view: fixedRowView,
         docked,
         thumbnailSize: twoLineRowHeight - 2 * thumbnailMargin,
         widestNumber,

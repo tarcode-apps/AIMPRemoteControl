@@ -13,7 +13,6 @@
 #include "player/playerFeatures.h"
 #include "player/playerState.h"
 #include "player/playlists.h"
-#include "player/queue.h"
 #include "playlistChangeFilter.h"
 
 class StateUpdateEvents::MessageHook : public IUnknownImpl<IAIMPMessageHook>
@@ -415,12 +414,39 @@ std::uint64_t StateUpdateEvents::TagWrites(const std::string &playlistId)
 	return it == FTagWrites.end() ? 0 : it->second;
 }
 
-bool StateUpdateEvents::Wait(Kind kind, std::chrono::milliseconds timeout)
+namespace
+{
+	// Waits on `changed` until `ready` or the deadline, looking up from it now and
+	// then to ask `cancelled`, which must not be asked under the lock.
+	template <typename Ready>
+	bool WaitCancellable(std::unique_lock<std::mutex> &lock, std::condition_variable &changed, std::chrono::milliseconds timeout,
+						 const StateUpdateEvents::Cancellation &cancelled, Ready ready)
+	{
+		if (!cancelled)
+			return changed.wait_for(lock, timeout, ready);
+		const auto deadline = std::chrono::steady_clock::now() + timeout;
+		while (true)
+		{
+			const auto slice = std::min<std::chrono::steady_clock::time_point>(deadline, std::chrono::steady_clock::now() + StateUpdateEvents::CancelCheckInterval);
+			if (changed.wait_until(lock, slice, ready))
+				return true;
+			if (std::chrono::steady_clock::now() >= deadline)
+				return false;
+			lock.unlock();
+			const bool stop = cancelled();
+			lock.lock();
+			if (stop)
+				return ready();
+		}
+	}
+}
+
+bool StateUpdateEvents::Wait(Kind kind, std::chrono::milliseconds timeout, const Cancellation &cancelled)
 {
 	std::unique_lock lock(FMutex);
 	const std::uint64_t seen = FVersions[kind];
-	return FChanged.wait_for(lock, timeout, [&]
-							 { return FStopped || FVersions[kind] != seen; }) &&
+	return WaitCancellable(lock, FChanged, timeout, cancelled, [&]
+						   { return FStopped || FVersions[kind] != seen; }) &&
 		   !FStopped;
 }
 
@@ -432,11 +458,11 @@ StateUpdateEvents::Versions StateUpdateEvents::Current()
 	return versions;
 }
 
-std::bitset<StateUpdateEvents::KindCount> StateUpdateEvents::WaitAny(Versions &seen, std::chrono::milliseconds timeout)
+std::bitset<StateUpdateEvents::KindCount> StateUpdateEvents::WaitAny(Versions &seen, std::chrono::milliseconds timeout, const Cancellation &cancelled)
 {
 	std::bitset<KindCount> changed;
 	std::unique_lock lock(FMutex);
-	const bool moved = FChanged.wait_for(lock, timeout, [&]
+	const bool moved = WaitCancellable(lock, FChanged, timeout, cancelled, [&]
 										 {
 											 if (FStopped)
 												 return true;

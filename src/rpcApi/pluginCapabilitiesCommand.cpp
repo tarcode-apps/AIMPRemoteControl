@@ -1,6 +1,5 @@
 #include "pluginCapabilitiesCommand.h"
 
-#include <functional>
 
 #include <nlohmann/json.hpp>
 

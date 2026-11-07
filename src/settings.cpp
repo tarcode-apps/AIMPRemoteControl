@@ -3,6 +3,8 @@
 #include "apiCore.h"
 #include "aimpHelper.h"
 #include "md5.h"
+#include "randomBytes.h"
+#include "utf8Path.h"
 
 #include <algorithm>
 #include <cctype>
@@ -98,6 +100,7 @@ namespace
 	constexpr const char *KeyAuthEnabled = R"(AIMPRemoteControl\Auth\Enabled)";
 	constexpr const char *KeyAuthUsername = R"(AIMPRemoteControl\Auth\Username)";
 	constexpr const char *KeyAuthHa1 = R"(AIMPRemoteControl\Auth\HA1)";
+	constexpr const char *KeyAuthNonceKey = R"(AIMPRemoteControl\Auth\NonceKey)";
 	constexpr const char *KeyFeatPhysicalDeletion = R"(AIMPRemoteControl\Features\PhysicalDeletion)";
 	constexpr const char *KeyFeatDownloadTracks = R"(AIMPRemoteControl\Features\DownloadTracks)";
 	constexpr const char *KeyFeatUploadTracks = R"(AIMPRemoteControl\Features\UploadTracks)";
@@ -150,6 +153,11 @@ std::string Settings::AuthSettings::ComputeHa1(const std::string &username, cons
 	return Md5Hex(username + ":" + Realm + ":" + password);
 }
 
+std::string Settings::AuthSettings::NewNonceKey()
+{
+	return RandomHex(32);
+}
+
 Settings Settings::Load(IAIMPCore *core)
 {
 	Settings s;
@@ -160,6 +168,13 @@ Settings Settings::Load(IAIMPCore *core)
 	s.Auth.Enabled = store.GetInt(KeyAuthEnabled, 0) != 0;
 	s.Auth.Username = store.GetString(KeyAuthUsername);
 	s.Auth.Ha1 = store.GetString(KeyAuthHa1);
+	// Made once and kept at once, so that every reader of the settings signs alike.
+	s.Auth.NonceKey = store.GetString(KeyAuthNonceKey);
+	if (s.Auth.NonceKey.empty())
+	{
+		s.Auth.NonceKey = Settings::AuthSettings::NewNonceKey();
+		store.SetString(KeyAuthNonceKey, s.Auth.NonceKey);
+	}
 	s.Features.PhysicalDeletion = store.GetInt(KeyFeatPhysicalDeletion, 0) != 0;
 	s.Features.DownloadTracks = store.GetInt(KeyFeatDownloadTracks, 1) != 0;
 	s.Features.UploadTracks = store.GetInt(KeyFeatUploadTracks, 0) != 0;
@@ -179,6 +194,7 @@ void Settings::Save(IAIMPCore *core) const
 	store.SetInt(KeyAuthEnabled, Auth.Enabled ? 1 : 0);
 	store.SetString(KeyAuthUsername, Auth.Username);
 	store.SetString(KeyAuthHa1, Auth.Ha1);
+	store.SetString(KeyAuthNonceKey, Auth.NonceKey);
 	store.SetInt(KeyFeatPhysicalDeletion, Features.PhysicalDeletion ? 1 : 0);
 	store.SetInt(KeyFeatDownloadTracks, Features.DownloadTracks ? 1 : 0);
 	store.SetInt(KeyFeatUploadTracks, Features.UploadTracks ? 1 : 0);
@@ -197,14 +213,7 @@ std::string Settings::FeatureSettings::DefaultUploadFolder()
 	std::string result;
 	PWSTR path = nullptr;
 	if (SUCCEEDED(::SHGetKnownFolderPath(FOLDERID_Music, KF_FLAG_DEFAULT, nullptr, &path)) && path)
-	{
-		const int needed = ::WideCharToMultiByte(CP_UTF8, 0, path, -1, nullptr, 0, nullptr, nullptr);
-		if (needed > 1)
-		{
-			result.resize(static_cast<size_t>(needed) - 1);
-			::WideCharToMultiByte(CP_UTF8, 0, path, -1, result.data(), needed, nullptr, nullptr);
-		}
-	}
+		result = PathToUtf8(std::filesystem::path(path));
 	if (path)
 		::CoTaskMemFree(path);
 	return result;

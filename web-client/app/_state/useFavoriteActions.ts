@@ -3,12 +3,14 @@
 import { useItemDetails, usePlaylists } from '@/app/_api/playlists';
 import type { SelectionInPlaylist } from '@/app/_api/types';
 import type { MenuItem } from '@/app/_components/menus';
+import { useErrorToast } from '@/app/_components/toast';
 import { useTranslation } from 'react-i18next';
 import { toRecord, useFavorites, type FavoriteRecord } from './Favorites';
 import type { TrackRef } from './useTrackActions';
 
 export function useFavoriteActions() {
     const { t } = useTranslation();
+    const showError = useErrorToast();
     const favorites = useFavorites();
     const details = useItemDetails();
     const { data: playlists } = usePlaylists();
@@ -49,7 +51,7 @@ export function useFavoriteActions() {
                                   revision: track.revision,
                                   selection: { indexes: [track.index] },
                               },
-                          ]),
+                          ]).catch(showError),
                   },
     };
 }

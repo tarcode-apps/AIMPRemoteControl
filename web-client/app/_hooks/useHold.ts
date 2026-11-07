@@ -45,3 +45,40 @@ export function useHold(delay: number, onHold: () => void, repeat?: number) {
         },
     };
 }
+
+type PointerAt = { clientX: number; clientY: number };
+
+// A press held in place, as a long press on a mobile: it fires the action given
+// to `start` after `delay`, unless the pointer travels further than `slop`
+// first, which makes it a drag or a scroll.
+export function useHoldInPlace(slop: number, delay = 500) {
+    const hold = useRef<{ timer: number; x: number; y: number } | null>(null);
+    const cancel = () => {
+        if (hold.current) window.clearTimeout(hold.current.timer);
+        hold.current = null;
+    };
+    useEffect(() => cancel, []);
+
+    return {
+        start({ clientX, clientY }: PointerAt, action: () => void) {
+            cancel();
+            hold.current = {
+                x: clientX,
+                y: clientY,
+                timer: window.setTimeout(() => {
+                    hold.current = null;
+                    action();
+                }, delay),
+            };
+        },
+        // Whether the press is still held in place; one that wandered off is cancelled.
+        move({ clientX, clientY }: PointerAt): boolean {
+            const start = hold.current;
+            if (!start) return false;
+            if (Math.hypot(clientX - start.x, clientY - start.y) <= slop) return true;
+            cancel();
+            return false;
+        },
+        cancel,
+    };
+}

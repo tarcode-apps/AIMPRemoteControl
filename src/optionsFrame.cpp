@@ -331,13 +331,31 @@ void OptionsFrame::BuildAuthGroup(IAIMPServiceUI *svc)
 	if (FPassEdit)
 		FPassEdit->SetValueAsInt32(AIMPUI_EDIT_PROPID_PASSWORDCHAR, static_cast<INT32>('*'));
 
-	if (auto *hint = CreateControl<IAIMPUILabel>(FCore, svc, FForm, FAuthGroup, nullptr, "lbPassHint", IID_IAIMPUILabel))
+	const auto addHint = [&](const char *name) -> IAIMPUIControl *
 	{
+		auto *hint = CreateControl<IAIMPUILabel>(FCore, svc, FForm, FAuthGroup, nullptr, name, IID_IAIMPUILabel);
+		if (!hint)
+			return nullptr;
 		hint->SetValueAsInt32(AIMPUI_LABEL_PROPID_AUTOSIZE, 0);
 		hint->SetValueAsInt32(AIMPUI_LABEL_PROPID_WORDWRAP, 1);
 		Align(hint, ualTop, RowHeight, {RowIndent + LabelWidth + LabelGap, 0, 0, 0}); // no top gap: it belongs to the password row
 		FAuthChildren.push_back(hint);
-	}
+		return hint;
+	};
+	FPassHint = addHint("lbPassHint");
+	FPassNeeded = addHint("lbPassNeeded");
+	if (FPassNeeded)
+		FPassNeeded->SetValueAsInt32(AIMPUI_LABEL_PROPID_TEXTSTYLE, AIMPUI_FLAGS_FONT_BOLD);
+}
+
+// Whether the page holds a password for the user it names: one typed in, or the
+// one saved for that very user. A saved one belongs to the name it was made with.
+bool OptionsFrame::HasPassword() const
+{
+	if (FPassEdit && !GetPropertyAsString(FPassEdit, AIMPUI_BASEEDIT_PROPID_TEXT).empty())
+		return true;
+	const std::string username = FUserEdit ? GetPropertyAsString(FUserEdit, AIMPUI_BASEEDIT_PROPID_TEXT) : std::string();
+	return !FSettings.Auth.Ha1.empty() && username == FSettings.Auth.Username;
 }
 
 void OptionsFrame::BuildFeaturesGroup(IAIMPServiceUI *svc)
@@ -368,8 +386,14 @@ void OptionsFrame::BuildFeaturesGroup(IAIMPServiceUI *svc)
 
 void OptionsFrame::UpdateEnabledStates()
 {
-	SetEnabled(FAuthChildren, IsChecked(FAuthGroup, AIMPUI_GROUPBOX_PROPID_CHECKED));
+	const bool auth = IsChecked(FAuthGroup, AIMPUI_GROUPBOX_PROPID_CHECKED);
+	SetEnabled(FAuthChildren, auth);
 	SetEnabled(FUploadChildren, IsChecked(FUploadTracksCheck, AIMPUI_CHECKBOX_PROPID_STATE));
+	const bool needed = auth && !HasPassword();
+	if (FPassHint)
+		FPassHint->SetValueAsInt32(AIMPUI_CONTROL_PROPID_VISIBLE, needed ? 0 : 1);
+	if (FPassNeeded)
+		FPassNeeded->SetValueAsInt32(AIMPUI_CONTROL_PROPID_VISIBLE, needed ? 1 : 0);
 }
 
 void OptionsFrame::LoadFromSettings()
@@ -410,7 +434,9 @@ void OptionsFrame::SaveToSettings()
 	Settings s = FSettings;
 
 	Settings::AuthSettings &a = s.Auth;
-	a.Enabled = IsChecked(FAuthGroup, AIMPUI_GROUPBOX_PROPID_CHECKED);
+	// Without a password the server would let everyone in while the page showed
+	// authentication on; it is saved off, and the warning under the password says so.
+	a.Enabled = IsChecked(FAuthGroup, AIMPUI_GROUPBOX_PROPID_CHECKED) && HasPassword();
 	if (FUserEdit)
 		a.Username = GetPropertyAsString(FUserEdit, AIMPUI_BASEEDIT_PROPID_TEXT);
 	const std::string password = FPassEdit ? GetPropertyAsString(FPassEdit, AIMPUI_BASEEDIT_PROPID_TEXT) : std::string();
@@ -442,8 +468,12 @@ void OptionsFrame::SaveToSettings()
 
 	s.Save(FCore);
 	FSettings = s;
+	// The box stays as the user left it, with the warning under it while saved off.
+	FLoading = true;
 	if (FPassEdit)
 		SetString(FCore, FPassEdit, AIMPUI_BASEEDIT_PROPID_TEXT, "");
+	FLoading = false;
+	UpdateEnabledStates();
 
 	if (FOnSettingsChanged)
 		FOnSettingsChanged(FSettings);
@@ -500,6 +530,8 @@ void OptionsFrame::OnBrowseUploadFolder()
 void WINAPI OptionsFrame::DestroyFrame()
 {
 	ReleaseAll(FAuthChildren);
+	FPassHint = nullptr;
+	FPassNeeded = nullptr;
 	ReleaseAll(FUploadChildren);
 	for (InterfaceCheck &c : FInterfaceChecks)
 		c.Check->Release();

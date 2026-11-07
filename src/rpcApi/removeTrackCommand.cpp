@@ -9,17 +9,12 @@
 #include "apiCore.h"
 #include "apiPlaylists.h"
 #include "aimpHelper.h"
+#include "helpers/legacyErrors.h"
 #include "helpers/idLookup.h"
 #include "mainThreadRunner.h"
 #include "helpers/remoteControlIdManager.h"
 #include "player/playlistItems.h"
 #include "settings.h"
-
-namespace
-{
-	constexpr int ErrorTrackNotFound = 21;
-	constexpr int ErrorRemoveFailed = 28;
-}
 
 void rpcapi::RemoveTrackCommand::Register(IEndpointRouteBuilder &endpoints)
 {

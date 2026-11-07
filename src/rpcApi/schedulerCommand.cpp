@@ -13,10 +13,12 @@
 
 #include "settings.h"
 #include "sleepTimer.h"
+#include "helpers/legacyErrors.h"
 
 namespace
 {
-	constexpr int ErrorSchedulerUnavailable = -1;
+	// As the web API bounds a timer; beyond it the seconds overflow the clock.
+	constexpr std::chrono::hours MaxDelay{24 * 366};
 
 	// The actions the app knows; the web API has more.
 	const std::pair<SleepTimer::Action, const char *> LegacyActions[] = {
@@ -102,8 +104,8 @@ void rpcapi::SchedulerCommand::Register(IEndpointRouteBuilder &endpoints)
 			if (!params.contains("expiration_delay") || !params["expiration_delay"].is_number())
 				throw RpcError(-32602, "expiration_delay is required");
 			const double seconds = params["expiration_delay"].get<double>();
-			if (seconds <= 0)
-				throw RpcError(-32602, "expiration_delay must be positive");
+			if (!(seconds > 0) || seconds > std::chrono::duration<double>(MaxDelay).count())
+				throw RpcError(-32602, "expiration_delay must be positive and within a year");
 			SleepTimer::Request request;
 			request.Actions = {*action};
 			request.When = SleepTimer::Trigger::After;

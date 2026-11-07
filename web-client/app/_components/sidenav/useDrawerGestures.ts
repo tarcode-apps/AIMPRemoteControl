@@ -1,10 +1,9 @@
-import { usePointerDrag } from '@/app/_hooks/usePointerDrag';
+import { flingVelocity, usePointerDrag } from '@/app/_hooks/usePointerDrag';
 import { useRef, type RefObject } from 'react';
 
 const edgeWidth = 24;
 const edgeHoldDelay = 300;
 const peekWidth = 16;
-const flingVelocity = 0.5;
 
 export type DrawerGesturesOptions = {
     containerRef: RefObject<HTMLElement | null>;

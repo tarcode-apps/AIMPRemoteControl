@@ -51,20 +51,20 @@
 }
 
 .star {
+    --icon-size: var(--rating-star);
     position: relative;
-    font-size: var(--rating-star);
 
     // The player's own rating of the track, which the user has not confirmed.
     .hollow & {
-        font-variation-settings: "FILL" 0;
+        --icon-fill: 0;
         color: var(--color-text-secondary);
     }
 }
 
 // Under a star filled in part: the outline of the whole of it.
 .outline {
+    --icon-size: var(--rating-star);
+    --icon-fill: 0;
     position: absolute;
-    font-size: var(--rating-star);
-    font-variation-settings: "FILL" 0;
     color: var(--color-text-dim);
 }

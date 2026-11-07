@@ -3,6 +3,7 @@
 import { usePlayer, usePlayerPosition, useSetPlayer } from '@/app/_api/player';
 import { useTranslation } from 'react-i18next';
 import { TrackCover } from '../cover';
+import { useErrorToast } from '../toast';
 import { Marquee } from './Marquee';
 import styles from './MiniPlayer.module.scss';
 import { PlayButton } from './PlayButton';
@@ -19,6 +20,7 @@ export function MiniPlayer({ onExpand }: MiniPlayerProps) {
     const { expanded, docked } = usePlayerPanel();
     const { data: player } = usePlayer();
     const setPlayer = useSetPlayer();
+    const showError = useErrorToast();
     const shown = !expanded && !docked;
     const position = usePlayerPosition(player, shown);
     const track = player?.track ?? null;
@@ -49,7 +51,7 @@ export function MiniPlayer({ onExpand }: MiniPlayerProps) {
                 className={styles.progress}
                 value={position}
                 max={duration}
-                onCommit={value => setPlayer.mutate({ position: value })}
+                onCommit={value => setPlayer.mutate({ position: value }, { onError: showError })}
             />
         </div>
     );

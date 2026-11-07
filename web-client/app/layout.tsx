@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { ApiProvider } from './_api/helpers/ApiProvider';
-import { Drawer, DrawerContainer, DrawerContent, PlayerPanel, PlayerPanelProvider, Sidebar } from './_components';
+import { PlayerPanel, PlayerPanelProvider } from './_components/player';
+import { Drawer, DrawerContainer, DrawerContent, Sidebar } from './_components/sidenav';
+import { ToastProvider } from './_components/toast';
 import { DetectLanguage } from './_i18n/DetectLanguage';
 import { fallbackLanguage, resources } from './_i18n/resources';
 import { NavigationProvider } from './_state/Navigation';
@@ -33,21 +35,23 @@ export default function RootLayout({
             <body>
                 <DetectLanguage />
                 <ApiProvider>
-                    <NavigationProvider>
-                        <PlaylistSelectionProvider>
-                            <UploadsProvider>
-                                <PlayerPanelProvider>
-                                    <DrawerContainer>
-                                        <Drawer>
-                                            <Sidebar />
-                                        </Drawer>
-                                        <DrawerContent>{children}</DrawerContent>
-                                        <PlayerPanel />
-                                    </DrawerContainer>
-                                </PlayerPanelProvider>
-                            </UploadsProvider>
-                        </PlaylistSelectionProvider>
-                    </NavigationProvider>
+                    <ToastProvider>
+                        <NavigationProvider>
+                            <PlaylistSelectionProvider>
+                                <UploadsProvider>
+                                    <PlayerPanelProvider>
+                                        <DrawerContainer>
+                                            <Drawer>
+                                                <Sidebar />
+                                            </Drawer>
+                                            <DrawerContent>{children}</DrawerContent>
+                                            <PlayerPanel />
+                                        </DrawerContainer>
+                                    </PlayerPanelProvider>
+                                </UploadsProvider>
+                            </PlaylistSelectionProvider>
+                        </NavigationProvider>
+                    </ToastProvider>
                 </ApiProvider>
             </body>
         </html>

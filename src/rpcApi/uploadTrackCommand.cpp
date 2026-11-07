@@ -12,6 +12,7 @@
 #include "helpers/idLookup.h"
 #include "mainThreadRunner.h"
 #include "helpers/remoteControlIdManager.h"
+#include "parseInt32.h"
 #include "player/uploads.h"
 #include "settings.h"
 #include "utf8Path.h"
@@ -21,23 +22,11 @@ namespace
 	std::string TagBasedName(IAIMPCore *core, const std::string &fileUtf8)
 	{
 		std::string artist, title;
-		IAIMPServiceFileInfo *service = nullptr;
-		if (Succeeded(core->QueryInterface(IID_IAIMPServiceFileInfo, reinterpret_cast<void **>(&service))) && service)
+		if (IAIMPFileInfo *info = ReadFileInfo(core, fileUtf8))
 		{
-			IAIMPFileInfo *info = nullptr;
-			IAIMPString *uri = StringToIAIMPString(core, fileUtf8);
-			if (uri && Succeeded(core->CreateObject(IID_IAIMPFileInfo, reinterpret_cast<void **>(&info))) && info)
-			{
-				if (Succeeded(service->GetFileInfoFromFileURI(uri, 0, info)))
-				{
-					artist = GetPropertyAsString(info, AIMP_FILEINFO_PROPID_ARTIST);
-					title = GetPropertyAsString(info, AIMP_FILEINFO_PROPID_TITLE);
-				}
-				info->Release();
-			}
-			if (uri)
-				uri->Release();
-			service->Release();
+			artist = GetPropertyAsString(info, AIMP_FILEINFO_PROPID_ARTIST);
+			title = GetPropertyAsString(info, AIMP_FILEINFO_PROPID_TITLE);
+			info->Release();
 		}
 		if (title.empty())
 			return {};
@@ -63,35 +52,47 @@ namespace
 void rpcapi::UploadTrackCommand::Register(IEndpointRouteBuilder &endpoints)
 {
 	endpoints.MapUpload(R"(/uploadTrack/playlist_id/(-?\d+))",
-				  [core = FCore, &idManager = FIdManager, &settings = FSettings](const std::vector<std::string> &matches, const std::vector<HttpUploadedFile> &files) -> int
+				  [core = FCore, &idManager = FIdManager, &settings = FSettings](const std::vector<std::string> &matches, IUploadBody &body) -> int
 				  {
 					  const Settings::FeatureSettings features = settings.Get().Features;
 					  if (!features.UploadTracks)
 						  return 403;
-					  if (matches.empty() || files.empty())
+					  const std::optional<std::int32_t> playlistId = matches.empty() ? std::nullopt : ParseInt32(matches[0]);
+					  if (!playlistId)
 						  return 400;
-					  const std::int32_t playlistId = static_cast<std::int32_t>(std::stol(matches[0]));
 					  const bool playlistExists = RunOnMainThread(core, [&]
 																  {
-						  IAIMPPlaylist *playlist = FindPlaylist(core, idManager, playlistId);
+						  IAIMPPlaylist *playlist = FindPlaylist(core, idManager, *playlistId);
 						  if (playlist)
 							  playlist->Release();
 						  return playlist != nullptr; });
 					  if (!playlistExists)
 						  return 404;
 
-					  std::vector<player::UploadedFile> uploads;
-					  for (const HttpUploadedFile &file : files)
-						  uploads.push_back({file.FileName.empty() ? file.Name : file.FileName, file.Content});
-					  player::SavedUploads saved = player::SaveUploads(features.EffectiveUploadFolder(), uploads);
+					  player::UploadWriter writer(features.EffectiveUploadFolder());
+					  if (!writer.HasRoomFor(body.DeclaredSize()))
+						  return 500;
+					  std::vector<std::string> names;
+					  const bool whole = body.ReadFiles([&](const UploadPart &part)
+														{
+															names.push_back(part.FileName);
+															return writer.Begin(part.FileName); },
+														[&](const char *data, std::size_t size)
+														{ return writer.Write(data, size); });
+					  player::SavedUploads saved = writer.Finish();
 					  if (saved.Failure != player::UploadFailure::None)
 						  return 500;
+					  if (!whole || saved.Paths.empty())
+					  {
+						  writer.Abandon();
+						  return 400;
+					  }
 					  for (std::size_t i = 0; i < saved.Paths.size(); ++i)
-						  if (uploads[i].Name.find('?') != std::string::npos)
+						  if (names[i].find('?') != std::string::npos)
 							  saved.Paths[i] = RestoreName(core, saved.Paths[i]);
 
 					  const HRESULT result = RunOnMainThread(core, [&]
-															 { return AddFilesByPlaylistId(core, idManager, playlistId, saved.Paths); });
+															 { return AddFilesByPlaylistId(core, idManager, *playlistId, saved.Paths); });
 					  return result == E_INVALIDARG ? 404 : (Failed(result) ? 500 : 200);
 				  });
 }

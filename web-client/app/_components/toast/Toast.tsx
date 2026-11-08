@@ -1,6 +1,7 @@
 'use client';
 
-import { errorMessage } from '@/app/_api/helpers/errors';
+import { connectionState } from '@/app/_api/helpers/connection';
+import { errorMessage, isConnectionError } from '@/app/_api/helpers/errors';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './Toast.module.scss';
@@ -49,9 +50,15 @@ export function useToast(): ToastValue {
 
 // For an action whose failure has no place on screen of its own: the error goes
 // to the toast. An action with a form shows its error there instead, and one
-// that may fail unnoticed says why where it is called.
+// that may fail unnoticed says why where it is called. A failure for want of
+// the player is left to the connection banner, which says so already or will
+// once the check under way fails.
 export function useErrorToast(): (error: unknown) => void {
     const { t } = useTranslation();
     const toast = useToast();
-    return error => toast.show(errorMessage(error, t));
+    return error => {
+        const { online, checking } = connectionState();
+        if (isConnectionError(error) && (!online || checking)) return;
+        toast.show(errorMessage(error, t));
+    };
 }

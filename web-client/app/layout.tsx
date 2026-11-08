@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { ApiProvider } from './_api/helpers/ApiProvider';
+import { ConnectionBanner } from './_components/connection';
 import { PlayerPanel, PlayerPanelProvider } from './_components/player';
 import { Drawer, DrawerContainer, DrawerContent, Sidebar } from './_components/sidenav';
 import { ToastProvider } from './_components/toast';
@@ -36,6 +37,7 @@ export default function RootLayout({
             <body>
                 <DetectLanguage />
                 <ApiProvider>
+                    <ConnectionBanner />
                     <ToastProvider>
                         <NavigationProvider>
                             <PlaylistSelectionProvider>

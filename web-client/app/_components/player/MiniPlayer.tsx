@@ -1,6 +1,8 @@
 'use client';
 
+import { useConnection } from '@/app/_api/helpers/connection';
 import { usePlayer, usePlayerPosition, useSetPlayer } from '@/app/_api/player';
+import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { TrackCover } from '../cover';
 import { useErrorToast } from '../toast';
@@ -21,6 +23,7 @@ export function MiniPlayer({ onExpand }: MiniPlayerProps) {
     const { data: player } = usePlayer();
     const setPlayer = useSetPlayer();
     const showError = useErrorToast();
+    const { online } = useConnection();
     const shown = !expanded && !docked;
     const position = usePlayerPosition(player, shown);
     const track = player?.track ?? null;
@@ -36,7 +39,11 @@ export function MiniPlayer({ onExpand }: MiniPlayerProps) {
                 title={t('player.expand')}
                 aria-label={t('player.expand')}
             />
-            <TrackCover hash={shown ? track?.coverHash : undefined} size={48} className={styles.cover} />
+            <TrackCover
+                hash={shown ? track?.coverHash : undefined}
+                size={48}
+                className={clsx(styles.cover, !online && styles.offline)}
+            />
             <div className={styles.track}>
                 {track && <Marquee className={styles.title}>{track.title}</Marquee>}
                 {track?.artist && <span className={styles.artist}>{track.artist}</span>}
@@ -51,6 +58,7 @@ export function MiniPlayer({ onExpand }: MiniPlayerProps) {
                 className={styles.progress}
                 value={position}
                 max={duration}
+                disabled={!online}
                 onCommit={value => setPlayer.mutate({ position: value }, { onError: showError })}
             />
         </div>

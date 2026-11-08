@@ -33,6 +33,15 @@ const knownStatuses = [400, 401, 403, 404, 413, 500, 502, 503, 504, 507] as cons
 type KnownStatus = (typeof knownStatuses)[number];
 const isKnownStatus = (status: number): status is KnownStatus => knownStatuses.includes(status as KnownStatus);
 
+// No player answered: the network failed, or a proxy in front of the player
+// found it down.
+export function isConnectionError(error: unknown): boolean {
+    return (
+        error instanceof NetworkError ||
+        (error instanceof HttpError && (error.status === 502 || error.status === 503 || error.status === 504))
+    );
+}
+
 export function errorMessage(error: unknown, t: TFunction): string {
     if (error instanceof ApiError) return error.message;
     if (error instanceof HttpError)

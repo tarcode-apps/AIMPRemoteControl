@@ -22,6 +22,15 @@
       "507": "The player has no room for the file"
     }
   },
+  "connection": {
+    "lost": "No connection to the player",
+    "closed": "AIMP was closed",
+    "deviceOffline": "This device is not connected to a network",
+    "retryIn": "Retrying in {{seconds}} s",
+    "connecting": "Connecting…",
+    "retry": "Retry",
+    "restored": "Connection restored"
+  },
   "app": {
     "name": "AIMP Remote Control"
   },

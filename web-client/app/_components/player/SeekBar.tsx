@@ -12,15 +12,16 @@ export type SeekBarProps = {
     value: number;
     max: number;
     className?: string;
+    disabled?: boolean;
     onCommit(value: number): void;
 };
 
 // A line that seeks on a tap or a sideways drag and leaves an upward drag to the
 // sheet under it: unlike a range input, it does nothing on the pointer down itself.
-export function SeekBar({ title, value, max, className, onCommit }: SeekBarProps) {
+export function SeekBar({ title, value, max, className, disabled = false, onCommit }: SeekBarProps) {
     const bar = useRef<HTMLDivElement>(null);
     const startX = useRef(0);
-    const enabled = max > 0;
+    const enabled = max > 0 && !disabled;
     const valueAt = (clientX: number) => {
         const rect = bar.current!.getBoundingClientRect();
         return Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1) * max;

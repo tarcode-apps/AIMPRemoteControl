@@ -189,7 +189,10 @@ Things that bite:
   made: a form or dialog shows `mutation.error`; an action without one passes
   `{ onError: showError }` from `useErrorToast()` (`.catch(showError)` for an
   async helper), which shows it in the one toast; a call that may fail unnoticed
-  says why in a comment. There is no global error handler on purpose.
+  says why in a comment. There is no global error handler on purpose. A failure
+  for want of the player is the one exception: queries wait for the player
+  instead of failing, and `useErrorToast` leaves such a failure to the
+  connection banner at the top (`app/_api/helpers/connection.ts`).
   A class passed to a shared component never sets a property the component's
   own root class sets: which of two rules of equal specificity wins depends on
   the order the bundler gives the stylesheets, which differs between dev and

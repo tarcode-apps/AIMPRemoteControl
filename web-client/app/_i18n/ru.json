@@ -22,6 +22,15 @@
       "507": "У плеера нет места для файла"
     }
   },
+  "connection": {
+    "lost": "Нет связи с плеером",
+    "closed": "AIMP закрыт",
+    "deviceOffline": "Устройство не подключено к сети",
+    "retryIn": "Повтор через {{seconds}} с",
+    "connecting": "Подключение…",
+    "retry": "Повторить",
+    "restored": "Связь восстановлена"
+  },
   "app": {
     "name": "AIMP Remote Control"
   },

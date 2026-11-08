@@ -2,7 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { NetworkError } from './errors';
+import { isConnectionError } from './errors';
 import { useEventStream } from './events';
 
 export function ApiProvider({ children }: { children: ReactNode }) {
@@ -10,9 +10,16 @@ export function ApiProvider({ children }: { children: ReactNode }) {
         () =>
             new QueryClient({
                 defaultOptions: {
+                    // Without the player a query waits for it rather than failing; the
+                    // connection state tells React Query, see connection.ts.
                     queries: {
                         staleTime: Infinity,
-                        retry: (failureCount, error) => error instanceof NetworkError && failureCount < 3,
+                        retry: (failureCount, error) => isConnectionError(error) && failureCount < 3,
+                    },
+                    // A command fails at once: run when the player is back, it would
+                    // be one the user no longer means.
+                    mutations: {
+                        networkMode: 'always',
                     },
                 },
             }),

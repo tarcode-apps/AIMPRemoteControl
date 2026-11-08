@@ -1,5 +1,6 @@
 'use client';
 
+import { connectionState, flashConnectionBanner } from '@/app/_api/helpers/connection';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { media } from '@/app/_styles/media';
 import { usePathname, useRouter, useSelectedLayoutSegment } from 'next/navigation';
@@ -84,6 +85,12 @@ function subscribeDepth(onChange: () => void) {
 // `pathname`, and the pending depth would land on a later entry.
 function navigateTo(router: Router, pending: RefObject<number | null>, href: string, depth: number, replace: boolean) {
     if (new URL(href, window.location.href).pathname === window.location.pathname) return;
+    // A screen not loaded before comes from the player, and when that fails Next
+    // loads the whole page instead, which leaves the browser's error page.
+    if (!connectionState().online) {
+        flashConnectionBanner();
+        return;
+    }
     pending.current = depth;
     if (replace) router.replace(href);
     else router.push(href);

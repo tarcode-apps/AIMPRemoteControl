@@ -1,4 +1,5 @@
-import { ApiError, HttpError, NetworkError } from './errors';
+import { reportConnectionFailure } from './connection';
+import { ApiError, HttpError, isConnectionError, NetworkError } from './errors';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -42,6 +43,7 @@ export async function request<T>(method: HttpMethod, path: string, options: Requ
         });
     } catch (cause) {
         if (cause instanceof DOMException && cause.name === 'AbortError') throw cause;
+        reportConnectionFailure();
         throw new NetworkError(cause);
     }
 
@@ -51,5 +53,7 @@ export async function request<T>(method: HttpMethod, path: string, options: Requ
         if (!contentType?.includes('application/json')) throw new HttpError(response.status);
         return (await response.json()) as T;
     }
-    throw responseError(response.status, contentType, await response.text());
+    const error = responseError(response.status, contentType, await response.text());
+    if (isConnectionError(error)) reportConnectionFailure();
+    throw error;
 }

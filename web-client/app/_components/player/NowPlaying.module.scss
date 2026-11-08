@@ -335,3 +335,8 @@ $lyrics-page-height: 6 * 22px;
         text-align: right;
     }
 }
+
+// The track as it was when the player was lost.
+.offline {
+    opacity: 0.4;
+}

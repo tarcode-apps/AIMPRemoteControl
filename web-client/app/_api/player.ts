@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { useConnection } from './helpers/connection';
 import { useOptimisticMutation } from './helpers/optimistic';
 import { request } from './helpers/request';
 import type { PlayerCommand, PlayerCursor, PlayerPatch, PlayerState, PlayTrackRequest } from './types';
@@ -47,9 +48,11 @@ export function usePlayerCursor() {
 
 // Re-renders on every whole second of the playing track. The clock is state, not
 // read in render, so that memoization sees the position change.
+// Without the player it stands where it was when the loss was shown.
 export function usePlayerPosition(state: PlayerSnapshot | undefined, enabled: boolean): number {
     const [now, setNow] = useState(() => performance.now());
-    const playing = enabled && state?.state === 'playing';
+    const { online, lostAt } = useConnection();
+    const playing = enabled && online && state?.state === 'playing';
     useEffect(() => {
         if (!playing || !state) return;
         let timer: number;
@@ -63,7 +66,7 @@ export function usePlayerPosition(state: PlayerSnapshot | undefined, enabled: bo
         schedule();
         return () => window.clearTimeout(timer);
     }, [playing, state]);
-    return state ? positionOf(state, Math.max(now, state.receivedAt)) : 0;
+    return state ? positionOf(state, Math.max(Math.min(now, lostAt ?? Infinity), state.receivedAt)) : 0;
 }
 
 function useOptimisticPlayerMutation<TVariables>(

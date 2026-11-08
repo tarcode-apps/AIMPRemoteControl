@@ -1,5 +1,6 @@
 'use client';
 
+import { useConnection } from '@/app/_api/helpers/connection';
 import { usePlayerCommand, useSeekBy } from '@/app/_api/player';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -22,6 +23,7 @@ export function SkipButton({ direction, className }: SkipButtonProps) {
     const { t } = useTranslation();
     const command = usePlayerCommand();
     const showError = useErrorToast();
+    const { online } = useConnection();
     const seekBy = useSeekBy();
     const step = direction === 'next' ? seekStep : -seekStep;
 
@@ -29,6 +31,7 @@ export function SkipButton({ direction, className }: SkipButtonProps) {
         <IconButton
             title={t('player.holdToSeek', { action: t(`player.${direction}`) })}
             className={clsx(styles.button, className)}
+            disabled={!online}
             hold={{ delay: seekHoldDelay, repeat: seekInterval, action: () => seekBy(step, showError) }}
             onClick={() => command.mutate(direction, { onError: showError })}
         >

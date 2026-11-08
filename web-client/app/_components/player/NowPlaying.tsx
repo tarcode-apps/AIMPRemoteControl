@@ -1,5 +1,6 @@
 'use client';
 
+import { useConnection } from '@/app/_api/helpers/connection';
 import { usePlayer, usePlayerCommand, usePlayerPosition, useSetPlayer } from '@/app/_api/player';
 import { usePlaylists, useSetItemMark } from '@/app/_api/playlists';
 import type { PlayerCommand, PlayerPatch, RepeatMode } from '@/app/_api/types';
@@ -62,8 +63,11 @@ export function NowPlaying() {
     const setMark = useSetItemMark();
     // Every control here reports a refusal in the toast.
     const showError = useErrorToast();
+    const { online } = useConnection();
     const runCommand = (name: PlayerCommand) => command.mutate(name, { onError: showError });
     const patchPlayer = (patch: PlayerPatch) => setPlayer.mutate(patch, { onError: showError });
+    const markTrack = (playlistId: string, index: number, mark: number) =>
+        setMark.mutate({ playlistId, index, mark }, { onError: showError });
     const shown = expanded || docked;
     const position = usePlayerPosition(player, shown);
 
@@ -247,12 +251,7 @@ export function NowPlaying() {
                         mark={track.mark}
                         rating={track.rating}
                         displayingMark={track.displayingMark}
-                        onChange={mark =>
-                            setMark.mutate(
-                                { playlistId: track.playlistId, index: track.index, mark },
-                                { onError: showError },
-                            )
-                        }
+                        onChange={online ? mark => markTrack(track.playlistId, track.index, mark) : undefined}
                     />
                 )}
                 <div className={clsx(styles.actions, volumeOpen && styles.volumeOpen)}>
@@ -261,7 +260,7 @@ export function NowPlaying() {
                             title={captureTitle}
                             className={clsx(styles.capture, capturing && styles.capturing)}
                             aria-pressed={capturing}
-                            disabled={!track?.isUrl}
+                            disabled={!track?.isUrl || !online}
                             onClick={() => patchPlayer({ radioCapture: !capturing })}
                         >
                             <Icon>sensors</Icon>
@@ -273,6 +272,7 @@ export function NowPlaying() {
                                 <IconButton
                                     title={t(mute ? 'player.unmute' : 'player.mute')}
                                     className={clsx(styles.toggle, mute && styles.on)}
+                                    disabled={!online}
                                     onClick={() => {
                                         adjust({ volume: mute ? lastVolume.current : volume, mute: !mute });
                                         patchPlayer({ mute: !mute });
@@ -285,6 +285,7 @@ export function NowPlaying() {
                                     value={shownVolume}
                                     max={1}
                                     step={0.01}
+                                    disabled={!online}
                                     onChange={value => setVolume(value, false)}
                                     onCommit={value => setVolume(value, true)}
                                 />
@@ -294,6 +295,7 @@ export function NowPlaying() {
                             title={volumeLabel}
                             className={clsx(volumeOpen && styles.on)}
                             aria-expanded={volumeOpen}
+                            disabled={!online}
                             onClick={() => setVolumeOpen(!volumeOpen)}
                         >
                             <Icon>{volumeIcon(shownVolume, mute)}</Icon>
@@ -306,7 +308,7 @@ export function NowPlaying() {
             </header>
             <div ref={coverArea} className={styles.cover}>
                 {/* Loaded while the sheet is closed too, so that it opens on the image rather than the placeholder. */}
-                <TrackCover hash={track?.coverHash} className={styles.coverBox} />
+                <TrackCover hash={track?.coverHash} className={clsx(styles.coverBox, !online && styles.offline)} />
                 {roomy && lyricsShown && track && (
                     <Lyrics
                         className={styles.coverLyrics}
@@ -377,6 +379,7 @@ export function NowPlaying() {
                 <IconButton
                     title={t('player.shuffle')}
                     className={clsx(styles.toggle, styles.sideButton, styles.sideStart, player?.shuffle && styles.on)}
+                    disabled={!online}
                     onClick={() => player && patchPlayer({ shuffle: !player.shuffle })}
                 >
                     <Icon>shuffle</Icon>
@@ -386,6 +389,7 @@ export function NowPlaying() {
                     <>
                         <IconButton
                             title={t('player.stop')}
+                            disabled={!online}
                             className={clsx(transport.button, styles.wide)}
                             onClick={() => runCommand('stop')}
                         >
@@ -393,6 +397,7 @@ export function NowPlaying() {
                         </IconButton>
                         <IconButton
                             title={t('player.play')}
+                            disabled={!online}
                             className={clsx(transport.button, styles.big)}
                             onClick={() => runCommand('play')}
                         >
@@ -400,6 +405,7 @@ export function NowPlaying() {
                         </IconButton>
                         <IconButton
                             title={t('player.pause')}
+                            disabled={!online}
                             className={clsx(transport.button, styles.wide)}
                             onClick={() => runCommand('pause')}
                         >
@@ -419,6 +425,7 @@ export function NowPlaying() {
                         styles.sideEnd,
                         repeat !== 'off' && styles.on,
                     )}
+                    disabled={!online}
                     onClick={() => patchPlayer({ repeat: repeatCycle[repeat] })}
                 >
                     {/* The font has no crossed-out repeat, so the stroke is drawn over it. */}
@@ -432,7 +439,7 @@ export function NowPlaying() {
                 value={position}
                 max={duration}
                 // A stream has no length to seek in.
-                disabled={duration <= 0}
+                disabled={duration <= 0 || !online}
                 onCommit={value => patchPlayer({ position: value })}
             />
             <div className={styles.times}>

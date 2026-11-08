@@ -116,5 +116,7 @@ void webapi::EventsController::Register(IEndpointRouteBuilder &endpoints)
 			for (int kind = 0; kind < StateUpdateEvents::KindCount; ++kind)
 				if (changed.test(kind) && !stream.Send(EventName(kind), EventData(core, events, covers, settings, timer, kind).dump()))
 					return;
-		} });
+		}
+		// The player is closing: a client can tell it from a lost network.
+		stream.Send("shutdown", "{}"); });
 }

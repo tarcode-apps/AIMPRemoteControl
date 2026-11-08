@@ -1,0 +1,64 @@
+@use "../../_styles/mixins" as mixins;
+
+// Under the top inset, as tall as the root's --connection-banner-height, which
+// grows and shrinks as the banner comes and goes.
+.banner {
+    position: fixed;
+    top: env(safe-area-inset-top, 0px);
+    left: 0;
+    right: 0;
+    z-index: 30;
+    height: var(--connection-banner-height);
+    overflow: hidden;
+    background: var(--color-surface);
+    color: var(--color-text);
+}
+
+// At the bottom of the banner, so that it slides out from under the top edge.
+.content {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: var(--connection-banner-bar-height);
+    padding: 0 calc(4px + var(--safe-right)) 0 calc(16px + var(--safe-left));
+}
+
+.icon {
+    flex: none;
+    color: var(--color-accent);
+}
+
+.text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.title {
+    @include mixins.ellipsis;
+
+    font-weight: var(--font-weight-medium);
+}
+
+.details {
+    @include mixins.ellipsis;
+
+    font-size: 0.875em;
+    color: var(--color-text-secondary);
+}
+
+// What needed the player was not done: the banner says why.
+.flash {
+    animation: flash 0.3s ease-out 2;
+}
+
+@keyframes flash {
+    from {
+        background: var(--color-selection-soft);
+    }
+}

@@ -1249,6 +1249,7 @@ change; the payload is a JSON object.
 | `effects` | the balance, speed, tempo, pitch, a sound effect or the equalizer changed, in the player's window or through the API | the same object as [`GET /api/v1/effects`](#get-apiv1effects) |
 | `settings` | the plugin's settings were saved on its options page | the same object as [`GET /api/v1/settings`](#get-apiv1settings) |
 | `ping` | after 30 s without events | `{}` — nothing changed |
+| `shutdown` | the player is closing; the stream ends after it | `{}` — tells a closed player from a lost connection, which ends the stream without a word |
 
 A track switch raises several player changes within a few milliseconds, with
 a stopped player in between, and a slider dragged in the player's window raises
@@ -1261,10 +1262,10 @@ server notice a client that went away, and lets a client notice a connection
 that died without a word, which a browser's `EventSource` goes on calling open:
 a stream silent for longer than two pings is dead. It is an event rather than
 a comment line because scripts never see comments. On player shutdown the
-stream ends; while the player is down, a proxy in front of it answers the
-reconnection with an error status, on which a browser's `EventSource` gives
-up for good — a client that wants to outlive a restart reopens the stream
-itself.
+stream sends `shutdown` and ends; while the player is down, a proxy in front
+of it answers the reconnection with an error status, on which a browser's
+`EventSource` gives up for good — a client that wants to outlive a restart
+reopens the stream itself.
 
 Each open stream occupies one worker thread of the HTTP server, like the
 long polls of the frozen protocol, so they are capped together: at most 16 per

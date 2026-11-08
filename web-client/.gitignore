@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+# what the end-to-end tests create: the throwaway player, media, results
+/e2e/runtime/
 
 # next.js
 /.next/

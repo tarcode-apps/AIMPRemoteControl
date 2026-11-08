@@ -171,7 +171,7 @@ function preparePlayerDir() {
         throw new Error(`AIMP.exe is not in ${installDir}; set AIMP_DIR to the player's folder`);
     if (!fs.existsSync(path.join(pluginDistDir, 'aimp_remote_control.dll')))
         throw new Error(
-            `the plugin is not built: ${pluginDistDir} has no aimp_remote_control.dll (run build-windows.ps1 -Arch x64)`,
+            `the plugin is not built: ${pluginDistDir} has no aimp_remote_control.dll (run plugin/build-windows.ps1 -Arch x64)`,
         );
 
     removePlayerDir();

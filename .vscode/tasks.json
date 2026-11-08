@@ -12,7 +12,7 @@
                 "-ExecutionPolicy",
                 "Bypass",
                 "-File",
-                "${workspaceFolder}\\deploy-windows.ps1",
+                "${workspaceFolder}\\plugin\\deploy-windows.ps1",
                 "-Config",
                 "Debug",
                 "-NoStart"
@@ -30,7 +30,7 @@
                 "-ExecutionPolicy",
                 "Bypass",
                 "-File",
-                "${workspaceFolder}\\deploy-wsl.ps1",
+                "${workspaceFolder}\\plugin\\deploy-wsl.ps1",
                 "-Config",
                 "Debug",
                 "-NoStart"

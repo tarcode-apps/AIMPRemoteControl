@@ -11,7 +11,7 @@ import { runtimeDir } from './lib/paths';
 const playerUrl = process.env.E2E_PLAYER_URL ?? defaultPlayerUrl;
 
 // The web client under test: the one the plugin serves from
-// dist/windows-x64/wwwroot (built with `npm run build`), or a dev server such as
+// plugin/dist/windows-x64/wwwroot (built with `npm run build`), or a dev server such as
 // http://localhost:3334.
 const clientUrl = process.env.E2E_CLIENT_URL ?? playerUrl;
 

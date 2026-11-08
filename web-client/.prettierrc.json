@@ -9,6 +9,13 @@
   "htmlWhitespaceSensitivity": "ignore",
   "overrides": [
     {
+      "files": ["*.md"],
+      "options": {
+        "proseWrap": "always",
+        "embeddedLanguageFormatting": "off"
+      }
+    },
+    {
       "files": ["*.ts", "*.js", "*.tsx", "*.jsx", "*.mjs"],
       "options": {
         "tabWidth": 4,

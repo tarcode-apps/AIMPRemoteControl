@@ -106,7 +106,8 @@ test.describe('with authentication', () => {
 
     // As a proxy passes the request line on: the Next dev server drops an empty query.
     test('a URI that names the same resource otherwise passes', async ({ api }) => {
-        expect((await signed(api.context, 'GET', '/api/v1/player', { signedUri: '/api/v1/player?' })).status()).toBe(200);
+        const same = await signed(api.context, 'GET', '/api/v1/player', { signedUri: '/api/v1/player?' });
+        expect(same.status()).toBe(200);
     });
 
     test('a URI that names another resource is a bad request, not a failed attempt', async ({ api }) => {

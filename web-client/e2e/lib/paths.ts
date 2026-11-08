@@ -8,5 +8,5 @@ export const repoRoot = path.resolve(webClientDir, '..');
 // Playwright's results and its report. Ignored by git.
 export const runtimeDir = path.join(e2eDir, 'runtime');
 
-// The built plugin, as `build-windows.ps1 -Arch x64` leaves it.
-export const pluginDistDir = path.join(repoRoot, 'dist', 'windows-x64');
+// The built plugin, as `plugin/build-windows.ps1 -Arch x64` leaves it.
+export const pluginDistDir = path.join(repoRoot, 'plugin', 'dist', 'windows-x64');

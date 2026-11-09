@@ -114,7 +114,7 @@ HRESULT WINAPI AIMPPlugin::Initialize(IAIMPCore *Core)
 	FStateEvents.Start(Core);
 	FCoverIndex = std::make_unique<webapi::CoverIndex>(Core);
 	FSleepTimer.Start(Core, FStateEvents);
-	FDiscoveryServer.Start(FNetworkWatcher);
+	FDiscoveryServer.Start(FNetworkWatcher, FSettings);
 
 	std::vector<std::unique_ptr<IApiController>> commands;
 	commands.push_back(std::make_unique<rpcapi::VersionCommand>(Core));

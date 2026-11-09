@@ -11,6 +11,7 @@
 #include <asio.hpp>
 
 #include "networkWatcher.h"
+#include "settings.h"
 
 struct AIMPServiceDiscoveryServer::Impl
 {
@@ -26,7 +27,7 @@ struct AIMPServiceDiscoveryServer::Impl
 	asio::io_context Io;
 	asio::executor_work_guard<asio::io_context::executor_type> Work{asio::make_work_guard(Io)};
 	std::map<std::string, std::shared_ptr<Listener>> Listeners;
-	std::string Reply;
+	const SharedSettings *Settings = nullptr;
 	std::thread Thread;
 
 	void Receive(const std::shared_ptr<Listener> &listener)
@@ -37,7 +38,10 @@ struct AIMPServiceDiscoveryServer::Impl
 												if (ec == asio::error::operation_aborted || !listener->Socket.is_open())
 													return;
 												if (!ec)
-													listener->Socket.send_to(asio::buffer(Reply), listener->Sender, 0, ec);
+												{
+													const std::string reply = Settings->Get().EffectivePlayerName();
+													listener->Socket.send_to(asio::buffer(reply), listener->Sender, 0, ec);
+												}
 												Receive(listener);
 											});
 	}
@@ -103,13 +107,13 @@ struct AIMPServiceDiscoveryServer::Impl
 AIMPServiceDiscoveryServer::AIMPServiceDiscoveryServer() = default;
 AIMPServiceDiscoveryServer::~AIMPServiceDiscoveryServer() { Stop(); }
 
-bool AIMPServiceDiscoveryServer::Start(NetworkWatcher &network)
+bool AIMPServiceDiscoveryServer::Start(NetworkWatcher &network, const SharedSettings &settings)
 {
 	if (FImpl)
 		return true;
 
 	auto impl = std::make_unique<Impl>();
-	impl->Reply = asio::ip::host_name();
+	impl->Settings = &settings;
 	Impl *p = impl.get();
 	network.Subscribe([p](const std::vector<NetworkAddress> &allowed)
 					  {

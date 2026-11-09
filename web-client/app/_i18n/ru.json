@@ -34,6 +34,12 @@
   "app": {
     "name": "AIMP Remote Control"
   },
+  "about": {
+    "address": "Адрес",
+    "plugin": "Плагин",
+    "source": "Исходный код",
+    "licenses": "Лицензии"
+  },
   "nav": {
     "main": "Основная навигация",
     "playlists": "Плейлисты",

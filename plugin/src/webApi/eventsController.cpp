@@ -8,6 +8,7 @@
 
 #include "effectsController.h"
 #include "helpers/coverIndex.h"
+#include "player/playerFeatures.h"
 #include "playerController.h"
 #include "pluginInfo.h"
 #include "requestScope.h"
@@ -20,6 +21,15 @@ namespace
 {
 	constexpr std::chrono::seconds KeepAliveInterval{30};
 	constexpr std::chrono::milliseconds BurstInterval{100};
+
+	std::string HelloData(const std::string &aimpVersion, const SharedSettings &settings)
+	{
+		return nlohmann::json{
+			{"pluginVersion", PLUGIN_VERSION_STRING},
+			{"aimpVersion", aimpVersion},
+			{"name", settings.Get().EffectivePlayerName()},
+		}.dump();
+	}
 
 	nlohmann::json PlaylistsData(StateUpdateEvents &events)
 	{
@@ -79,11 +89,19 @@ namespace
 	}
 }
 
+webapi::EventsController::EventsController(IAIMPCore *core, StateUpdateEvents &events, CoverIndex &covers,
+										   const SharedSettings &settings, const SleepTimer &timer)
+	: FCore(core), FEvents(events), FCovers(covers), FSettings(settings), FTimer(timer),
+	  FAIMPVersion(player::AIMPVersion(core))
+{
+}
+
 void webapi::EventsController::Register(IEndpointRouteBuilder &endpoints)
 {
-	endpoints.MapEventStream("/api/v1/events", [core = FCore, &events = FEvents, &covers = FCovers, &settings = FSettings, &timer = FTimer](IEventStream &stream)
+	endpoints.MapEventStream("/api/v1/events", [core = FCore, &events = FEvents, &covers = FCovers, &settings = FSettings, &timer = FTimer, &aimpVersion = FAIMPVersion](IEventStream &stream)
 					   {
-		if (!stream.Send("hello", nlohmann::json{{"pluginVersion", PLUGIN_VERSION_STRING}}.dump()))
+		std::string hello = HelloData(aimpVersion, settings);
+		if (!stream.Send("hello", hello))
 			return;
 
 		StateUpdateEvents::Versions seen = events.Current();
@@ -116,6 +134,13 @@ void webapi::EventsController::Register(IEndpointRouteBuilder &endpoints)
 			for (int kind = 0; kind < StateUpdateEvents::KindCount; ++kind)
 				if (changed.test(kind) && !stream.Send(EventName(kind), EventData(core, events, covers, settings, timer, kind).dump()))
 					return;
+			if (changed.test(StateUpdateEvents::Settings))
+			{
+				std::string renamed = HelloData(aimpVersion, settings);
+				if (renamed != hello && !stream.Send("hello", renamed))
+					return;
+				hello = std::move(renamed);
+			}
 		}
 		// The player is closing: a client can tell it from a lost network.
 		stream.Send("shutdown", "{}"); });

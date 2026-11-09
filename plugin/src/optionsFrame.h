@@ -48,6 +48,8 @@ private:
 	IAIMPUIForm *FForm = nullptr;
 
 	// Connection group
+	IAIMPUIEdit *FPlayerNameEdit = nullptr;
+	std::vector<IAIMPUIControl *> FConnectionChildren;
 	struct InterfaceCheck
 	{
 		std::string Id;

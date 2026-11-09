@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 class IAIMPCore;
 
 namespace player
@@ -14,4 +16,7 @@ namespace player
 	};
 
 	PlayerFeatures GetPlayerFeatures(IAIMPCore *core);
+
+	// As the player shows it, such as "v6.00.3080 Beta 5".
+	std::string AIMPVersion(IAIMPCore *core);
 }

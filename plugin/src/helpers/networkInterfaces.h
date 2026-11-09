@@ -12,3 +12,5 @@ struct NetworkAddress
 };
 
 std::vector<NetworkAddress> ListIPv4Addresses();
+
+std::string HostName();

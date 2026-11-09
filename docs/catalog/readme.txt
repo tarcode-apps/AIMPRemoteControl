@@ -45,10 +45,11 @@ Not affiliated with the AIMP or the app authors.
 
   Настройки -> Плагины -> Удалённое управление:
 
-  - "Подключение" - список адресов, на которых работает сервер. Откройте
-    один из них в браузере (http://<адрес>:3333/) или введите в
-    приложении, которое умеет и само найти плеер в сети. Снимите галочку
-    с интерфейса, чтобы не слушать на нём.
+  - "Подключение" - имя плеера, которое показывают браузер и приложение
+    (если не задано, это имя компьютера), и список адресов, на которых
+    работает сервер. Откройте один из них в браузере (http://<адрес>:3333/) или
+    введите в приложении, которое умеет и само найти плеер в сети.
+    Снимите галочку с интерфейса, чтобы не слушать на нём.
   - "Разрешения клиента" - что браузеру и приложению позволено помимо
     управления воспроизведением. Всё выключено по умолчанию, включая обзор
     файлов на компьютере, кроме скачивания треков.
@@ -102,10 +103,11 @@ SETUP
 
   Options -> Plugins -> Remote Control:
 
-  - "Connection" lists the addresses the server listens on. Open one of
-    them in a browser (http://<address>:3333/) or enter it in the app,
-    which can also discover the player on the local network. Untick an
-    interface to stop listening on it.
+  - "Connection" names the player, as a browser and the app show it (the
+    computer's name unless set), and lists the addresses the server
+    listens on. Open one of them in a browser (http://<address>:3333/) or
+    enter it in the app, which can also discover the player on the local
+    network. Untick an interface to stop listening on it.
   - "Client permissions" - what browsers and the app may do beyond
     playback. Everything here is off by default, including browsing the
     computer's files, except downloading tracks.

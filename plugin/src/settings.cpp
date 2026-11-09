@@ -3,6 +3,7 @@
 #include "apiCore.h"
 #include "aimpHelper.h"
 #include "md5.h"
+#include "networkInterfaces.h"
 #include "randomBytes.h"
 #include "utf8Path.h"
 
@@ -97,6 +98,7 @@ namespace
 		IAIMPServiceConfig *FConfig = nullptr;
 	};
 
+	constexpr const char *KeyPlayerName = R"(AIMPRemoteControl\PlayerName)";
 	constexpr const char *KeyAuthEnabled = R"(AIMPRemoteControl\Auth\Enabled)";
 	constexpr const char *KeyAuthUsername = R"(AIMPRemoteControl\Auth\Username)";
 	constexpr const char *KeyAuthHa1 = R"(AIMPRemoteControl\Auth\HA1)";
@@ -165,6 +167,7 @@ Settings Settings::Load(IAIMPCore *core)
 	if (!store)
 		return s;
 
+	s.PlayerName = Settings::PlayerNameForStorage(store.GetString(KeyPlayerName));
 	s.Auth.Enabled = store.GetInt(KeyAuthEnabled, 0) != 0;
 	s.Auth.Username = store.GetString(KeyAuthUsername);
 	s.Auth.Ha1 = store.GetString(KeyAuthHa1);
@@ -191,6 +194,10 @@ void Settings::Save(IAIMPCore *core) const
 	if (!store)
 		return;
 
+	if (PlayerName.empty())
+		store.Delete(KeyPlayerName);
+	else
+		store.SetString(KeyPlayerName, PlayerName);
 	store.SetInt(KeyAuthEnabled, Auth.Enabled ? 1 : 0);
 	store.SetString(KeyAuthUsername, Auth.Username);
 	store.SetString(KeyAuthHa1, Auth.Ha1);
@@ -205,6 +212,20 @@ void Settings::Save(IAIMPCore *core) const
 		store.Delete(KeyNetExcludedInterfaces);
 	else
 		store.SetString(KeyNetExcludedInterfaces, JoinList(Network.ExcludedInterfaces, InterfaceListSeparator));
+}
+
+std::string Settings::EffectivePlayerName() const
+{
+	return PlayerName.empty() ? HostName() : PlayerName;
+}
+
+std::string Settings::PlayerNameForStorage(const std::string &name)
+{
+	const std::size_t first = name.find_first_not_of(" \t");
+	if (first == std::string::npos)
+		return {};
+	const std::string trimmed = name.substr(first, name.find_last_not_of(" \t") - first + 1);
+	return trimmed == HostName() ? std::string() : trimmed;
 }
 
 std::string Settings::FeatureSettings::DefaultUploadFolder()

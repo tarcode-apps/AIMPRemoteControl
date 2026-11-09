@@ -1,0 +1,88 @@
+@use "../../_styles/mixins" as mixins;
+
+.header {
+    // The list under it has its own 8 px on top.
+    padding: 8px 12px 0;
+}
+
+.card {
+    display: flex;
+    align-items: center;
+    // The icon and the text where the rows below have theirs.
+    gap: 20px;
+    width: 100%;
+    min-height: 64px;
+    padding: 8px 16px;
+    border-radius: 16px;
+    background: var(--color-surface-raised);
+    text-align: left;
+    transition: background-color 0.15s;
+
+    &:disabled {
+        cursor: default;
+    }
+
+    @include mixins.hover-capable {
+        &:enabled:hover {
+            background-image: linear-gradient(var(--color-hover), var(--color-hover));
+        }
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: -2px;
+    }
+}
+
+.logo {
+    flex: none;
+    width: var(--icon-size);
+    height: var(--icon-size);
+}
+
+.text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.name {
+    @include mixins.ellipsis;
+
+    font-weight: var(--font-weight-medium);
+}
+
+.details {
+    @include mixins.ellipsis;
+
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.facts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 24px;
+    margin: 8px 0 0;
+
+    dt {
+        color: var(--color-text-secondary);
+    }
+
+    dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+    }
+}
+
+.links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    margin: 20px 0 0;
+
+    a {
+        color: var(--color-accent);
+    }
+}

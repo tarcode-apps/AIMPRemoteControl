@@ -1,3 +1,4 @@
+import { receiveAbout, type About } from '@/app/_api/about';
 import { receiveEffects } from '@/app/_api/effects';
 import { favoriteKeys } from '@/app/_api/favorites';
 import { playerKeys, snapshot } from '@/app/_api/player';
@@ -12,7 +13,6 @@ import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { connectionState, setConnectionHandlers, updateConnection } from './connection';
 
-type Hello = { pluginVersion: string };
 type PlaylistsChanged = { playlists: { id: string; revision: number }[] };
 
 const invalidations: Record<string, QueryKey> = {
@@ -150,9 +150,10 @@ export function useEventStream(client: QueryClient) {
             // restarts; one path for both.
             source.onerror = () =>
                 reconnect(waking() ? wakeRetryDelay : Math.min(firstRetryDelay * 2 ** failures++, maxRetryDelay));
-            on<Hello>('hello', ({ pluginVersion }) => {
-                if (knownPluginVersion !== undefined && knownPluginVersion !== pluginVersion) location.reload();
-                knownPluginVersion = pluginVersion;
+            on<About>('hello', about => {
+                if (knownPluginVersion !== undefined && knownPluginVersion !== about.pluginVersion) location.reload();
+                knownPluginVersion = about.pluginVersion;
+                receiveAbout(about);
             });
             on<PlaylistsChanged>('playlists', data => invalidateChangedPlaylists(client, data));
             on<PlayerState>('player', data => client.setQueryData(playerKeys.state, snapshot(data)));

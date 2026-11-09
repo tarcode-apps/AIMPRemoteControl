@@ -23,16 +23,19 @@
 }
 
 // Wider and taller than its stroke, which lies on the edge, rounded on the
-// list's side, so that a finger finds it.
+// list's side, so that a finger finds it. Moved rather than placed, so that a
+// drag does not lay the list out again.
 .thumb {
     --thumb-height: 48px;
 
     position: absolute;
-    top: calc(var(--progress) * (100% - var(--thumb-height)));
+    top: 0;
     right: 0;
     width: 24px;
     height: var(--thumb-height);
+    translate: 0 calc(var(--progress) * (100cqh - var(--thumb-height)));
     pointer-events: auto;
+    cursor: grab;
 
     &::before {
         content: "";
@@ -43,6 +46,22 @@
         height: 22px;
         border-radius: 3px 0 0 3px;
         background: var(--color-accent);
+        transition: width 0.15s;
+    }
+
+    // The stroke widens under a mouse, to say it can be taken.
+    @include mixins.hover-capable {
+        &:hover::before {
+            width: 9px;
+        }
+    }
+}
+
+.dragging {
+    cursor: grabbing;
+
+    &::before {
+        width: 9px;
     }
 }
 

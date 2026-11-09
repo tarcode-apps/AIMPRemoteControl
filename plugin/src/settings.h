@@ -48,9 +48,14 @@ struct Settings
 		std::vector<std::string> ExcludedInterfaces;
 	};
 
+	// Empty for the computer's name, so that renaming the computer renames the player.
+	std::string PlayerName;
 	AuthSettings Auth;
 	FeatureSettings Features;
 	NetworkSettings Network;
+
+	std::string EffectivePlayerName() const;
+	static std::string PlayerNameForStorage(const std::string &name);
 
 	static Settings Load(IAIMPCore *core);
 	void Save(IAIMPCore *core) const;

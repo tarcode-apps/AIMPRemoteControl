@@ -25,6 +25,7 @@ import { usePlayerPanel } from '../player';
 import { useFileUpload, usePlaylistActions } from '../playlists';
 import { Skeleton } from '../skeleton';
 import { useDrawer } from './Drawer';
+import { PlayerCard } from './PlayerCard';
 import styles from './Sidebar.module.scss';
 import { TimerBadge } from './TimerBadge';
 
@@ -293,17 +294,21 @@ function Playlists() {
                         </span>
                     </div>
                 ) : (
-                    <>
-                        <SearchField
-                            className={styles.search}
-                            value={filter}
-                            onChange={setFilter}
-                            placeholder={t('playlists.searchPlaceholder')}
-                        />
-                        <IconButton title={t('playlists.create')} onClick={actions.create}>
-                            <Icon>playlist_add</Icon>
-                        </IconButton>
-                    </>
+                    <SearchField
+                        className={styles.search}
+                        value={filter}
+                        onChange={setFilter}
+                        placeholder={t('playlists.searchPlaceholder')}
+                        actions={
+                            <IconButton
+                                title={t('playlists.create')}
+                                className={styles.createButton}
+                                onClick={actions.create}
+                            >
+                                <Icon>playlist_add</Icon>
+                            </IconButton>
+                        }
+                    />
                 )}
             </div>
             {list}
@@ -367,9 +372,7 @@ export function Sidebar() {
 
     return (
         <nav className={styles.sidebar} aria-label={t('nav.main')} onKeyDown={onNavKeyDown}>
-            <div className={styles.header}>
-                <span className={styles.title}>{t('app.name')}</span>
-            </div>
+            <PlayerCard />
             <div className={styles.playerNav}>
                 <ul className={styles.list}>
                     <li data-row>

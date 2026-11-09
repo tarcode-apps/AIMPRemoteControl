@@ -16,6 +16,7 @@ import {
     twoLineRowHeight,
     useActiveRow,
     usePlaylistDrag,
+    useRowKeys,
 } from '@/app/_components/lists';
 import styles from '@/app/_components/lists/ListPage.module.scss';
 import { useRowMenu } from '@/app/_components/menus';
@@ -26,7 +27,7 @@ import { useTrackActions } from '@/app/_state/useTrackActions';
 import { media } from '@/app/_styles/media';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import clsx from 'clsx';
-import { useId, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type MouseEvent } from 'react';
+import { useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueueMode } from './QueueMode';
 
@@ -51,12 +52,13 @@ export function QueuePage() {
 
     const rows = useMemo(() => new PlaylistRows(items.length, undefined), [items.length]);
     const collapsed = useRef<(row: number) => boolean>(() => false);
+    const [thumbDragging, setThumbDragging] = useState(false);
     // eslint-disable-next-line react-hooks/incompatible-library -- the compiler skips this component, which is fine here
     const virtualizer = useVirtualizer({
         count: rows.count,
         getScrollElement: () => scrollRef.current,
         estimateSize: row => (collapsed.current(row) ? 0 : twoLineRowHeight),
-        overscan: overscanRows,
+        overscan: thumbDragging ? 0 : overscanRows,
     });
     const active = useActiveRow(rows, row => virtualizer.scrollToIndex(row, { align: 'auto' }));
     const virtualRows = virtualizer.getVirtualItems();
@@ -166,8 +168,14 @@ export function QueuePage() {
         );
     }
 
+    const rowKey = useRowKeys(
+        virtualRows.map(row => row.index),
+        () => 'item',
+        !drag.state,
+    );
+
     return (
-        <FastScroll scrollRef={scrollRef}>
+        <FastScroll scrollRef={scrollRef} onDragChange={setThumbDragging}>
             <section
                 ref={scrollRef}
                 className={clsx(styles.page, active.byKeyboard && styles.keyboard)}
@@ -213,7 +221,7 @@ export function QueuePage() {
                             const transform = `translateY(${start + drag.shift(index)}px)`;
                             return (
                                 <div
-                                    key={index}
+                                    key={rowKey(index)}
                                     id={rowId(index)}
                                     role="option"
                                     data-testid="item-row"

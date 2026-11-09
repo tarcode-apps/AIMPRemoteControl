@@ -126,7 +126,8 @@ namespace
 	IAIMPUIEdit *CreateLabeledEdit(IAIMPCore *core, IAIMPServiceUI *svc, IAIMPUIForm *form,
 								   IAIMPUIWinControl *parent, IUnknown *events,
 								   const char *baseName,
-								   std::vector<IAIMPUIControl *> &children)
+								   std::vector<IAIMPUIControl *> &children,
+								   int labelAlign = AIMPUI_ALIGN_NEAR, int bottomGap = 0)
 	{
 		const std::string rowName = std::string("pn") + baseName;
 		auto *row = CreateControl<IAIMPUIPanel>(core, svc, form, parent, nullptr, rowName.c_str(), IID_IAIMPUIPanel);
@@ -134,13 +135,13 @@ namespace
 			return nullptr;
 		row->SetValueAsInt32(AIMPUI_PANEL_PROPID_TRANSPARENT, 1);
 		row->SetValueAsInt32(AIMPUI_PANEL_PROPID_BORDERS, 0);
-		Align(row, ualTop, RowHeight, {RowIndent, RowGap, 0, 0});
+		Align(row, ualTop, RowHeight, {RowIndent, RowGap, 0, bottomGap});
 
 		const std::string labelName = std::string("lb") + baseName;
 		if (auto *label = CreateControl<IAIMPUILabel>(core, svc, form, row, nullptr, labelName.c_str(), IID_IAIMPUILabel))
 		{
 			label->SetValueAsInt32(AIMPUI_LABEL_PROPID_AUTOSIZE, 0);
-			label->SetValueAsInt32(AIMPUI_LABEL_PROPID_TEXTALIGN, AIMPUI_ALIGN_FAR);
+			label->SetValueAsInt32(AIMPUI_LABEL_PROPID_TEXTALIGN, labelAlign);
 			label->SetValueAsInt32(AIMPUI_LABEL_PROPID_TEXTALIGNVERT, AIMPUI_ALIGN_CENTER);
 			Align(label, ualLeft, LabelWidth, {0, 0, LabelGap, 0});
 			children.push_back(label);
@@ -248,6 +249,10 @@ void OptionsFrame::BuildConnectionGroup(IAIMPServiceUI *svc)
 	auto *group = CreateGroup(FCore, svc, FForm, nullptr, "gbConnection", AIMPUI_CHECKMODE_NONE, 0);
 	if (!group)
 		return;
+
+	FPlayerNameEdit = CreateLabeledEdit(FCore, svc, FForm, group, FEvents, "PlayerName", FConnectionChildren);
+	if (FPlayerNameEdit)
+		SetString(FCore, FPlayerNameEdit, AIMPUI_EDIT_PROPID_TEXTHINT, HostName());
 
 	if (auto *hint = CreateControl<IAIMPUILabel>(FCore, svc, FForm, group, nullptr, "lbConnectionHint", IID_IAIMPUILabel))
 	{
@@ -367,19 +372,19 @@ void OptionsFrame::BuildFeaturesGroup(IAIMPServiceUI *svc)
 	FSchedulerCheck = CreateCheckBox(FCore, svc, FForm, group, FEvents, "cbScheduler");
 	FPhysicalDeletionCheck = CreateCheckBox(FCore, svc, FForm, group, FEvents, "cbPhysicalDeletion");
 	FDownloadTracksCheck = CreateCheckBox(FCore, svc, FForm, group, FEvents, "cbDownloadTracks");
+	FBrowseFilesCheck = CreateCheckBox(FCore, svc, FForm, group, FEvents, "cbBrowseFiles");
 	FUploadTracksCheck = CreateCheckBox(FCore, svc, FForm, group, FEvents, "cbUploadTracks");
 
-	FUploadFolderEdit = CreateLabeledEdit(FCore, svc, FForm, group, FEvents, "UploadFolder", FUploadChildren);
+	// Its label against the edit, away from the checkboxes' edge, reads as part of
+	// the upload above it.
+	FUploadFolderEdit = CreateLabeledEdit(FCore, svc, FForm, group, FEvents, "UploadFolder", FUploadChildren,
+										  AIMPUI_ALIGN_FAR, GroupBottomPad);
 	if (FUploadFolderEdit)
 	{
 		IAIMPUIEditButton *button = nullptr;
 		if (Succeeded(FUploadFolderEdit->AddButton(FBrowseEvents, &button)) && button)
 			button->Release();
 	}
-
-	FBrowseFilesCheck = CreateCheckBox(FCore, svc, FForm, group, FEvents, "cbBrowseFiles");
-	if (FBrowseFilesCheck)
-		Align(FBrowseFilesCheck, ualTop, RowHeight, {RowIndent, RowGap, 0, GroupBottomPad});
 
 	group->Release();
 }
@@ -403,6 +408,8 @@ void OptionsFrame::LoadFromSettings()
 	const Settings::FeatureSettings &f = FSettings.Features;
 
 	FLoading = true;
+	if (FPlayerNameEdit)
+		SetString(FCore, FPlayerNameEdit, AIMPUI_BASEEDIT_PROPID_TEXT, FSettings.PlayerName);
 	SetChecked(FAuthGroup, AIMPUI_GROUPBOX_PROPID_CHECKED, a.Enabled);
 	if (FUserEdit)
 		SetString(FCore, FUserEdit, AIMPUI_BASEEDIT_PROPID_TEXT, a.Username);
@@ -432,6 +439,8 @@ void OptionsFrame::SaveToSettings()
 		return;
 
 	Settings s = FSettings;
+	if (FPlayerNameEdit)
+		s.PlayerName = Settings::PlayerNameForStorage(GetPropertyAsString(FPlayerNameEdit, AIMPUI_BASEEDIT_PROPID_TEXT));
 
 	Settings::AuthSettings &a = s.Auth;
 	// Without a password the server would let everyone in while the page showed
@@ -472,6 +481,8 @@ void OptionsFrame::SaveToSettings()
 	FLoading = true;
 	if (FPassEdit)
 		SetString(FCore, FPassEdit, AIMPUI_BASEEDIT_PROPID_TEXT, "");
+	if (FPlayerNameEdit)
+		SetString(FCore, FPlayerNameEdit, AIMPUI_BASEEDIT_PROPID_TEXT, FSettings.PlayerName);
 	FLoading = false;
 	UpdateEnabledStates();
 
@@ -529,6 +540,8 @@ void OptionsFrame::OnBrowseUploadFolder()
 
 void WINAPI OptionsFrame::DestroyFrame()
 {
+	ReleaseAll(FConnectionChildren);
+	Drop(FPlayerNameEdit);
 	ReleaseAll(FAuthChildren);
 	FPassHint = nullptr;
 	FPassNeeded = nullptr;

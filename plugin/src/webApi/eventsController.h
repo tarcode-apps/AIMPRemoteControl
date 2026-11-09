@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "apiController.h"
 
 class IAIMPCore;
@@ -15,8 +17,7 @@ namespace webapi
 	{
 	public:
 		EventsController(IAIMPCore *core, StateUpdateEvents &events, CoverIndex &covers, const SharedSettings &settings,
-						 const SleepTimer &timer)
-			: FCore(core), FEvents(events), FCovers(covers), FSettings(settings), FTimer(timer) {}
+						 const SleepTimer &timer);
 
 		void Register(IEndpointRouteBuilder &endpoints) override;
 
@@ -26,5 +27,6 @@ namespace webapi
 		CoverIndex &FCovers;
 		const SharedSettings &FSettings;
 		const SleepTimer &FTimer;
+		const std::string FAIMPVersion;
 	};
 }

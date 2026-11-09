@@ -20,6 +20,8 @@ export const flingVelocity = 0.5;
 export type PointerDragOptions = {
     axis: 'x' | 'y';
     enabled?: boolean;
+    // Pixels to travel before the drag begins; with 0 it begins at the first move,
+    // whatever its direction.
     threshold?: number;
     // Milliseconds the pointer must stay still before a drag may begin; moving earlier
     // abandons the gesture.
@@ -154,7 +156,7 @@ export function usePointerDrag({
                 // A move mostly along the other axis is another gesture's, such as the
                 // sheet's under a seek bar: the pointer is let go of before the hold.
                 const across = Math.abs(crossPosition(event) - current.crossStart);
-                if (!current.active && across >= threshold && across > Math.abs(delta)) {
+                if (threshold > 0 && !current.active && across >= threshold && across > Math.abs(delta)) {
                     current.detach();
                     gesture.current = null;
                     return;

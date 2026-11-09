@@ -1,6 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '../buttons';
 import { Icon } from '../icons';
@@ -13,9 +14,19 @@ export type SearchFieldProps = {
     autoFocus?: boolean;
     placeholder?: string;
     className?: string;
+    // Buttons at the end of the field, after the one that clears it.
+    actions?: ReactNode;
 };
 
-export function SearchField({ value, onChange, onClose, autoFocus, placeholder, className }: SearchFieldProps) {
+export function SearchField({
+    value,
+    onChange,
+    onClose,
+    autoFocus,
+    placeholder,
+    className,
+    actions,
+}: SearchFieldProps) {
     const { t } = useTranslation();
     const clear = () => {
         onChange('');
@@ -42,6 +53,7 @@ export function SearchField({ value, onChange, onClose, autoFocus, placeholder, 
                     <Icon>close</Icon>
                 </IconButton>
             )}
+            {actions}
         </label>
     );
 }

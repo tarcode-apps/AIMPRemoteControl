@@ -52,8 +52,9 @@ and their changes itself; the plugin works around their absence in older version
 
 Open _Options → Plugins → Remote Control_:
 
-- **Connection** lists the addresses the server listens on — open one in a browser as `http://<address>:3333/`, or enter
-  it in the app, which can also discover the player on the local network. Untick an interface to stop listening on it.
+- **Connection** names the player, as a browser and the app show it (the computer's name unless set), and lists the
+  addresses the server listens on — open one in a browser as `http://<address>:3333/`, or enter it in the app, which can
+  also discover the player on the local network. Untick an interface to stop listening on it.
 - **Client permissions** — what browsers and the app may do beyond playback. Everything here is off by default,
   including browsing the computer's files, except downloading tracks to the client.
 - **Require authentication** — a username and password to control the player; a browser asks for them once. Recommended

@@ -10,6 +10,7 @@
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <netinet/in.h>
+#include <unistd.h>
 #endif
 
 namespace
@@ -85,4 +86,16 @@ std::vector<NetworkAddress> ListIPv4Addresses()
 	freeifaddrs(list);
 #endif
 	return result;
+}
+
+std::string HostName()
+{
+#ifdef _WIN32
+	wchar_t name[256];
+	DWORD size = static_cast<DWORD>(std::size(name));
+	return GetComputerNameExW(ComputerNameDnsHostname, name, &size) ? WideToUtf8(name) : std::string();
+#else
+	char name[256] = {};
+	return gethostname(name, sizeof(name) - 1) == 0 ? std::string(name) : std::string();
+#endif
 }

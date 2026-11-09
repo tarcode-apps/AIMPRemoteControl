@@ -7,22 +7,6 @@
     padding: var(--safe-top) 0 var(--safe-bottom);
 }
 
-.header {
-    display: flex;
-    align-items: center;
-    height: var(--app-bar-height);
-    padding: 0 20px;
-}
-
-.title {
-    @include mixins.ellipsis;
-
-    flex: 1;
-    min-width: 0;
-    font-weight: var(--font-weight-medium);
-    color: var(--color-text-secondary);
-}
-
 .list {
     list-style: none;
     padding: 8px 12px;
@@ -70,8 +54,9 @@
     justify-content: center;
     min-width: 36px;
     height: 36px;
-    // About as far from the pill edge as from its top and bottom; the pill has 16px padding.
-    margin-right: -9px;
+    // As far from the pill's end as from its top and bottom, 6 px, as the buttons
+    // at the end of the other rows are; the pill has 16 px padding.
+    margin-right: -10px;
     padding: 0 10px;
     border-radius: 18px;
     font-size: 14px;
@@ -95,11 +80,10 @@
     border-top: 1px solid var(--color-divider);
 }
 
-// The playlist search and the add button, in the gutter of the list under them.
+// The playlist search with the add button in it, in the gutter of the list under it.
 .playlistsBar {
     display: flex;
     align-items: center;
-    gap: 4px;
     padding: 8px 12px 0;
 }
 
@@ -114,6 +98,13 @@
     min-width: 0;
 }
 
+// The size and place of the badges and menu buttons below; the field ends 4 px after it.
+.createButton {
+    --icon-button-size: 36px;
+
+    margin-right: 2px;
+}
+
 .notFound {
     margin: 0;
     padding: 20px 28px;
@@ -126,14 +117,15 @@
 
 // Room for the menu button, which sits over the pill's right end.
 .playlist {
-    padding-right: 44px;
+    padding-right: 48px;
 }
 
+// The size and place of the badges.
 .menuButton {
-    --icon-button-size: 32px;
+    --icon-button-size: 36px;
     position: absolute;
-    top: 8px;
-    right: 8px;
+    top: 6px;
+    right: 6px;
 
     @include mixins.hover-capable {
         opacity: 0;
@@ -190,9 +182,12 @@
 }
 
 // Under the add button of the bar above: the pill's padding is taken back.
+// The size and place of the badges.
 .pendingButton {
+    --icon-button-size: 36px;
+
     flex: none;
-    margin-right: -16px;
+    margin-right: -10px;
 }
 
 .failure {

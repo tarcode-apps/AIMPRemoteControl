@@ -3,9 +3,8 @@
 
 #include <nlohmann/json.hpp>
 
-#include "apiCore.h"
-#include "aimpHelper.h"
 #include "pluginInfo.h"
+#include "player/playerFeatures.h"
 
 namespace
 {
@@ -19,29 +18,10 @@ namespace
 	{
 		j = {{"aimp_version", v.AIMPVersion}, {"plugin_version", v.PluginVersion}};
 	}
-
-	std::string GetAIMPVersion(IAIMPCore *core)
-	{
-		if (!core)
-			return {};
-		IAIMPServiceVersionInfo *service = nullptr;
-		if (Failed(core->QueryInterface(IID_IAIMPServiceVersionInfo, reinterpret_cast<void **>(&service))) || !service)
-			return {};
-
-		IAIMPString *str = nullptr;
-		std::string result;
-		if (Succeeded(service->FormatInfo(&str)) && str)
-		{
-			result = IAIMPStringToString(str);
-			str->Release();
-		}
-		service->Release();
-		return result;
-	}
 }
 
 void rpcapi::VersionCommand::Register(IEndpointRouteBuilder &endpoints)
 {
 	endpoints.MapRpc("Version", [core = FCore](const nlohmann::json &) -> nlohmann::json
-			{ return VersionInfo{GetAIMPVersion(core), PLUGIN_REMOTE_CONTROL_VERSION}; });
+			{ return VersionInfo{player::AIMPVersion(core), PLUGIN_REMOTE_CONTROL_VERSION}; });
 }

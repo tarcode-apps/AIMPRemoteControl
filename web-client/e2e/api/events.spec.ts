@@ -1,10 +1,16 @@
-import { expect, test } from '../fixtures';
+import os from 'node:os';
+import { expect, test, withPluginSettings } from '../fixtures';
 import { EventStream } from '../lib/events';
 
 type PlaylistsEvent = { playlists: { id: string; revision: number }[] };
 
+const versions = {
+    pluginVersion: expect.stringMatching(/^\d+\.\d+\.\d+\.\d+$/),
+    aimpVersion: expect.stringMatching(/\d/),
+};
+
 test.describe('events', () => {
-    test('greet a new stream with the plugin version', async ({ playerUrl }) => {
+    test("greet a new stream with the versions and the computer's name", async ({ playerUrl }) => {
         // Aborted rather than cancelled: a cancelled body leaves Node's connection
         // open, and the stream holds its place on the server.
         const controller = new AbortController();
@@ -20,7 +26,8 @@ test.describe('events', () => {
         }
         controller.abort();
         expect(text).toMatch(/^retry: 3000/);
-        expect(text).toMatch(/event: hello\ndata: \{"pluginVersion":"\d+\.\d+\.\d+\.\d+"\}/);
+        const hello = /event: hello\ndata: (.*)\n/.exec(text);
+        expect(JSON.parse(hello![1])).toEqual({ ...versions, name: os.hostname() });
     });
 
     test('list every playlist with its revision when one is added or removed', async ({ api, events }) => {
@@ -88,5 +95,13 @@ test.describe('events', () => {
             second.close();
             await api.resetEffects();
         }
+    });
+});
+
+test.describe('events of a named player', () => {
+    withPluginSettings({ playerName: 'rc-e2e player' });
+
+    test('greet with the name from the plugin settings', async ({ events }) => {
+        expect(events.received('hello')[0].data).toEqual({ ...versions, name: 'rc-e2e player' });
     });
 });

@@ -1,21 +1,19 @@
-import type { Metadata, Viewport } from 'next';
+import type { Viewport } from 'next';
 import { ApiProvider } from './_api/helpers/ApiProvider';
 import { ConnectionBanner } from './_components/connection';
 import { PlayerPanel, PlayerPanelProvider } from './_components/player';
 import { Drawer, DrawerContainer, DrawerContent, Sidebar } from './_components/sidenav';
+import { DocumentTitle } from './_components/title';
 import { ToastProvider } from './_components/toast';
 import { DetectLanguage } from './_i18n/DetectLanguage';
-import { fallbackLanguage, resources } from './_i18n/resources';
+import { fallbackLanguage } from './_i18n/resources';
 import { FileDragProvider } from './_state/FileDrag';
 import { NavigationProvider } from './_state/Navigation';
 import { PlaylistSelectionProvider } from './_state/PlaylistSelection';
 import { UploadsProvider } from './_state/Uploads';
 import './_styles/globals.scss';
 
-export const metadata: Metadata = {
-    title: resources[fallbackLanguage].translation.app.name,
-};
-
+// The title is the DocumentTitle component's: it names the player.
 export const viewport: Viewport = {
     themeColor: [
         { media: '(prefers-color-scheme: light)', color: '#ffffff' },
@@ -36,6 +34,7 @@ export default function RootLayout({
         <html lang={fallbackLanguage}>
             <body>
                 <DetectLanguage />
+                <DocumentTitle />
                 <ApiProvider>
                     <ConnectionBanner />
                     <ToastProvider>

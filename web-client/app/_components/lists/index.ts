@@ -25,3 +25,4 @@ export { PlaylistRows, type PlaylistRow, type PlaylistRowKey, type RowSpan } fro
 export { useActiveRow } from './useActiveRow';
 export { usePlaylistDrag, type DragSource, type DragState, type PlaylistDragOptions } from './useListDrag';
 export { useListHeading, type ListHeading, type ListHeadingOptions } from './useListHeading';
+export { useRowKeys } from './useRowKeys';

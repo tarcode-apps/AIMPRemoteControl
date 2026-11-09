@@ -27,7 +27,7 @@ Contents
 | Control channel | JSON-RPC 2.0 over HTTP, `POST /RPC_JSON`, TCP port **3333**              |
 | Binary data     | plain HTTP `GET`/`POST` on the same port (covers, track download/upload) |
 | Push            | long polling via the `SubscribeOnAIMPStateUpdateEvent` method            |
-| Discovery       | UDP port **3332**, request/response with the host name                   |
+| Discovery       | UDP port **3332**, request/response with the player's name               |
 | Authentication  | HTTP Digest (optional, configured on the player)                         |
 | Encoding        | UTF‑8 JSON; all strings are UTF‑8                                        |
 
@@ -187,13 +187,14 @@ HTTP endpoints use HTTP status codes (`401`, `403`, `404`, `400`, `413`, `500`; 
 
 The app can find players on the local network by broadcasting to UDP port 3332.
 
-|          |                                                                                                        |
-| -------- | ------------------------------------------------------------------------------------------------------ |
-| Request  | any UDP datagram to `<broadcast>:3332` (the payload is ignored)                                        |
-| Response | the player's **host name** as a plain string (no terminator), sent to the requester's address and port |
+|          |                                                                                                   |
+| -------- | ------------------------------------------------------------------------------------------------- |
+| Request  | any UDP datagram to `<broadcast>:3332` (the payload is ignored)                                   |
+| Response | the player's **name** as a plain string (no terminator), sent to the requester's address and port |
 
 The app then offers the responder's IP address with port 3333. The server answers only on the network interfaces that
-are enabled in its settings.
+are enabled in its settings. The original sent the computer's host name; this implementation sends the player name set
+on its options page, which is the host name unless set.
 
 ---
 

@@ -219,6 +219,9 @@ export function ItemRow({
             )}
             {showsThumbnail(view) && (
                 <ItemCover
+                    // Its own for each track: a row handed to another track must not show
+                    // the last one's cover while the new one loads.
+                    key={`${playlistId}/${item.index}`}
                     playlistId={playlistId}
                     index={item.index}
                     coverKey={item.cover}

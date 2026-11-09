@@ -3,6 +3,7 @@
 #include <memory>
 
 class NetworkWatcher;
+class SharedSettings;
 
 class AIMPServiceDiscoveryServer
 {
@@ -15,7 +16,8 @@ public:
 	AIMPServiceDiscoveryServer(const AIMPServiceDiscoveryServer &) = delete;
 	AIMPServiceDiscoveryServer &operator=(const AIMPServiceDiscoveryServer &) = delete;
 
-	bool Start(NetworkWatcher &network);
+	// Answers every request with the player's name of the settings, as they are then.
+	bool Start(NetworkWatcher &network, const SharedSettings &settings);
 	void Stop();
 
 private:

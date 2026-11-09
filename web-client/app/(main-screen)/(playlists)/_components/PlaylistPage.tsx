@@ -35,6 +35,7 @@ import {
     useActiveRow,
     useFoldingItems,
     usePlaylistDrag,
+    useRowKeys,
 } from '@/app/_components/lists';
 import styles from '@/app/_components/lists/ListPage.module.scss';
 import { MenuPopover, menuSeparator, useRowMenu, type MenuEntry } from '@/app/_components/menus';
@@ -123,13 +124,14 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
 
     // Filled in by the drag hook below, which needs the virtualizer first.
     const collapsed = useRef<(row: number) => boolean>(() => false);
+    const [thumbDragging, setThumbDragging] = useState(false);
     // eslint-disable-next-line react-hooks/incompatible-library -- the compiler skips this component, which is fine here
     const virtualizer = useVirtualizer({
         count: rows.count,
         getScrollElement: () => scrollRef.current,
         estimateSize: row =>
             collapsed.current(row) ? 0 : rows.at(row).kind === 'group' ? groupRowHeight : itemRowHeight,
-        overscan: overscanRows,
+        overscan: thumbDragging ? 0 : overscanRows,
     });
     const active = useActiveRow(rows, row => virtualizer.scrollToIndex(row, { align: 'auto' }));
     const virtualRows = virtualizer.getVirtualItems();
@@ -620,8 +622,14 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
             );
     }
 
+    const rowKey = useRowKeys(
+        virtualRows.map(row => row.index),
+        index => rows.at(index).kind,
+        !drag.state,
+    );
+
     return (
-        <FastScroll scrollRef={scrollRef} label={topGroupName(rows, virtualizer)}>
+        <FastScroll scrollRef={scrollRef} label={topGroupName(rows, virtualizer)} onDragChange={setThumbDragging}>
             <section
                 ref={scrollRef}
                 className={clsx(styles.page, styles.droppable, active.byKeyboard && styles.keyboard)}
@@ -671,7 +679,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                             if (row.kind === 'group')
                                 return (
                                     <div
-                                        key={index}
+                                        key={rowKey(index)}
                                         id={rowId(index)}
                                         role="option"
                                         data-testid="group-row"
@@ -731,7 +739,7 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                             const item = itemAt(row.position);
                             return (
                                 <div
-                                    key={index}
+                                    key={rowKey(index)}
                                     id={rowId(index)}
                                     role="option"
                                     data-testid="item-row"

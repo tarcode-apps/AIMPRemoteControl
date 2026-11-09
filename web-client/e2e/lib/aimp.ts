@@ -19,6 +19,8 @@ const stopTimeout = 15_000;
 
 // As the player's options page sets them.
 export type PluginSettings = {
+    // Empty for the computer's name.
+    playerName: string;
     physicalDeletion: boolean;
     downloadTracks: boolean;
     uploadTracks: boolean;
@@ -30,6 +32,7 @@ export type PluginSettings = {
 
 // What the tests count on: every permission on and no authentication.
 export const defaultPluginSettings: PluginSettings = {
+    playerName: '',
     physicalDeletion: true,
     downloadTracks: true,
     uploadTracks: true,
@@ -140,6 +143,7 @@ function writePlayerProfile(profile: PlayerProfile) {
 function writePluginSettings(settings: PluginSettings) {
     const flag = (on: boolean) => (on ? '1' : '0');
     setProfileSection('AIMPRemoteControl', {
+        PlayerName: settings.playerName,
         'Auth\\Enabled': flag(settings.auth !== null),
         'Auth\\Username': settings.auth?.username ?? '',
         'Auth\\HA1': settings.auth ? md5(`${settings.auth.username}:${authRealm}:${settings.auth.password}`) : '',

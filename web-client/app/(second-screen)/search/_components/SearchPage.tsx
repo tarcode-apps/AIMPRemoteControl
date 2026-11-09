@@ -21,6 +21,7 @@ import {
     twoLineRowHeight,
     useActiveRow,
     useFoldingItems,
+    useRowKeys,
     type PlaylistRow,
 } from '@/app/_components/lists';
 import styles from '@/app/_components/lists/ListPage.module.scss';
@@ -59,6 +60,10 @@ export function SearchPage() {
     });
     const active = useActiveRow(rows, row => virtualizer.scrollToIndex(row, { align: 'auto' }));
     const virtualRows = virtualizer.getVirtualItems();
+    const rowKey = useRowKeys(
+        virtualRows.map(row => row.index),
+        index => rows.at(index).kind,
+    );
     const first = virtualRows.at(0)?.index;
     const last = virtualRows.at(-1)?.index;
     const pages = pagesAround(
@@ -250,7 +255,7 @@ export function SearchPage() {
                     if (row.kind === 'group')
                         return (
                             <div
-                                key={index}
+                                key={rowKey(index)}
                                 id={rowId(index)}
                                 role="option"
                                 data-testid="group-row"
@@ -282,7 +287,7 @@ export function SearchPage() {
                     const hit = hitAt(row.position);
                     return (
                         <div
-                            key={index}
+                            key={rowKey(index)}
                             id={rowId(index)}
                             role="option"
                             data-testid="item-row"

@@ -68,7 +68,7 @@ e2e/
     media.ts             generated WAV tracks with tags (RIFF INFO, plus ID3 for the rest), CUE sheets, covers, .lrc lyrics
     streams.ts           an HTTP server broadcasting endless silence, a radio station for what only a stream allows
     paths.ts             where things are
-  api/*.spec.ts          one file per resource of the web API, plus the server,
+  api/*.spec.ts          one file per resource of the web API, plus the server, discovery,
                          authentication and permissions
   api/legacy/*.spec.ts   the frozen JSON-RPC protocol of the Android app
   ui/fixtures.ts         the page objects every UI test starts from: app, player

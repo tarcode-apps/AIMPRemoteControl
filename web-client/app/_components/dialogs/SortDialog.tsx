@@ -45,6 +45,8 @@ function OpenSortDialog<By extends SortBy>({
     const [descending, setDescending] = useState(false);
     const byField = fieldSorts.includes(by);
     const ready = by !== 'template' || template.trim() !== '';
+    // Of the whole type, not of `By`: the keys are checked against a known union.
+    const modeLabel = (mode: SortBy) => t(`playlist.sortModes.${mode}`);
 
     const submit = () => {
         if (!ready || pending) return;
@@ -85,7 +87,7 @@ function OpenSortDialog<By extends SortBy>({
                 {modes.map(mode => (
                     <div key={mode}>
                         <label className={dialogStyles.option}>
-                            <span className={dialogStyles.label}>{t(`playlist.sortModes.${mode}`)}</span>
+                            <span className={dialogStyles.label}>{modeLabel(mode)}</span>
                             <Radio name="by" value={mode} checked={by === mode} onChange={() => setBy(mode)} />
                         </label>
                         {mode === 'template' && by === 'template' && (

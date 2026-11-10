@@ -157,28 +157,77 @@ namespace webapi
 		return values;
 	}
 
-	// `indexes`, or `search` with `except`, `groups` and extra `indexes`; see
-	// player::ItemSelection.
-	inline player::ItemSelection SelectionBody(const nlohmann::json &body)
+	inline bool EnabledBody(const nlohmann::json &body)
 	{
-		if (!body.is_object())
+		if (!body.is_object() || !body.contains("enabled") || !body["enabled"].is_boolean())
 			throw ApiError(400, "invalidBody");
-		player::ItemSelection selection;
-		selection.Search = OptionalField<std::string>(body, "search", &nlohmann::json::is_string);
-		if (!selection.Search)
+		return body["enabled"].get<bool>();
+	}
+
+	// A non-empty array of `[from, to]` pairs of positions, each in order.
+	inline std::vector<std::pair<std::int32_t, std::int32_t>> RangeArray(const nlohmann::json &body, const char *name)
+	{
+		if (!body.contains(name))
+			throw ApiError(400, "invalidBody");
+		const nlohmann::json &array = body[name];
+		if (!array.is_array() || array.empty())
+			throw ApiError(400, "invalidBody");
+		std::vector<std::pair<std::int32_t, std::int32_t>> ranges;
+		for (const nlohmann::json &range : array)
 		{
-			if (body.contains("except") || body.contains("groups") || body.contains("fields"))
+			if (!range.is_array() || range.size() != 2 || !range[0].is_number_integer() || !range[1].is_number_integer())
 				throw ApiError(400, "invalidBody");
-			selection.Indexes = IntArray(body, "indexes", true);
-			return selection;
+			const auto from = range[0].get<std::int32_t>();
+			const auto to = range[1].get<std::int32_t>();
+			if (from < 0 || to < from)
+				throw ApiError(400, "invalidBody");
+			ranges.emplace_back(from, to);
 		}
-		selection.Indexes = IntArray(body, "indexes", false);
-		selection.Except = IntArray(body, "except", false);
-		if (body.contains("groups"))
-			selection.Groups = IntArray(body, "groups", false);
+		return ranges;
+	}
+
+	// A selection as a request names it, with the revision of each of its playlists
+	// it was made against, where the client says.
+	struct RequestSelection
+	{
+		player::ItemsSelection Items;
+		std::vector<std::optional<std::uint64_t>> Revisions; // one for each of Items.Playlists
+	};
+
+	// See player::ItemsSelection; with a search only ranges, as its list is what
+	// they count.
+	inline RequestSelection SelectionBody(const nlohmann::json &body)
+	{
+		if (!body.is_object() || !body.contains("playlists"))
+			throw ApiError(400, "invalidBody");
+		const nlohmann::json &playlists = body["playlists"];
+		if (!playlists.is_array() || playlists.empty())
+			throw ApiError(400, "invalidBody");
+		RequestSelection request;
+		player::ItemsSelection &selection = request.Items;
+		const std::optional<std::string> search = OptionalField<std::string>(body, "search", &nlohmann::json::is_string);
+		if (search)
+			selection.Search = *search;
+		else if (body.contains("fields"))
+			throw ApiError(400, "invalidBody");
 		if (body.contains("fields"))
 			selection.Fields = ParseSearchFields(StringArray(body, "fields", true), "invalidBody");
-		return selection;
+		for (const nlohmann::json &json : playlists)
+		{
+			if (!json.is_object() || !json.contains("playlistId") || !json["playlistId"].is_string())
+				throw ApiError(400, "invalidBody");
+			player::PlaylistSelection entry;
+			entry.PlaylistId = json["playlistId"].get<std::string>();
+			if (json.contains("ranges") == json.contains("indexes") || (search && json.contains("indexes")))
+				throw ApiError(400, "invalidBody");
+			if (json.contains("ranges"))
+				entry.Ranges = RangeArray(json, "ranges");
+			else
+				entry.Indexes = IntArray(json, "indexes", true);
+			selection.Playlists.push_back(std::move(entry));
+			request.Revisions.push_back(OptionalField<std::uint64_t>(json, "revision", &nlohmann::json::is_number_unsigned));
+		}
+		return request;
 	}
 
 	// The positions (or indexes) to move, named `listName`, and their `target`.
@@ -189,26 +238,26 @@ namespace webapi
 		return {IntArray(body, listName, true), body["target"].get<std::int32_t>()};
 	}
 
-	inline void ThrowUnlessOk(player::MutationResult result)
+	inline void ThrowUnlessOk(player::MutationResult result, nlohmann::json details = nlohmann::json::object())
 	{
 		switch (result)
 		{
 		case player::MutationResult::Ok:
 			return;
 		case player::MutationResult::PlaylistNotFound:
-			throw ApiError(404, "playlistNotFound");
+			throw ApiError(404, "playlistNotFound", std::move(details));
 		case player::MutationResult::PlaylistReadOnly:
-			throw ApiError(403, "playlistReadOnly");
+			throw ApiError(403, "playlistReadOnly", std::move(details));
 		case player::MutationResult::GroupNotFound:
-			throw ApiError(404, "groupNotFound");
+			throw ApiError(404, "groupNotFound", std::move(details));
 		case player::MutationResult::ItemNotFound:
-			throw ApiError(404, "itemNotFound");
+			throw ApiError(404, "itemNotFound", std::move(details));
 		case player::MutationResult::ItemInContainer:
-			throw ApiError(400, "itemInContainer");
+			throw ApiError(400, "itemInContainer", std::move(details));
 		case player::MutationResult::FilesNotDeletable:
-			throw ApiError(403, "filesNotDeletable");
+			throw ApiError(403, "filesNotDeletable", std::move(details));
 		case player::MutationResult::Failed:
-			throw ApiError(500, "playlistUpdateFailed");
+			throw ApiError(500, "playlistUpdateFailed", std::move(details));
 		}
 	}
 
@@ -222,6 +271,29 @@ namespace webapi
 			throw ApiError(400, "invalidBody");
 		if (body["revision"].get<std::uint64_t>() != current)
 			throw ApiError(409, changedCode);
+	}
+
+	// The error names the playlist that failed, by its place in the selection.
+	inline void ThrowUnlessOk(player::MutationResult result, const RequestSelection &request, std::size_t failedPlaylist)
+	{
+		if (result == player::MutationResult::Ok)
+			return;
+		const std::vector<player::PlaylistSelection> &playlists = request.Items.Playlists;
+		nlohmann::json details = nlohmann::json::object();
+		if (failedPlaylist < playlists.size())
+			details["playlistId"] = playlists[failedPlaylist].PlaylistId;
+		ThrowUnlessOk(result, std::move(details));
+	}
+
+	// The error names the playlist whose revision has moved on.
+	inline void CheckSelectionRevisions(const RequestSelection &request, StateUpdateEvents &events)
+	{
+		for (std::size_t i = 0; i < request.Revisions.size(); ++i)
+		{
+			const std::string &playlistId = request.Items.Playlists[i].PlaylistId;
+			if (request.Revisions[i] && *request.Revisions[i] != events.PlaylistRevision(playlistId))
+				throw ApiError(409, "playlistChanged", {{"playlistId", playlistId}});
+		}
 	}
 
 	// Zero for a playlist the events have not seen.

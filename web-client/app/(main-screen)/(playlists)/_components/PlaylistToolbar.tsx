@@ -1,8 +1,8 @@
 'use client';
 
 import { useFormats } from '@/app/_api/files';
+import { useSetItemsEnabled } from '@/app/_api/items';
 import { usePlayer } from '@/app/_api/player';
-import { useSetItemsEnabled } from '@/app/_api/playlists';
 import { useEnqueue } from '@/app/_api/queue';
 import { useSettings } from '@/app/_api/settings';
 import type { FileType } from '@/app/_api/types';
@@ -48,35 +48,16 @@ export function PlaylistToolbar() {
     const fileInput = useRef<HTMLInputElement>(null);
     const [sortDialog, setSortDialog] = useState(false);
     const [urlDialog, setUrlDialog] = useState(false);
+    const selection = mode.itemsSelection;
     const enqueueSelected = (atBeginning: boolean) => {
-        const selection = mode.itemSelection();
-        if (selected && selection)
-            enqueue.mutate(
-                { playlistId: selected.id, revision: selected.revision, atBeginning, ...selection },
-                { onError: showError },
-            );
+        if (selection) enqueue.mutate({ ...selection, atBeginning }, { onError: showError });
     };
     const addSelectedToFavorites = () => {
-        const selection = mode.itemSelection();
-        if (selected && selection)
-            void favoriteActions
-                .addSelections([{ playlistId: selected.id, revision: selected.revision, selection }])
-                .catch(showError);
-    };
-    const selectedRemoval = () => {
-        const selection = mode.itemSelection();
-        return selected && selection
-            ? { parts: [{ playlistId: selected.id, revision: selected.revision, selection }] }
-            : undefined;
+        if (selection) void favoriteActions.addSelection(selection).catch(showError);
     };
     const setItemsEnabled = useSetItemsEnabled();
     const switchSelected = (enabled: boolean) => {
-        const selection = mode.itemSelection();
-        if (selected && selection)
-            setItemsEnabled.mutate(
-                { playlistId: selected.id, revision: selected.revision, enabled, ...selection },
-                { onError: showError },
-            );
+        if (selection) setItemsEnabled.mutate({ ...selection, enabled }, { onError: showError });
     };
     // Only while the playlist shows its switch column: hidden, the player plays
     // every track.
@@ -199,7 +180,7 @@ export function PlaylistToolbar() {
                         onSelect: addSelectedToFavorites,
                     },
                     ...switchEntries,
-                    ...removal.selectionItems(selectedRemoval, mode.nothingSelected || !selected || selected.readOnly),
+                    ...removal.selectionItems(() => selection),
                     ...(mode.mode === 'search' ? [extendedSearch] : []),
                 ]}
                 sorting={

@@ -139,6 +139,9 @@
 // value, which may run to several lines. Positioned for the held label, which
 // is taken out of the flow and must not stretch the page.
 .line {
+    // The height of a line of the text, which the icon is centred on.
+    --line-text-height: calc(var(--font-size-body) * var(--line-height-body));
+
     position: relative;
     display: flex;
     align-items: flex-start;
@@ -151,10 +154,10 @@
     padding: 6px 0;
 }
 
+// On the first line of the text, which may be smaller than the glyph.
 .icon {
     flex: none;
-    // The 24px glyph on the text's line.
-    margin-top: -1px;
+    margin-top: calc((var(--line-text-height) - var(--icon-size)) / 2);
 }
 
 @include mixins.drawer-docked {
@@ -232,9 +235,12 @@
 }
 
 .fields .file {
+    --file-font-size: 13px;
+    --line-text-height: calc(var(--file-font-size) * var(--line-height-body));
+
     min-height: 0;
     padding: 0;
-    font-size: 13px;
+    font-size: var(--file-font-size);
     color: var(--color-text-secondary);
 }
 

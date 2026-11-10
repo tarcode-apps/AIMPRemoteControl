@@ -9,6 +9,7 @@
     height: 100%;
     overflow-y: auto;
     scrollbar-width: none;
+    user-select: text;
     font-size: var(--font-size-subtitle);
     line-height: 22px;
     text-align: center;

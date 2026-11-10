@@ -167,22 +167,22 @@ player::QueueState player::GetQueueState(IAIMPCore *core)
 	return state;
 }
 
-player::MutationResult player::EnqueueItems(IAIMPCore *core, const std::string &playlistId, const ItemSelection &selection, bool atBeginning)
+player::MutationResult player::EnqueueItems(IAIMPCore *core, const ItemsSelection &selection, bool atBeginning, std::size_t &failedPlaylist)
 {
-	IAIMPPlaylist *playlist = LoadedPlaylistByAIMPId(core, playlistId);
-	if (!playlist)
-		return MutationResult::PlaylistNotFound;
+	std::vector<ResolvedPlaylist> resolved;
+	const MutationResult opened = ResolveSelection(core, selection, false, resolved, failedPlaylist);
+	if (opened != MutationResult::Ok)
+		return opened;
 	IAIMPObjectList *list = nullptr;
 	HRESULT result = core->CreateObject(IID_IAIMPObjectList, reinterpret_cast<void **>(&list));
-	bool found = Succeeded(result);
-	if (found)
-		found = VisitSelectedItems(core, playlist, selection, [&](const PlaylistItemContext &ctx, std::int32_t)
-								   {
+	for (const ResolvedPlaylist &playlist : resolved)
+		VisitResolvedItems(core, playlist, [&](const PlaylistItemContext &ctx, std::int32_t)
+						   {
 			if (Succeeded(result))
 				result = list->Add(ctx.Item); });
-	playlist->Release();
+	resolved.clear();
 
-	if (found && Succeeded(result) && list->GetCount() > 0)
+	if (Succeeded(result) && list->GetCount() > 0)
 	{
 		IAIMPPlaylistQueue *queue = Queue(core);
 		result = queue ? queue->AddList(list, atBeginning) : E_FAIL;
@@ -191,7 +191,7 @@ player::MutationResult player::EnqueueItems(IAIMPCore *core, const std::string &
 	}
 	if (list)
 		list->Release();
-	return found ? ResultOf(result) : MutationResult::ItemNotFound;
+	return ResultOf(result);
 }
 
 player::MutationResult player::EnqueueItem(IAIMPCore *core, IAIMPPlaylistItem *item, bool atBeginning)

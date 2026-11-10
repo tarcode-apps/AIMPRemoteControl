@@ -1,13 +1,20 @@
 'use client';
 
-import { useQueue } from '@/app/_api/queue';
+import { useQueue, useRemoveFromQueue } from '@/app/_api/queue';
 import type { QueueItem } from '@/app/_api/types';
 import { useListMode, type ListModeValue } from '@/app/_components/lists';
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { useErrorToast } from '@/app/_components/toast';
+import { useOnChange } from '@/app/_hooks/useOnChange';
+import { createContext, useContext, useMemo, type ReactNode } from 'react';
 
 export type QueueModeContextValue = ListModeValue & {
     // The items the list shows: the whole queue, or the search's matches.
     items: QueueItem[];
+    selectedItems(): QueueItem[];
+    // Takes the items out of the queue, and the selection with them, as the
+    // positions renumber; the mode stays for the next pick. The menu items and the
+    // Delete key share it.
+    removeFromQueue(items: QueueItem[]): void;
 };
 
 const QueueModeContext = createContext<QueueModeContextValue | null>(null);
@@ -19,14 +26,13 @@ export function useQueueMode(): QueueModeContextValue {
 }
 
 export function QueueModeProvider({ children }: { children: ReactNode }) {
+    const showError = useErrorToast();
     const list = useListMode('queue');
     const { data } = useQueue();
-    // The selection names entries by position, which the player moves as it plays.
-    const [revision, setRevision] = useState(data?.revision);
-    if (revision !== data?.revision) {
-        setRevision(data?.revision);
-        list.clearSelection();
-    }
+    const remove = useRemoveFromQueue();
+    // The selection names the items shown by position, which the player moves as
+    // it plays.
+    useOnChange(data?.revision, list.clearSelection);
     const all = data?.items;
     const { text } = list;
     // The queue is small and loaded whole, so the search runs on the client.
@@ -38,5 +44,19 @@ export function QueueModeProvider({ children }: { children: ReactNode }) {
             item => item.displayText.toLowerCase().includes(needle) || item.secondLine.toLowerCase().includes(needle),
         );
     }, [all, text]);
-    return <QueueModeContext value={{ ...list, items }}>{children}</QueueModeContext>;
+
+    const value: QueueModeContextValue = {
+        ...list,
+        items,
+        selectedItems: () => items.filter((_, position) => list.isSelected(position)),
+        removeFromQueue: removed => {
+            if (!removed.length) return;
+            remove.mutate(
+                { positions: removed.map(item => item.position), revision: data?.revision },
+                { onError: showError },
+            );
+            list.clearSelection();
+        },
+    };
+    return <QueueModeContext value={value}>{children}</QueueModeContext>;
 }

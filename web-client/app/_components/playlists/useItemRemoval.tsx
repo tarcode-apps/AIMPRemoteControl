@@ -1,9 +1,10 @@
 'use client';
 
 import { ApiError, errorMessage } from '@/app/_api/helpers/errors';
-import { usePlaylists, useRemovePlaylistItems } from '@/app/_api/playlists';
+import { selectionOfTracks, useRemoveItems } from '@/app/_api/items';
+import { usePlaylists } from '@/app/_api/playlists';
 import { useSettings } from '@/app/_api/settings';
-import type { SelectionInPlaylist } from '@/app/_api/types';
+import type { ItemsSelection } from '@/app/_api/types';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextButton } from '../buttons';
@@ -22,24 +23,24 @@ export type RemovableTrack = {
     name: string;
 };
 
-// What goes, and what to do once it has gone.
-export type SelectionRemoval = {
-    parts: SelectionInPlaylist[];
-    onRemoved?: (physically: boolean) => void;
-};
+type OnRemoved = (physically: boolean) => void;
 
 type Removal = {
-    parts: SelectionInPlaylist[];
-    physically: boolean;
+    selection: ItemsSelection;
     name?: string;
-    onRemoved?: () => void;
+    onRemoved?: OnRemoved;
 };
 
 export type ItemRemoval = {
-    // "Remove from playlist" and, where the settings allow it, "Delete from disk".
-    trackItems(track: RemovableTrack, onRemoved?: (physically: boolean) => void): MenuItem[];
-    // The same for a selection, which `select` gathers when an item is chosen.
-    selectionItems(select: () => SelectionRemoval | undefined, disabled: boolean): MenuItem[];
+    // "Remove from playlist" and, where the settings allow it, "Delete from disk";
+    // disabled while the track's playlist is read-only.
+    trackItems(track: RemovableTrack, onRemoved?: OnRemoved): MenuItem[];
+    // The same for a selection, which `select` gathers: disabled while it names
+    // nothing or a read-only playlist.
+    selectionItems(select: () => ItemsSelection | undefined, onRemoved?: OnRemoved): MenuItem[];
+    // The Delete key: out of the playlist at once, on the terms of the menu items.
+    removeTrack(track: RemovableTrack, onRemoved?: OnRemoved): void;
+    removeSelection(selection: ItemsSelection | undefined, onRemoved?: OnRemoved): void;
     // The open dialog, for the caller to render.
     dialogs: ReactNode;
 };
@@ -48,44 +49,53 @@ export type ItemRemoval = {
 // together. Deleting from disk asks first; a removal that fails tells why.
 export function useItemRemoval(): ItemRemoval {
     const { t } = useTranslation();
-    const remove = useRemovePlaylistItems();
+    const remove = useRemoveItems();
     const { data: playlists } = usePlaylists();
     const canDelete = useSettings().data?.permissions.physicalDeletion === true;
-    const [dialog, setDialog] = useState<(Removal & { asking: boolean }) | null>(null);
+    const [dialog, setDialog] = useState<(Removal & { physically: boolean; asking: boolean }) | null>(null);
     const close = () => setDialog(null);
 
-    const run = async (removal: Removal) => {
+    const run = async (removal: Removal, physically: boolean) => {
         try {
-            for (const { playlistId, revision, selection } of removal.parts)
-                await remove.mutateAsync({ playlistId, revision, physically: removal.physically, ...selection });
+            await remove.mutateAsync({ ...removal.selection, physically });
         } catch {
-            setDialog({ ...removal, asking: false });
+            setDialog({ ...removal, physically, asking: false });
             return;
         }
         close();
-        removal.onRemoved?.();
+        removal.onRemoved?.(physically);
     };
-    const start = (removal: Removal) => {
+    const start = (removal: Removal | undefined, physically: boolean) => {
+        if (!removal || remove.isPending) return;
         remove.reset();
-        if (removal.physically) setDialog({ ...removal, asking: true });
-        else void run(removal);
+        if (physically) setDialog({ ...removal, physically, asking: true });
+        else void run(removal, physically);
     };
 
-    const items = (removal: (physically: boolean) => Removal | undefined, disabled: boolean, noFile = false) => {
-        const chosen = (physically: boolean) => () => {
-            if (remove.isPending) return;
-            const next = removal(physically);
-            if (next) start(next);
-        };
+    const readOnly = (playlistId: string) => playlists?.find(playlist => playlist.id === playlistId)?.readOnly === true;
+    const ofTrack = (track: RemovableTrack, onRemoved?: OnRemoved): Removal | undefined =>
+        readOnly(track.playlistId) ? undefined : { selection: selectionOfTracks([track]), name: track.name, onRemoved };
+    const ofSelection = (selection: ItemsSelection | undefined, onRemoved?: OnRemoved): Removal | undefined =>
+        selection?.playlists.length && !selection.playlists.some(({ playlistId }) => readOnly(playlistId))
+            ? { selection, onRemoved }
+            : undefined;
+
+    const items = (removal: Removal | undefined, noFile = false) => {
+        const disabled = removal === undefined;
         const entries: MenuItem[] = [
-            { label: t('playlist.removeFromPlaylist'), icon: 'playlist_remove', disabled, onSelect: chosen(false) },
+            {
+                label: t('playlist.removeFromPlaylist'),
+                icon: 'playlist_remove',
+                disabled,
+                onSelect: () => start(removal, false),
+            },
         ];
         if (canDelete)
             entries.push({
                 label: t('playlist.deleteFromDisk'),
                 icon: 'delete',
                 disabled: disabled || noFile,
-                onSelect: chosen(true),
+                onSelect: () => start(removal, true),
             });
         return entries;
     };
@@ -98,7 +108,7 @@ export function useItemRemoval(): ItemRemoval {
                 compact
                 title={t(dialog.physically ? 'playlist.deleteFromDisk' : 'playlist.removeFromPlaylist')}
                 onClose={close}
-                onSubmit={dialog.asking ? () => void run(dialog) : close}
+                onSubmit={dialog.asking ? () => void run(dialog, dialog.physically) : close}
                 actions={
                     dialog.asking ? (
                         <>
@@ -131,34 +141,10 @@ export function useItemRemoval(): ItemRemoval {
         );
 
     return {
-        trackItems: (track, onRemoved) =>
-            items(
-                physically => ({
-                    parts: [
-                        {
-                            playlistId: track.playlistId,
-                            revision: track.revision,
-                            selection: { indexes: [track.index] },
-                        },
-                    ],
-                    physically,
-                    name: track.name,
-                    onRemoved: onRemoved && (() => onRemoved(physically)),
-                }),
-                playlists?.find(playlist => playlist.id === track.playlistId)?.readOnly === true,
-                track.isUrl || track.inContainer,
-            ),
-        selectionItems: (select, disabled) =>
-            items(physically => {
-                const selected = select();
-                return (
-                    selected && {
-                        parts: selected.parts,
-                        physically,
-                        onRemoved: selected.onRemoved && (() => selected.onRemoved?.(physically)),
-                    }
-                );
-            }, disabled),
+        trackItems: (track, onRemoved) => items(ofTrack(track, onRemoved), track.isUrl || track.inContainer),
+        selectionItems: (select, onRemoved) => items(ofSelection(select(), onRemoved)),
+        removeTrack: (track, onRemoved) => start(ofTrack(track, onRemoved), false),
+        removeSelection: (selection, onRemoved) => start(ofSelection(selection, onRemoved), false),
         dialogs,
     };
 }

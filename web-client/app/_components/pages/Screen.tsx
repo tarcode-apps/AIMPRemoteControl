@@ -2,7 +2,7 @@
 
 import { useNavigation } from '@/app/_state/Navigation';
 import clsx from 'clsx';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '../buttons';
 import { Icon } from '../icons';
@@ -45,10 +45,19 @@ export function Screen({
     children,
 }: ScreenProps) {
     const { secondary, detail, open } = useDrawer();
-    const { goBack } = useNavigation();
+    const { goBack, takeScreenFocus } = useNavigation();
     const { t } = useTranslation();
+    const root = useRef<HTMLDivElement>(null);
     const hasToolbar = toolbar != null;
     const withPlayer = player ?? !secondary;
+
+    // The focus asked for this screen goes to its list, else to the screen itself;
+    // checked after each render, as the asking may come before the screen shows.
+    useEffect(() => {
+        if (!takeScreenFocus()) return;
+        const element = root.current;
+        (element?.querySelector<HTMLElement>('[role="listbox"]') ?? element)?.focus();
+    });
 
     useEffect(() => {
         if (!hasToolbar) return;
@@ -64,7 +73,7 @@ export function Screen({
     }, [withPlayer]);
 
     return (
-        <div className={clsx(styles.screen, withPlayer && styles.withPlayer)}>
+        <div ref={root} tabIndex={-1} className={clsx(styles.screen, withPlayer && styles.withPlayer)}>
             <header className={clsx(styles.appBar, tabs && styles.withTabs, search && styles.withSearch)}>
                 {secondary || onBack ? (
                     <IconButton

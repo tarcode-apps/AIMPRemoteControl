@@ -61,6 +61,20 @@ test.describe('track information', () => {
         await expect(info.value('year')).toHaveText('2021');
         await expect(info.value('trackNumber')).toHaveText('7');
         await expect(info.value('file')).toHaveText(playlist.files[0]);
+        // The file's path, smaller at the bottom, keeps to the column of the values
+        // with its icon centred on its first line; on a mobile the path stands
+        // alone, from the edge of the cover.
+        const fileLeft = (await info.value('file').boundingBox())?.x;
+        if (app.drawerDocked) {
+            expect(fileLeft).toBe((await info.value('title').boundingBox())?.x);
+            const offset = await info.line('file').evaluate(line => {
+                const icon = line.querySelector('[aria-hidden="true"]')!.getBoundingClientRect();
+                const value = line.querySelector('dd')!;
+                const lineHeight = parseFloat(getComputedStyle(value).lineHeight);
+                return icon.top + icon.height / 2 - (value.getBoundingClientRect().top + lineHeight / 2);
+            });
+            expect(Math.abs(offset)).toBeLessThan(1);
+        } else expect(fileLeft).toBe((await info.cover.boundingBox())?.x);
         await expect(info.value('lyrics')).toBeHidden();
 
         await info.showLyrics();
@@ -161,7 +175,7 @@ test.describe('track information', () => {
         await expect(info.value('lyrics')).toHaveText('Sung line\nSecond sung line');
         await info.showTags();
 
-        await api.post(`/playlists/${encodeURIComponent(playlist.id)}/items/remove`, { indexes: [1] });
+        await api.post('/items/remove', { playlists: [{ playlistId: playlist.id, indexes: [1] }] });
         await expect(app.notice).toHaveText(t('trackInfo.gone'));
         // What was read stays on screen.
         await expect(info.value('title')).toHaveText('Bravo');

@@ -2,8 +2,8 @@
 
 #include "apiErrors.h"
 
+#include <cstddef>
 #include <cstdint>
-#include <string>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -17,9 +17,11 @@
 namespace
 {
 	using webapi::CheckRevision;
+	using webapi::CheckSelectionRevisions;
 	using webapi::IntArray;
 	using webapi::MoveBody;
 	using webapi::OptionalField;
+	using webapi::RequestSelection;
 	using webapi::SelectionBody;
 	using webapi::ThrowUnlessOk;
 
@@ -55,15 +57,13 @@ void webapi::QueueController::Register(IEndpointRouteBuilder &endpoints)
 
 	endpoints.MapApi(HttpMethod::Post, "/api/v1/queue/items", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {
-		const nlohmann::json &body = request.Body;
-		if (!body.is_object() || !body.contains("playlistId") || !body["playlistId"].is_string())
-			throw ApiError(400, "invalidBody");
-		const std::string playlistId = body["playlistId"].get<std::string>();
-		const player::ItemSelection selection = SelectionBody(body);
-		const bool atBeginning = OptionalField<bool>(body, "atBeginning", &nlohmann::json::is_boolean).value_or(false);
-		CheckRevision(body, events, playlistId);
-		ThrowUnlessOk(RunOnMainThread(core, [&]
-									  { return player::EnqueueItems(core, playlistId, selection, atBeginning); }));
+		const RequestSelection body = SelectionBody(request.Body);
+		const bool atBeginning = OptionalField<bool>(request.Body, "atBeginning", &nlohmann::json::is_boolean).value_or(false);
+		CheckSelectionRevisions(body, events);
+		std::size_t failedPlaylist = 0;
+		const player::MutationResult result = RunOnMainThread(core, [&]
+															  { return player::EnqueueItems(core, body.Items, atBeginning, failedPlaylist); });
+		ThrowUnlessOk(result, body, failedPlaylist);
 		return nlohmann::json::object(); });
 
 	endpoints.MapApi(HttpMethod::Post, "/api/v1/queue/remove", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json

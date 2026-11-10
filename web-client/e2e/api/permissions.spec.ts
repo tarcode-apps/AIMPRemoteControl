@@ -27,8 +27,9 @@ test.describe('with deletion, download, upload and the timer disallowed', () => 
 
     test('files stay on disk, while removing from the playlist still works', async ({ api, playlists }) => {
         const playlist = await playlists.create({ tracks: 3 });
-        const route = `/playlists/${encode(playlist.id)}/items/remove`;
-        const refused = await api.post(route, { indexes: [0], physically: true });
+        const route = '/items/remove';
+        const selection = { playlists: [{ playlistId: playlist.id, indexes: [0] }] };
+        const refused = await api.post(route, { ...selection, physically: true });
         expect(refused.status).toBe(403);
         expect(refused.error?.code).toBe('physicalDeletionDisabled');
         expect(await api.playlistItemCount(playlist.id)).toBe(3);
@@ -40,7 +41,7 @@ test.describe('with deletion, download, upload and the timer disallowed', () => 
         ).toBe(28);
         expect(fs.existsSync(playlist.files[0])).toBe(true);
 
-        expect((await api.post(route, { indexes: [0] })).status).toBe(200);
+        expect((await api.post(route, selection)).status).toBe(200);
         await expect.poll(() => api.playlistItemCount(playlist.id)).toBe(2);
         expect(fs.existsSync(playlist.files[0])).toBe(true);
     });

@@ -1,12 +1,12 @@
 'use client';
 
-import { useItemDetails, usePlaylists } from '@/app/_api/playlists';
-import type { SelectionInPlaylist } from '@/app/_api/types';
+import { selectionOfTracks, useItemDetails, type TrackRef } from '@/app/_api/items';
+import { usePlaylists } from '@/app/_api/playlists';
+import type { ItemsSelection } from '@/app/_api/types';
 import type { MenuItem } from '@/app/_components/menus';
 import { useErrorToast } from '@/app/_components/toast';
 import { useTranslation } from 'react-i18next';
 import { toRecord, useFavorites, type FavoriteRecord } from './Favorites';
-import type { TrackRef } from './useTrackActions';
 
 export function useFavoriteActions() {
     const { t } = useTranslation();
@@ -15,22 +15,21 @@ export function useFavoriteActions() {
     const details = useItemDetails();
     const { data: playlists } = usePlaylists();
 
-    const recordsOf = async ({ playlistId, revision, selection }: SelectionInPlaylist): Promise<FavoriteRecord[]> => {
-        const { items } = await details.mutateAsync({ playlistId, revision, ...selection });
-        const playlistName = playlists?.find(playlist => playlist.id === playlistId)?.name ?? '';
-        return items.map(item => toRecord(item, playlistId, playlistName));
+    // One request for the whole selection, so that the favorites change once and
+    // keep the order of its playlists.
+    const recordsOf = async (selection: ItemsSelection): Promise<FavoriteRecord[]> => {
+        const { items } = await details.mutateAsync(selection);
+        const names = new Map(playlists?.map(playlist => [playlist.id, playlist.name]));
+        return items.map(item => toRecord(item, item.playlistId, names.get(item.playlistId) ?? ''));
     };
 
-    // All the parts are read before anything is added, so that the favorites
-    // change once and keep the order of the parts.
-    const addSelections = async (parts: SelectionInPlaylist[]) =>
-        favorites.add((await Promise.all(parts.map(recordsOf))).flat());
+    const addSelection = async (selection: ItemsSelection) => favorites.add(await recordsOf(selection));
 
     return {
-        addSelections,
+        addSelection,
         // The track takes the place of the favorite whose file is gone.
-        async relink(fileUri: string, { playlistId, index, revision }: TrackRef) {
-            const [record] = await recordsOf({ playlistId, revision, selection: { indexes: [index] } });
+        async relink(fileUri: string, track: TrackRef) {
+            const [record] = await recordsOf(selectionOfTracks([track]));
             if (record) favorites.replace(fileUri, record);
         },
         // Adds the track, or takes it out when it is there already.
@@ -44,14 +43,7 @@ export function useFavoriteActions() {
                 : {
                       label: t('favorites.add'),
                       icon: 'heart_plus',
-                      onSelect: () =>
-                          void addSelections([
-                              {
-                                  playlistId: track.playlistId,
-                                  revision: track.revision,
-                                  selection: { indexes: [track.index] },
-                              },
-                          ]).catch(showError),
+                      onSelect: () => void addSelection(selectionOfTracks([track])).catch(showError),
                   },
     };
 }

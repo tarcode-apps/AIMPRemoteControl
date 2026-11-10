@@ -64,6 +64,7 @@ export function useListHeading({
                 autoFocus
                 onChange={externalSearch ? externalSearch.onChange : mode.setQuery}
                 onClose={externalSearch ? undefined : () => mode.setQuery(null)}
+                onKeyDown={mode.searchKeyDown}
             />
         ),
     };

@@ -270,56 +270,7 @@ As with the mark, there is no `revision` to send, the response is an empty objec
 
 Errors: `400 invalidBody`, `404 playlistNotFound`, `404 itemNotFound`, `500 playlistUpdateFailed`.
 
-### `POST /api/v1/playlists/{id}/items/enabled`
-
-The same for a selection, as one change of the playlist. The body names the items as
-[`POST /api/v1/queue/items`](#post-apiv1queueitems) does, `playlistId` aside, plus `enabled` and an optional `revision`;
-a whole group is `{ "search": "", "groups": [2] }`.
-
-```json
-{ "indexes": [12, 13], "enabled": true, "revision": 7 }
-{ "search": "", "groups": [2], "enabled": false, "revision": 7 }
-```
-
-Errors: `400 invalidBody`, `404 playlistNotFound`, `404 itemNotFound`, `409 playlistChanged`,
-`500 playlistUpdateFailed`.
-
-### `POST /api/v1/playlists/{id}/items/details`
-
-The selected items with the tag fields a client keeps for lists of its own, such as favorites. The body names the items
-as [`POST /api/v1/queue/items`](#post-apiv1queueitems) does, `playlistId` aside, plus an optional `revision`.
-
-```json
-{
-  "items": [
-    {
-      "index": 12,
-      "displayText": "Artist A - Track One",
-      "secondLine": "MP3 :: 44 kHz :: 320 kbps :: Stereo :: 10,16 MB",
-      "duration": 266.4,
-      "size": 10655744,
-      "mark": 4,
-      "rating": 0.8,
-      "displayingMark": 4,
-      "enabled": true,
-      "isUrl": false,
-      "inContainer": false,
-      "cover": "7068c7442182d15a",
-      "fileUri": "C:\\Music\\Artist A\\Track One.mp3",
-      "artist": "Artist A",
-      "album": "Album",
-      "genre": "Rock",
-      "year": "2008",
-      "folder": "Artist A"
-    }
-  ]
-}
-```
-
-The items are [playlist items](#get-apiv1playlistsiditems) with the tags as written, empty when missing; `secondLine`
-follows the playlist's template whether or not the playlist shows it, `folder` is the name of the file's folder.
-
-Errors: `400 invalidBody`, `404 playlistNotFound`, `404 itemNotFound`, `409 playlistChanged`.
+The same for a selection, which may span playlists, is [`POST /api/v1/items/enabled`](#post-apiv1itemsenabled).
 
 ### `GET /api/v1/playlists/{id}/items/info?uri=…`
 
@@ -527,31 +478,141 @@ Moving items across group boundaries is allowed; the player splits or merges gro
 Errors: `400 invalidBody`, `403 playlistReadOnly`, `404 playlistNotFound`, `404 itemNotFound`, `409 playlistChanged`,
 `500 playlistUpdateFailed`.
 
-### `POST /api/v1/playlists/{id}/items/remove`
+## Items
 
-Takes items out of the playlist. The body names them as [`POST /api/v1/queue/items`](#post-apiv1queueitems) does,
-`playlistId` aside, plus an optional `revision`; with `physically` the files are deleted from disk too, the way the
+What is done to items takes a selection of them, which may lie in several playlists: `playlists`, one entry per
+playlist, each with the playlist's id and either the items' `indexes` or `ranges` of positions:
+
+```json
+{
+  "playlists": [
+    { "playlistId": "{A1B2C3D4-...}", "revision": 7, "indexes": [3, 4, 9] },
+    { "playlistId": "{B2C3D4E5-...}", "revision": 3, "ranges": [[0, 41], [57, 57]] }
+  ]
+}
+```
+
+`ranges` are inclusive `[from, to]` spans of positions, in any order, in the list the whole playlist makes, or, with a
+`search` beside `playlists`, the list the search makes in each playlist:
+
+```json
+{
+  "search": "beatles",
+  "fields": ["artist"],
+  "playlists": [
+    { "playlistId": "{A1B2C3D4-...}", "revision": 7, "ranges": [[0, 2]] },
+    { "playlistId": "{B2C3D4E5-...}", "revision": 3, "ranges": [[0, 41], [57, 57]] }
+  ]
+}
+```
+
+So a client selects whole groups, or everything but a few rows, without loading the items: a group covers the positions
+[`GET /api/v1/playlists/{id}/groups`](#get-apiv1playlistsidgroups) gives it. The search is the playlist's own, or, with
+`fields`, a non-empty array of the names [`GET /api/v1/search`](#get-apiv1search) takes, that search's. An empty
+`search` lists the whole playlist. With a search the entries carry `ranges` alone, as its list is what they count;
+`fields` without `search`, an entry with both `indexes` and `ranges` or with neither, and an empty `playlists`,
+`indexes` or `ranges` are refused. `revision` is the playlist's and optional, as in the group requests. The items come
+in the order of the entries, each playlist's in playlist order.
+
+The selection is checked as a whole before anything is done: a playlist that is gone, whose revision has moved on or
+whose indexes or positions lie outside the list fails the request, nothing is changed, and the error names the playlist
+in `playlistId`:
+
+```json
+{ "error": { "code": "playlistChanged", "message": "…", "playlistId": "{B2C3D4E5-...}" } }
+```
+
+Errors every request here may answer: `400 invalidBody`, `404 playlistNotFound`, `404 itemNotFound` (an index or a
+position outside the playlist or the search's list), `409 playlistChanged`.
+
+### `POST /api/v1/items/enabled`
+
+Sets the switch in front of the selected items, `false` taking them out of playback, as one change of each playlist:
+
+```json
+{ "playlists": [{ "playlistId": "{A1B2C3D4-...}", "revision": 7, "ranges": [[12, 40]] }], "enabled": false }
+```
+
+The response is an empty object; the change comes back through the `playlists` event. The player honours the switches
+only while the playlist shows them ([`showSwitches`](#get-apiv1playlists)).
+
+Errors: those of a selection, `500 playlistUpdateFailed`.
+
+### `POST /api/v1/items/details`
+
+The selected items with the tag fields a client keeps for lists of its own, such as favorites:
+
+```json
+{
+  "items": [
+    {
+      "playlistId": "{A1B2C3D4-...}",
+      "revision": 7,
+      "index": 12,
+      "displayText": "Artist A - Track One",
+      "secondLine": "MP3 :: 44 kHz :: 320 kbps :: Stereo :: 10,16 MB",
+      "duration": 266.4,
+      "size": 10655744,
+      "mark": 4,
+      "rating": 0.8,
+      "displayingMark": 4,
+      "enabled": true,
+      "isUrl": false,
+      "inContainer": false,
+      "cover": "7068c7442182d15a",
+      "fileUri": "C:\\Music\\Artist A\\Track One.mp3",
+      "artist": "Artist A",
+      "album": "Album",
+      "genre": "Rock",
+      "year": "2008",
+      "folder": "Artist A"
+    }
+  ]
+}
+```
+
+The items are [playlist items](#get-apiv1playlistsiditems) with their playlist and its revision, and the tags as
+written, empty when missing; `secondLine` follows the playlist's template whether or not the playlist shows it, `folder`
+is the name of the file's folder.
+
+Errors: those of a selection.
+
+### `POST /api/v1/items/summary`
+
+What the selected items amount to, for a client to show of a selection it has not loaded:
+
+```json
+{ "count": 44, "duration": 11023.6, "size": 440401920 }
+```
+
+`duration` is in seconds and `size` in bytes, as in the playlists.
+
+Errors: those of a selection.
+
+### `POST /api/v1/items/remove`
+
+Takes the selected items out of their playlists; with `physically` the files are deleted from disk too, the way the
 player's own command does it (on Windows into the Recycle Bin), which the plugin settings must allow.
 
 ```json
-{ "indexes": [12, 13], "physically": false, "revision": 7 }
-{ "search": "", "groups": [2], "except": [40], "physically": true, "revision": 7 }
+{ "playlists": [{ "playlistId": "{A1B2C3D4-...}", "revision": 7, "indexes": [12, 13] }], "physically": false }
 ```
 
-The items go in one pass, so the playlist changes once. A part of a container file, such as one track of a CUE sheet,
-cannot be deleted from disk: a selection with one is refused as a whole and nothing is removed. So is a selection with a
-file that cannot be deleted right now (no rights, a read-only volume, a file held by another program): the player would
-report such a failure in a dialog of its own, or not at all, so every file is checked first and `403 filesNotDeletable`
-names the offenders in `files`:
+The items of a playlist go in one pass, so each playlist changes once. A part of a container file, such as one track of
+a CUE sheet, cannot be deleted from disk: a selection with one is refused as a whole and nothing is removed. So is a
+selection with a file that cannot be deleted right now (no rights, a read-only volume, a file held by another program):
+the player would report such a failure in a dialog of its own, or not at all, so every file of every playlist is checked
+first and `403 filesNotDeletable` names the offenders in `files`:
 
 ```json
-{"error": {"code": "filesNotDeletable", "message": "…", "files": ["Z:\\Music\\Track.mp3"]}}
+{ "error": { "code": "filesNotDeletable", "message": "…", "files": ["Z:\\Music\\Track.mp3"] } }
 ```
 
-The response is an empty object; the new content arrives through the [`playlists` event](#get-apiv1events).
+Should the player refuse the removal from a later playlist, the earlier ones stay removed and the error names it. The
+response is an empty object; the new content arrives through the [`playlists` event](#get-apiv1events).
 
-Errors: `400 invalidBody`, `400 itemInContainer`, `403 playlistReadOnly`, `403 physicalDeletionDisabled`,
-`403 filesNotDeletable`, `404 playlistNotFound`, `404 itemNotFound`, `409 playlistChanged`, `500 playlistUpdateFailed`.
+Errors: those of a selection, `400 itemInContainer`, `403 playlistReadOnly`, `403 physicalDeletionDisabled`,
+`403 filesNotDeletable`, `500 playlistUpdateFailed`.
 
 ## Search
 
@@ -650,31 +711,17 @@ shows it, and `cover` works with the item's [cover URL](#get-apiv1playlistsidite
 
 ### `POST /api/v1/queue/items`
 
-Adds items of one playlist to the queue, in playlist order, at the end or, with `atBeginning`, at the beginning. The
-items are either named by index or chosen by search:
+Adds the selected items to the queue, in the order of the selection's playlists and in playlist order within each, at
+the end or, with `atBeginning`, at the beginning, where they keep that order ahead of what was there. The body is a
+[selection](#items) plus `atBeginning`:
 
 ```json
-{"playlistId": "{A1B2C3D4-...}", "indexes": [3, 4, 9], "atBeginning": false, "revision": 7}
-{"playlistId": "{A1B2C3D4-...}", "search": "beatles", "except": [12], "revision": 7}
+{ "playlists": [{ "playlistId": "{A1B2C3D4-...}", "revision": 7, "indexes": [3, 4, 9] }], "atBeginning": false }
 ```
 
-`search` selects every item the search would list (an empty string is the whole playlist) but the indexes in `except`; a
-client that selected everything in a long result does not have to send the indexes. With `fields`, a non-empty array of
-the names [`GET /api/v1/search`](#get-apiv1search) takes, the selection covers what that search lists in the playlist
-instead of what the playlist's own search does. `groups`, indexes of the playlist's groups as
-[`GET /api/v1/playlists/{id}/groups`](#get-apiv1playlistsidgroups) gives them, keeps the search to those groups, so a
-client can select whole groups without loading their items; `indexes` next to `search` adds items besides the matches.
-Either way the items come in playlist order:
+The response is an empty object.
 
-```json
-{"playlistId": "{A1B2C3D4-...}", "search": "", "groups": [0, 2], "except": [5], "indexes": [6], "revision": 7}
-```
-
-`except`, `groups` and `fields` without `search` are refused. `revision` is the playlist's and optional, as in the group
-requests. The response is an empty object.
-
-Errors: `400 invalidBody`, `404 playlistNotFound`, `404 itemNotFound` (an index or a group outside the playlist),
-`409 playlistChanged`, `500 playlistUpdateFailed`.
+Errors: those of a [selection](#items), `500 playlistUpdateFailed`.
 
 ### `POST /api/v1/queue/remove`
 

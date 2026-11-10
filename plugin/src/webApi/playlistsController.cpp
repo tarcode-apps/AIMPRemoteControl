@@ -35,6 +35,7 @@ namespace
 {
 	using webapi::CheckRevision;
 	using webapi::DefaultPageLimit;
+	using webapi::EnabledBody;
 	using webapi::MaxPageLimit;
 	using webapi::MoveBody;
 	using webapi::OptionalField;
@@ -42,7 +43,6 @@ namespace
 	using webapi::QueryString;
 	using webapi::RevisionOf;
 	using webapi::SearchText;
-	using webapi::SelectionBody;
 	using webapi::StringArray;
 	using webapi::ThrowUnlessOk;
 
@@ -146,13 +146,6 @@ namespace
 		else if (!name.empty() && name != "end")
 			throw ApiError(400, "invalidQuery");
 		return result;
-	}
-
-	bool EnabledBody(const nlohmann::json &body)
-	{
-		if (!body.is_object() || !body.contains("enabled") || !body["enabled"].is_boolean())
-			throw ApiError(400, "invalidBody");
-		return body["enabled"].get<bool>();
 	}
 
 	nlohmann::json ToJson(const player::PlaylistInfo &playlist, std::uint64_t revision)
@@ -439,29 +432,6 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 									  { return player::SetItemEnabled(core, playlistId, index, enabled); }));
 		return nlohmann::json::object(); });
 
-	endpoints.MapApi(HttpMethod::Post, R"(/api/v1/playlists/([^/]+)/items/enabled)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
-			   {
-		const std::string playlistId = request.PathMatches.at(0);
-		const player::ItemSelection selection = SelectionBody(request.Body);
-		const bool enabled = EnabledBody(request.Body);
-		CheckRevision(request.Body, events, playlistId);
-		ThrowUnlessOk(RunOnMainThread(core, [&]
-									  { return player::SetItemsEnabled(core, playlistId, selection, enabled); }));
-		return nlohmann::json::object(); });
-
-	endpoints.MapApi(HttpMethod::Post, R"(/api/v1/playlists/([^/]+)/items/details)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
-			   {
-		const std::string playlistId = request.PathMatches.at(0);
-		const player::ItemSelection selection = SelectionBody(request.Body);
-		CheckRevision(request.Body, events, playlistId);
-		std::vector<player::ItemDetails> details;
-		ThrowUnlessOk(RunOnMainThread(core, [&]
-									  { return player::DescribePlaylistItems(core, playlistId, selection, details); }));
-		nlohmann::json items = nlohmann::json::array();
-		for (const player::ItemDetails &item : details)
-			items.push_back(DetailsJson(item));
-		return {{"items", std::move(items)}}; });
-
 	// By the URI rather than the index: the information belongs to the file, and a
 	// screen that shows it outlives the revision it was opened at.
 	endpoints.MapApi(HttpMethod::Get, R"(/api/v1/playlists/([^/]+)/items/info)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
@@ -569,21 +539,5 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 		CheckRevision(request.Body, events, playlistId);
 		ThrowUnlessOk(RunOnMainThread(core, [&]
 									  { return player::MovePlaylistItems(core, playlistId, move.first, move.second); }));
-		return nlohmann::json::object(); });
-
-	endpoints.MapApi(HttpMethod::Post, R"(/api/v1/playlists/([^/]+)/items/remove)", [core = FCore, &events = FEvents, &settings = FSettings](const ApiRequest &request) -> nlohmann::json
-			   {
-		const std::string playlistId = request.PathMatches.at(0);
-		const player::ItemSelection selection = SelectionBody(request.Body);
-		const bool physically = OptionalField<bool>(request.Body, "physically", &nlohmann::json::is_boolean).value_or(false);
-		if (physically && !settings.Get().Features.PhysicalDeletion)
-			throw ApiError(403, "physicalDeletionDisabled");
-		CheckRevision(request.Body, events, playlistId);
-		std::vector<std::string> undeletable;
-		const player::MutationResult result = RunOnMainThread(core, [&]
-															  { return player::RemovePlaylistItems(core, playlistId, selection, physically, undeletable); });
-		if (result == player::MutationResult::FilesNotDeletable)
-			throw ApiError(403, "filesNotDeletable", {{"files", undeletable}});
-		ThrowUnlessOk(result);
 		return nlohmann::json::object(); });
 }

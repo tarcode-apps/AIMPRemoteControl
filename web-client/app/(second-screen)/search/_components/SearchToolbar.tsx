@@ -1,6 +1,6 @@
 'use client';
 
-import { useEnqueueSelections } from '@/app/_api/queue';
+import { useEnqueue } from '@/app/_api/queue';
 import { ToolbarButton } from '@/app/_components/buttons';
 import { Icon } from '@/app/_components/icons';
 import { ListToolbar } from '@/app/_components/lists';
@@ -18,13 +18,19 @@ export function SearchToolbar() {
     const { t } = useTranslation();
     const showError = useErrorToast();
     const mode = useSearchMode();
-    const enqueueSelections = useEnqueueSelections();
+    const enqueue = useEnqueue();
     const favoriteActions = useFavoriteActions();
     const removal = useItemRemoval();
     const { relinking } = useFavoriteRelink();
     const [dialog, setDialog] = useState<'playlists' | 'fields' | null>(null);
     const closeDialog = () => setDialog(null);
-    const enqueueSelected = (atBeginning: boolean) => enqueueSelections(mode.selectionByPlaylist() ?? [], atBeginning);
+    const selection = mode.itemsSelection;
+    const enqueueSelected = (atBeginning: boolean) => {
+        if (selection) enqueue.mutate({ ...selection, atBeginning }, { onError: showError });
+    };
+    const addSelectedToFavorites = () => {
+        if (selection) void favoriteActions.addSelection(selection).catch(showError);
+    };
 
     return (
         <>
@@ -53,25 +59,21 @@ export function SearchToolbar() {
                         label: t('playlist.enqueue'),
                         icon: 'playlist_add',
                         disabled: mode.nothingSelected,
-                        onSelect: () => void enqueueSelected(false).catch(showError),
+                        onSelect: () => enqueueSelected(false),
                     },
                     {
                         label: t('playlist.enqueueFirst'),
                         icon: 'playlist_play',
                         disabled: mode.nothingSelected,
-                        onSelect: () => void enqueueSelected(true).catch(showError),
+                        onSelect: () => enqueueSelected(true),
                     },
                     {
                         label: t('favorites.add'),
                         icon: 'heart_plus',
                         disabled: mode.nothingSelected,
-                        onSelect: () =>
-                            void favoriteActions.addSelections(mode.selectionByPlaylist() ?? []).catch(showError),
+                        onSelect: addSelectedToFavorites,
                     },
-                    ...removal.selectionItems(() => {
-                        const parts = mode.selectionByPlaylist();
-                        return parts && { parts };
-                    }, mode.nothingSelected),
+                    ...removal.selectionItems(() => selection),
                 ]}
             />
             {removal.dialogs}

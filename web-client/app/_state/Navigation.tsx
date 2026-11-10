@@ -32,6 +32,11 @@ const mainDepth = 1;
 const secondDepth = 2;
 const detailDepth = 3;
 
+// Hrefs carry the trailing slash the export wants; a pathname may not.
+function trimSlashes(path: string): string {
+    return path.replace(/\/+$/, '');
+}
+
 // For a second screen that keeps entries of its own in the history, to tell
 // an entry of its own from the screen it is left for.
 export const secondScreenDepth = secondDepth;
@@ -116,6 +121,12 @@ export type NavigationContextValue = {
     // A screen over whatever is on screen, the player included, which back returns to.
     openDetailScreen(href: string): void;
     goBack(): void;
+    // Asks the screen at `href`, once it shows, to take the keyboard focus: its
+    // list, else the screen itself. For the keys of the drawer, so that they go on
+    // in the screen they opened.
+    focusScreen(href: string): void;
+    // Whether the screen shown was asked to take the focus; asked once.
+    takeScreenFocus(): boolean;
 };
 
 const NavigationContext = createContext<NavigationContextValue | null>(null);
@@ -135,6 +146,7 @@ export function useNavigation(): NavigationContextValue {
 export function NavigationProvider({ children }: { children: ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
+    const focusAsked = useRef<string | null>(null);
     const docked = useMediaQuery(media.playerDocked);
     const segment = useSelectedLayoutSegment();
     const secondScreen = segment === secondScreenSegment;
@@ -273,6 +285,14 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
             if (depth === mainDepth) goToPlayer();
             else if (depth > mainDepth) walkTo(depth - 1);
             else navigate('/', playerDepth, true);
+        },
+        focusScreen: href => {
+            focusAsked.current = trimSlashes(href);
+        },
+        takeScreenFocus: () => {
+            if (focusAsked.current !== trimSlashes(pathname)) return false;
+            focusAsked.current = null;
+            return true;
         },
     };
 

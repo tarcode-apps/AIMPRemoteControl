@@ -278,7 +278,8 @@ export function TrackInfoScreen() {
                     {page === 'tags' && (
                         <dl className={clsx(styles.fields, styles.fileSection)}>
                             <InfoLine
-                                line={{ key: 'file', value: info.fileUri }}
+                                // On a mobile the path alone, its icon gone with the label.
+                                line={{ key: 'file', value: info.fileUri, icon: docked ? 'draft' : undefined }}
                                 labelled={docked}
                                 onCopy={copy}
                                 className={styles.file}

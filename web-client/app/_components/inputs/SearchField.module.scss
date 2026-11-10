@@ -1,12 +1,14 @@
 // Set from outside through --search-field-height, --search-field-inset (before
-// the icon) and --search-field-gap (between the icon and the text), so that a
-// field lines up with the rows around it.
+// the icon), --search-field-gap (between the icon and the text) and
+// --search-field-button-size with --search-field-button-inset (the button at the
+// end, which the owner's actions match), so that a field lines up with the rows
+// around it.
 .field {
     display: flex;
     align-items: center;
     gap: var(--search-field-gap, 8px);
     height: var(--search-field-height, 40px);
-    padding: 0 4px 0 var(--search-field-inset, 12px);
+    padding: 0 var(--search-field-button-inset, 4px) 0 var(--search-field-inset, 12px);
     border-radius: calc(var(--search-field-height, 40px) / 2);
     background: var(--color-surface);
 }
@@ -35,5 +37,5 @@
 }
 
 .clear {
-    --icon-button-size: 32px;
+    --icon-button-size: var(--search-field-button-size, 32px);
 }

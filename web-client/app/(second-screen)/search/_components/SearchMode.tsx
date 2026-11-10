@@ -1,28 +1,27 @@
 'use client';
 
 import { usePlaylists } from '@/app/_api/playlists';
-import { normalizeFields, searchKeys, useSearchPages, type SearchParams } from '@/app/_api/search';
+import { normalizeFields, useSearchPages, type SearchParams } from '@/app/_api/search';
 import {
     searchFields,
-    type ItemsSummary,
+    type ItemsSelection,
     type PlaylistGroup,
+    type PlaylistSelection,
     type SearchField,
-    type SearchHit,
     type SearchPage,
-    type SelectionInPlaylist,
 } from '@/app/_api/types';
 import {
+    groupRange,
     pageRange,
-    pageSize,
     PlaylistRows,
     useCollapsedGroups,
     useListMode,
     type ListModeValue,
+    type PositionRange,
 } from '@/app/_components/lists';
 import { useDebouncedValue } from '@/app/_hooks/useDebouncedValue';
+import { useOnChange } from '@/app/_hooks/useOnChange';
 import { usePersistedState } from '@/app/_hooks/usePersistedState';
-import { summaryOf } from '@/app/_utils/summary';
-import { useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
@@ -49,15 +48,13 @@ export type SearchModeContextValue = ListModeValue & {
     rows: PlaylistRows;
     toggleGroup(group: PlaylistGroup): void;
     setAllExpanded(expanded: boolean): void;
-    // The selection split by playlist, in the order of the results; nothing while
-    // nothing is selected.
-    selectionByPlaylist(): SelectionInPlaylist[] | undefined;
-    // A group's hits as a selection in its playlist; nothing while the result is
+    // The selection as the requests about items take it, split by playlist in the
+    // order of the results; nothing while nothing is selected or the result is
     // still the previous one.
-    groupSelection(group: PlaylistGroup): SelectionInPlaylist | undefined;
-    // Whether a group's playlist is one whose items cannot be removed.
-    groupReadOnly(group: PlaylistGroup): boolean;
-    selectionTotals: ItemsSummary | undefined;
+    itemsSelection: ItemsSelection | undefined;
+    // A group's hits as a selection; nothing while the result is still the
+    // previous one.
+    groupSelection(group: PlaylistGroup): ItemsSelection | undefined;
 };
 
 const SearchModeContext = createContext<SearchModeContextValue | null>(null);
@@ -80,8 +77,7 @@ function parseOptions(stored: unknown): SearchOptions | undefined {
 }
 
 export function SearchModeProvider({ children }: { children: ReactNode }) {
-    const client = useQueryClient();
-    const list = useListMode<SearchHit>('search');
+    const list = useListMode('search');
     const searchParams = useSearchParams();
     const [typed, setTyped] = useState(() => searchParams.get('q') ?? '');
     const text = useDebouncedValue(typed.trim(), 300);
@@ -111,7 +107,7 @@ export function SearchModeProvider({ children }: { children: ReactNode }) {
     const [firstPageQuery] = useSearchPages(params, [pageRange(0)]);
     const result = firstPageQuery?.data;
     // The previous result stands in while the next loads; a selection names hits of
-    // the result it was made in, so none is made or sent meanwhile.
+    // the result it was made in, so none is sent meanwhile.
     const settled = firstPageQuery !== undefined && !firstPageQuery.isPlaceholderData;
 
     const { collapsed, toggle, setAll } = useCollapsedGroups();
@@ -138,82 +134,33 @@ export function SearchModeProvider({ children }: { children: ReactNode }) {
 
     // Positions name other hits once the result changes under the selection.
     const signature = result ? `${result.total}:${result.playlists.map(p => `${p.id}@${p.revision}`).join()}` : '';
-    const [seenSignature, setSeenSignature] = useState(signature);
-    if (seenSignature !== signature) {
-        setSeenSignature(signature);
+    useOnChange(signature, () => {
         if (list.mode !== null) list.setMode(null);
-    }
+    });
 
-    const hitAt = (position: number) => {
-        if (!params) return undefined;
-        const page = Math.floor(position / pageSize);
-        return client.getQueryData<SearchPage>(searchKeys.page(params, pageRange(page)))?.items[
-            position - page * pageSize
-        ];
-    };
-
-    // A row can only be toggled on screen, where its hit is loaded; the mode keeps
-    // the hit in case its page drops out of the cache. Groups go as a whole.
-    const setSelected: SearchModeContextValue['setSelected'] = (positions, selected, rows, group) => {
-        if (settled) list.setSelected(positions, selected, rows, group, hitAt);
-    };
-    const setGroupSelected: SearchModeContextValue['setGroupSelected'] = (group, selected, rows) => {
-        if (settled) list.setGroupSelected(group, selected, rows);
-    };
-
-    // Each group's toggled hits: left out of a group that is in, picked from one
-    // that is out.
-    const toggledByGroup = () => {
-        const byGroup = new Map<number, SearchHit[]>();
-        for (const { group, data: hit } of list.selection.toggled.values()) {
-            if (group === undefined || !hit) continue;
-            const hits = byGroup.get(group);
-            if (hits) hits.push(hit);
-            else byGroup.set(group, [hit]);
-        }
-        return byGroup;
-    };
-
-    const selectionByPlaylist = () => {
-        if (list.nothingSelected || !params || !result || !settled) return undefined;
-        const toggled = toggledByGroup();
-        return result.playlists.flatMap((playlist, group): SelectionInPlaylist[] => {
-            const indexes = toggled.get(group)?.map(hit => hit.index) ?? [];
-            if (list.groupSelected(group))
-                return [
-                    {
-                        playlistId: playlist.id,
-                        revision: playlist.revision,
-                        selection: { search: params.search, fields: params.fields, except: indexes },
-                    },
-                ];
-            return indexes.length
-                ? [{ playlistId: playlist.id, revision: playlist.revision, selection: { indexes } }]
-                : [];
-        });
-    };
-
-    const groupSelection = (group: PlaylistGroup): SelectionInPlaylist | undefined => {
+    // What a selection names in one playlist: the ranges of the result's positions
+    // that fall in its group, counted from the group's first.
+    const inPlaylist = (group: PlaylistGroup, ranges: PositionRange[]): PlaylistSelection | undefined => {
         const playlist = result?.playlists[group.index];
-        if (!params || !playlist || !settled) return undefined;
-        return {
-            playlistId: playlist.id,
-            revision: playlist.revision,
-            selection: { search: params.search, fields: params.fields, except: [] },
-        };
+        if (!playlist) return undefined;
+        const [first, last] = groupRange(group);
+        const own = ranges.flatMap(([from, to]): PositionRange[] =>
+            to < first || from > last ? [] : [[Math.max(from, first) - first, Math.min(to, last) - first]],
+        );
+        return own.length ? { playlistId: playlist.id, revision: playlist.revision, ranges: own } : undefined;
     };
-    const groupReadOnly = (group: PlaylistGroup) => {
-        const id = result?.playlists[group.index]?.id;
-        return playlists?.find(playlist => playlist.id === id)?.readOnly === true;
+    // The selected positions as the search's selection, split by playlist.
+    const selectionOf = (ranges: PositionRange[], inGroups: readonly PlaylistGroup[]): ItemsSelection | undefined => {
+        if (!params || !settled) return undefined;
+        const playlists = inGroups.flatMap(group => {
+            const named = inPlaylist(group, ranges);
+            return named ? [named] : [];
+        });
+        return playlists.length ? { search: params.search, fields: params.fields, playlists } : undefined;
     };
-
-    const selectionTotals = settled
-        ? list.selectedTotals({
-              all: result && { count: result.total, duration: result.duration, size: result.size },
-              group: group => result?.playlists[group],
-              row: summaryOf,
-          })
-        : undefined;
+    const ranges = result && groups ? list.selectedRanges(result.total, groups) : undefined;
+    const itemsSelection = ranges && groups ? selectionOf(ranges, groups) : undefined;
+    const groupSelection = (group: PlaylistGroup) => selectionOf([groupRange(group)], [group]);
 
     const value: SearchModeContextValue = {
         ...list,
@@ -232,12 +179,8 @@ export function SearchModeProvider({ children }: { children: ReactNode }) {
             if (id !== undefined) toggle(id);
         },
         setAllExpanded: expanded => setAll(expanded, result?.playlists.map(playlist => playlist.id) ?? []),
-        setSelected,
-        setGroupSelected,
-        selectionByPlaylist,
+        itemsSelection,
         groupSelection,
-        groupReadOnly,
-        selectionTotals,
     };
     return <SearchModeContext value={value}>{children}</SearchModeContext>;
 }

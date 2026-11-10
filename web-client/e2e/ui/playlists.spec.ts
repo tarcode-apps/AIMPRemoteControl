@@ -4,6 +4,28 @@ import { t } from './strings';
 
 // The playlists themselves, as the drawer manages them.
 test.describe('playlists', () => {
+    test('text in the search puts the clear button where the create button was', async ({ app, playlists }) => {
+        const playlist = await playlists.create();
+        await new PlaylistScreen(app, playlist.name).open();
+        await app.openDrawer();
+        const create = app.navigation.getByRole('button', { name: t('playlists.create') });
+        const clear = app.navigation.getByRole('button', { name: t('playlist.closeSearch') });
+        const search = app.drawer.getByPlaceholder(t('playlists.searchPlaceholder'));
+        await expect(create).toBeVisible();
+        await expect(clear).toHaveCount(0);
+        await search.fill(playlist.name);
+        await expect(create).toHaveCount(0);
+        // The one takes the other's place exactly, measured once the drawer's slide is over.
+        await app.drawer.evaluate(drawer => Promise.all(drawer.getAnimations().map(animation => animation.finished)));
+        const box = await clear.boundingBox();
+        await search.fill('');
+        expect(await create.boundingBox()).toEqual(box);
+        await search.fill(playlist.name);
+        await clear.click();
+        await expect(search).toHaveValue('');
+        await expect(create).toBeVisible();
+    });
+
     test('a new playlist is created, renamed and deleted', async ({ api, app, playlists }, testInfo) => {
         const name = `rc-e2e new ${testInfo.project.name}`;
         const renamed = `${name} renamed`;

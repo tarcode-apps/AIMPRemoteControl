@@ -37,9 +37,9 @@ namespace webapi
 		return json;
 	}
 
-	inline nlohmann::json DetailsJson(const player::ItemDetails &details)
+	inline nlohmann::json DetailsJson(const player::ItemDetails &details, std::uint64_t revision)
 	{
-		nlohmann::json json = ItemJson(details.Item);
+		nlohmann::json json = ItemJson(details.Item, details.PlaylistId, revision);
 		json["artist"] = details.Artist;
 		json["album"] = details.Album;
 		json["genre"] = details.Genre;

@@ -188,21 +188,24 @@ test.describe('items', () => {
         expect((await api.patch(`${route}/1/enabled`, { enabled: false })).status).toBe(200);
         await expect.poll(enabled).toEqual([true, false, true]);
         expect(await enabledCounts()).toEqual([1, 1]);
-        expect(
-            (await api.post(`${route}/enabled`, { search: '', groups: [0], except: [], enabled: false })).status,
-        ).toBe(200);
+        // Album A is the first two positions.
+        const part = (selection: object) => ({ playlists: [{ playlistId: playlist.id, ...selection }] });
+        expect((await api.post('/items/enabled', { ...part({ ranges: [[0, 1]] }), enabled: false })).status).toBe(200);
         await expect.poll(enabled).toEqual([false, false, true]);
         expect(await enabledCounts()).toEqual([0, 1]);
-        expect((await api.post(`${route}/enabled`, { indexes: [0, 2], enabled: true })).status).toBe(200);
+        expect((await api.post('/items/enabled', { ...part({ indexes: [0, 2] }), enabled: true })).status).toBe(200);
         await expect.poll(enabled).toEqual([true, false, true]);
 
         expect((await api.patch(`${route}/1/enabled`, {})).error?.code).toBe('invalidBody');
         expect((await api.patch(`${route}/9/enabled`, { enabled: true })).error?.code).toBe('itemNotFound');
-        expect((await api.post(`${route}/enabled`, { indexes: [9], enabled: true })).error?.code).toBe('itemNotFound');
+        expect((await api.post('/items/enabled', part({ indexes: [0] }))).error?.code).toBe('invalidBody');
+        expect((await api.post('/items/enabled', { ...part({ indexes: [9] }), enabled: true })).error?.code).toBe(
+            'itemNotFound',
+        );
         const revision = (await api.playlist(playlist.id))!.revision;
         expect(
-            (await api.post(`${route}/enabled`, { indexes: [0], enabled: false, revision: revision + 100 })).error
-                ?.code,
+            (await api.post('/items/enabled', { ...part({ indexes: [0], revision: revision + 100 }), enabled: false }))
+                .error?.code,
         ).toBe('playlistChanged');
     });
 
@@ -213,11 +216,15 @@ test.describe('items', () => {
                 { title: 'Second' },
             ],
         });
-        const route = `/playlists/${encode(playlist.id)}/items/details`;
-        const details = await api.post<ItemDetailsResponse>(route, { indexes: [0] });
+        const route = '/items/details';
+        const revision = (await api.playlist(playlist.id))!.revision;
+        const part = (selection: object) => ({ playlists: [{ playlistId: playlist.id, ...selection }] });
+        const details = await api.post<ItemDetailsResponse>(route, part({ indexes: [0] }));
         expect(details.status).toBe(200);
         expect(details.body!.items).toHaveLength(1);
         expect(details.body!.items[0]).toMatchObject({
+            playlistId: playlist.id,
+            revision,
             index: 0,
             artist: 'Artist A',
             album: 'Album A',
@@ -226,10 +233,12 @@ test.describe('items', () => {
             fileUri: playlist.files[0],
         });
 
-        expect((await api.post<ItemDetailsResponse>(route, { search: '' })).body!.items).toHaveLength(2);
-        expect((await api.post(route, { indexes: [5] })).error?.code).toBe('itemNotFound');
-        const revision = (await api.playlist(playlist.id))!.revision;
-        expect((await api.post(route, { indexes: [0], revision: revision + 100 })).error?.code).toBe('playlistChanged');
+        const all = await api.post<ItemDetailsResponse>(route, part({ ranges: [[0, 1]] }));
+        expect(all.body!.items).toHaveLength(2);
+        expect((await api.post(route, part({ indexes: [5] }))).error?.code).toBe('itemNotFound');
+        expect((await api.post(route, part({ indexes: [0], revision: revision + 100 }))).error?.code).toBe(
+            'playlistChanged',
+        );
     });
 
     test('describes a track by its file: tags, stream, statistics', async ({ api, playlists }) => {

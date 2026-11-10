@@ -150,7 +150,7 @@ test.describe('playlist', () => {
         await expect(screen.row('Charlie')).toHaveAttribute('data-enabled', 'false');
     });
 
-    test('the group menu folds, queues, switches and removes the group', async ({ api, app }) => {
+    test('the group menu folds, queues, switches and removes the group', async ({ api, app, page }) => {
         await screen.groupAction('second', t('playlist.collapseGroup'));
         await expect(screen.row('Charlie')).toBeHidden();
         await screen.groupAction('first', t('playlist.expandAll'));
@@ -166,6 +166,10 @@ test.describe('playlist', () => {
                 .toEqual([false, false, true]);
         }
 
+        // Folding is a content change to the player, which the plugin tells apart
+        // from its own 500 ms later; the client must have that revision before it
+        // asks for a removal against it.
+        await page.waitForTimeout(700);
         await screen.groupAction('second', t('playlist.removeFromPlaylist'));
         await expect(screen.row('Charlie')).toBeHidden();
         expect(await api.playlistItemCount(playlist.id)).toBe(2);

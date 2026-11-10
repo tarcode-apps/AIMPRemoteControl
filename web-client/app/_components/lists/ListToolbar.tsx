@@ -1,9 +1,11 @@
 'use client';
 
+import { useFocusReturn } from '@/app/_hooks/useFocusReturn';
+import { useGlobalKey } from '@/app/_hooks/useGlobalKey';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { media } from '@/app/_styles/media';
 import clsx from 'clsx';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ToolbarButton } from '../buttons';
 import { Icon } from '../icons';
@@ -40,6 +42,26 @@ export function ListToolbar({
 }: ListToolbarProps) {
     const { t } = useTranslation();
     const docked = useMediaQuery(media.drawerDocked);
+
+    // The slash key, by its place on the keyboard, puts the focus in the search:
+    // the field here when docked, else the one that opens in the app bar. Escape
+    // on the emptied field sends it back where it came from; on a phone that is
+    // when the search closes, the field going with it.
+    const focus = useFocusReturn();
+    const input = useRef<HTMLInputElement>(null);
+    const searchable = mode.mode === null || mode.mode === 'search';
+    useGlobalKey(
+        event => event.code === 'Slash' && !event.ctrlKey && !event.metaKey && !event.altKey && searchable,
+        () => {
+            focus.remember();
+            if (docked) input.current?.focus();
+            else if (!externalSearch) mode.setQuery(mode.query ?? '');
+        },
+    );
+    const searchOpen = mode.query !== null;
+    useEffect(() => {
+        if (!docked && !searchOpen) focus.back();
+    }, [docked, searchOpen, focus]);
 
     let buttons;
     if (mode.mode === 'sort') buttons = sorting;
@@ -114,6 +136,9 @@ export function ListToolbar({
                     onChange={
                         externalSearch ? externalSearch.onChange : value => mode.setQuery(value === '' ? null : value)
                     }
+                    onEscape={focus.back}
+                    onKeyDown={mode.searchKeyDown}
+                    inputRef={input}
                 />
             )}
             {buttons}

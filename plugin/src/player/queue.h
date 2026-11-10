@@ -48,9 +48,9 @@ namespace player
 	QueueSnapshot GetQueue(IAIMPCore *core);
 	QueueState GetQueueState(IAIMPCore *core);
 
-	// Adds the selected items of a playlist, in playlist order, to the end or the
-	// beginning of the queue.
-	MutationResult EnqueueItems(IAIMPCore *core, const std::string &playlistId, const ItemSelection &selection, bool atBeginning);
+	// Adds the selected items, playlist by playlist and in playlist order, to the
+	// end or the beginning of the queue.
+	MutationResult EnqueueItems(IAIMPCore *core, const ItemsSelection &selection, bool atBeginning, std::size_t &failedPlaylist);
 	MutationResult EnqueueItem(IAIMPCore *core, IAIMPPlaylistItem *item, bool atBeginning);
 
 	// Takes every position of the item out of the queue.

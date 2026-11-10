@@ -1,5 +1,6 @@
 'use client';
 
+import { useSelectionSummary } from '@/app/_api/items';
 import { useListHeading } from '@/app/_components/lists';
 import { Screen } from '@/app/_components/pages';
 import { useFavoriteRelink } from '@/app/_state/Favorites';
@@ -26,12 +27,14 @@ function SearchScreen() {
     const mode = useSearchMode();
     const { result } = mode;
     const { relinking, finishRelink } = useFavoriteRelink();
+    const totals = result && { count: result.total, duration: result.duration, size: result.size };
+    const selectedTotals = useSelectionSummary(mode.itemsSelection, mode.allSelected ? totals : undefined);
     const heading = useListHeading({
         mode,
         name: t(relinking ? 'favorites.pickTitle' : 'search.title'),
         searchPlaceholder: t('search.placeholder'),
-        totals: result && { count: result.total, duration: result.duration, size: result.size },
-        selectedTotals: mode.selectionTotals,
+        totals,
+        selectedTotals,
         externalSearch: { value: mode.typed, onChange: mode.setTyped },
     });
 

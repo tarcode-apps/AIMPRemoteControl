@@ -3,7 +3,7 @@
 import { errorMessage } from '@/app/_api/helpers/errors';
 import { usePlayer } from '@/app/_api/player';
 import { usePlaylists } from '@/app/_api/playlists';
-import { useMoveQueueItems, useQueue, useRemoveFromQueue } from '@/app/_api/queue';
+import { useMoveQueueItems, useQueue } from '@/app/_api/queue';
 import type { QueueItem } from '@/app/_api/types';
 import {
     FastScroll,
@@ -17,11 +17,14 @@ import {
     useActiveRow,
     usePlaylistDrag,
     useRowKeys,
+    useSearchKeys,
+    useSelectionKeys,
 } from '@/app/_components/lists';
 import styles from '@/app/_components/lists/ListPage.module.scss';
 import { useRowMenu } from '@/app/_components/menus';
 import { useErrorToast } from '@/app/_components/toast';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
+import { useOnChange } from '@/app/_hooks/useOnChange';
 import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
 import { useTrackActions } from '@/app/_state/useTrackActions';
 import { media } from '@/app/_styles/media';
@@ -47,6 +50,7 @@ export function QueuePage() {
     const revisions = new Map(playlists?.map(playlist => [playlist.id, playlist.revision]));
     const searching = mode.text !== '';
     const selecting = mode.selecting;
+    const sorting = mode.mode === 'sort';
     // The handles are out while the checkboxes are in; a search lists other positions.
     const sortable = mode.mode === null && !searching;
 
@@ -62,20 +66,16 @@ export function QueuePage() {
     });
     const active = useActiveRow(rows, row => virtualizer.scrollToIndex(row, { align: 'auto' }));
     const virtualRows = virtualizer.getVirtualItems();
+    // The rows are the search's: the cursor goes with a change of the text.
+    useOnChange(mode.text, () => active.select(null));
 
     const move = useMoveQueueItems();
-    const remove = useRemoveFromQueue();
     const favoriteActions = useFavoriteActions();
     const trackActions = useTrackActions();
     const rowMenu = useRowMenu((item: QueueItem) => [
         trackActions.infoItem(item),
         favoriteActions.favoriteMenuItem({ ...item, revision: revisions.get(item.playlistId) }),
-        {
-            label: t('queue.remove'),
-            icon: 'delete',
-            onSelect: () =>
-                remove.mutate({ positions: [item.position], revision: queue?.revision }, { onError: showError }),
-        },
+        { label: t('queue.remove'), icon: 'delete', onSelect: () => mode.removeFromQueue([item]) },
     ]);
 
     const drag = usePlaylistDrag({
@@ -110,23 +110,34 @@ export function QueuePage() {
     const playing = player?.track;
     const isPlaying = (item: QueueItem) => playing?.playlistId === item.playlistId && playing.index === item.index;
 
-    const toggleSelected = (item: QueueItem) =>
-        mode.setSelected([item.position], !mode.isSelected(item.position), rows);
-
+    const keys = useSelectionKeys({
+        mode,
+        rows,
+        active,
+        list: scrollRef,
+        disabled: sorting,
+        dragging: drag.state !== null,
+    });
+    // Nothing plays from the queue, so Enter stays the field's.
+    useSearchKeys({ mode, rows, active, list: scrollRef, disabled: sorting });
     const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
         if (rows.count === 0) return;
         const pageRows = Math.max(1, Math.floor(event.currentTarget.clientHeight / twoLineRowHeight) - 1);
+        if (keys.onKeyDown(event, rows.count, pageRows)) return;
         const item = active.row === null ? undefined : items[active.row];
-        if (active.move(event.key, rows.count, pageRows)) event.preventDefault();
-        else if (event.key === ' ' && item && selecting) {
-            toggleSelected(item);
+        if (active.move(event.key, rows.count, pageRows) !== null) event.preventDefault();
+        else if (event.key === ' ' && active.row !== null && selecting) {
+            keys.toggle(rows.at(active.row));
+            event.preventDefault();
+        } else if (event.key === 'Delete' && !sorting) {
+            mode.removeFromQueue(selecting ? mode.selectedItems() : item ? [item] : []);
             event.preventDefault();
         }
     };
 
-    const onItemClick = (event: MouseEvent, row: number, item: QueueItem) => {
+    const onItemClick = (event: MouseEvent, row: number) => {
         if (mode.mode === 'select') {
-            toggleSelected(item);
+            keys.pick(row, () => keys.toggle(rows.at(row)));
             return;
         }
         // Nothing plays from here: a track started by hand would stay in the queue and
@@ -184,10 +195,6 @@ export function QueuePage() {
                 tabIndex={0}
                 aria-activedescendant={active.row === null ? undefined : rowId(active.row)}
                 onKeyDown={onKeyDown}
-                // Word selection starts on the second press of a double click.
-                onMouseDown={event => {
-                    if (event.detail > 1) event.preventDefault();
-                }}
             >
                 {query.isError ? (
                     <div className={styles.message}>
@@ -234,12 +241,15 @@ export function QueuePage() {
                                         drag.hidden(index) && styles.hidden,
                                     )}
                                     style={{ height: twoLineRowHeight, transform }}
-                                    onClick={event => onItemClick(event, index, item)}
+                                    onClickCapture={event => keys.onRowClick(event, index)}
+                                    onClick={event => onItemClick(event, index)}
                                 >
                                     <ItemRow
                                         {...itemProps(item)}
-                                        selected={selecting && mode.isSelected(item.position)}
-                                        onSelect={selected => mode.setSelected([item.position], selected, rows)}
+                                        selected={selecting && mode.isSelected(index)}
+                                        onSelect={selected =>
+                                            keys.pick(index, () => keys.setSelected(rows.at(index), selected))
+                                        }
                                         onDragStart={event => drag.start(index, event)}
                                         menu={selecting ? undefined : rowMenu.button(index, item)}
                                     />

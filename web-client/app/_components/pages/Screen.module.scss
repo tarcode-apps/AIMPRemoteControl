@@ -5,6 +5,7 @@
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    outline: none; // takes the focus for a screen without a list
 }
 
 .appBar {
@@ -15,6 +16,7 @@
     min-height: calc(var(--app-bar-height) + var(--safe-top));
     padding: var(--safe-top) calc(4px + var(--safe-right)) 0 calc(4px + var(--safe-left));
     background: var(--color-bg);
+    user-select: none;
 
     &.withTabs {
         @include mixins.drawer-modal {
@@ -188,6 +190,7 @@
     height: var(--toolbar-height);
     padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
     background: var(--color-bg);
+    user-select: none;
     // The list scrolls under the toolbar, which the shadow shows; the mini player
     // sits on the toolbar of a screen that keeps it, so that one stays flat.
     box-shadow: 0 -1px 6px color-mix(in srgb, var(--color-shadow) 45%, transparent);

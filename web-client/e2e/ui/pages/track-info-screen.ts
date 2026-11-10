@@ -23,12 +23,16 @@ export class TrackInfoScreen {
         this.cover = app.main.getByRole('button', { name: t('trackInfo.cover'), exact: true });
     }
 
-    // A field's value, by the field's label, which a mobile keeps out of sight
+    // A field's line, by the field's label, which a mobile keeps out of sight
     // until a hold shows it.
+    line(field: Field): Locator {
+        return this.lines.filter({
+            has: this.app.page.getByText(t(`trackInfo.fields.${field}`), { exact: true }),
+        });
+    }
+
     value(field: Field): Locator {
-        return this.lines
-            .filter({ has: this.app.page.getByText(t(`trackInfo.fields.${field}`), { exact: true }) })
-            .getByRole('definition');
+        return this.line(field).getByRole('definition');
     }
 
     toolbarButton(name: string): Locator {

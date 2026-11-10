@@ -6,6 +6,7 @@
     padding: 0 var(--safe-right) 0 var(--safe-left);
     overflow-y: auto;
     overscroll-behavior-y: contain;
+    user-select: none;
 }
 
 .list {
@@ -214,6 +215,7 @@
     gap: 12px;
     padding: 32px 16px;
     text-align: center;
+    user-select: text;
     color: var(--color-text-secondary);
 }
 
@@ -338,9 +340,11 @@
         display: contents;
     }
 
+    // Spanning the lines like the thumbnail: the drag handle is taller than a
+    // line and would stretch the first one, moving the text between the modes.
     .row .leading {
         grid-column: 1;
-        grid-row: 1;
+        grid-row: 1 / -1;
         align-self: center;
         margin-right: 12px;
     }
@@ -423,7 +427,6 @@
 .handle {
     color: var(--color-text);
     cursor: grab;
-    user-select: none;
 }
 
 // Outranks the pager's `.pane *` rule, which allows vertical panning on mobile.

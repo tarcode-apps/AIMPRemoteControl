@@ -7,7 +7,8 @@ test.describe('queue', () => {
     test('queues items at the end, at the beginning and more than once', async ({ api, events, playlists }) => {
         const playlist = await playlists.create({ tracks: 4 });
         const announced = events.next<{ count: number }>('queue', data => data.count === 2);
-        expect((await api.post('/queue/items', { playlistId: playlist.id, indexes: [2, 1] })).status).toBe(200);
+        const selection = { playlists: [{ playlistId: playlist.id, indexes: [2, 1] }] };
+        expect((await api.post('/queue/items', selection)).status).toBe(200);
         await announced;
         // In playlist order, whatever the order asked.
         expect((await api.queue()).items.map(item => item.index)).toEqual([1, 2]);
@@ -25,7 +26,10 @@ test.describe('queue', () => {
         expect(queue.suspended).toBe(false);
     });
 
-    test('queues what a search selects, by groups and with exceptions', async ({ api, playlists }) => {
+    test('queues the ranges of what a search lists, and whole groups by their positions', async ({
+        api,
+        playlists,
+    }) => {
         const playlist = await playlists.create({
             tracks: [
                 { title: 'Pick one', folder: 'A' },
@@ -34,16 +38,50 @@ test.describe('queue', () => {
                 { title: 'Pick three', folder: 'B' },
             ],
         });
-        expect((await api.post('/queue/items', { playlistId: playlist.id, search: 'pick', except: [3] })).status).toBe(
-            200,
-        );
+        // The search lists Pick one, Pick two and Pick three.
+        const picked = { search: 'pick', playlists: [{ playlistId: playlist.id, ranges: [[0, 1]] }] };
+        expect((await api.post('/queue/items', picked)).status).toBe(200);
         expect((await api.queue()).items.map(item => item.index)).toEqual([0, 2]);
         await api.clearQueue();
 
-        expect(
-            (await api.post('/queue/items', { playlistId: playlist.id, search: '', groups: [1], indexes: [1] })).status,
-        ).toBe(200);
+        // Group B, by the positions its groups listing gives, and an item of group A.
+        const groups = (await api.groups(playlist.id)).groups;
+        const b = groups[1];
+        const range = [b.firstPosition, b.firstPosition + b.count - 1];
+        const selection = { playlists: [{ playlistId: playlist.id, ranges: [range, [1, 1]] }] };
+        expect((await api.post('/queue/items', selection)).status).toBe(200);
         expect((await api.queue()).items.map(item => item.index)).toEqual([1, 2, 3]);
+    });
+
+    test('queues the playlists of several playlists in their order', async ({ api, playlists }) => {
+        const first = await playlists.create({ tracks: 2 });
+        const second = await playlists.create({ tracks: 2 });
+        const selection = {
+            playlists: [
+                { playlistId: second.id, indexes: [1] },
+                { playlistId: first.id, indexes: [0, 1] },
+            ],
+        };
+        expect((await api.post('/queue/items', selection)).status).toBe(200);
+        const order = async () => (await api.queue()).items.map(item => [item.playlistId, item.index]);
+        expect(await order()).toEqual([
+            [second.id, 1],
+            [first.id, 0],
+            [first.id, 1],
+        ]);
+        // At the beginning the playlists keep their order too, ahead of what was there.
+        expect(
+            (await api.post('/queue/items', { playlists: selection.playlists.slice().reverse(), atBeginning: true }))
+                .status,
+        ).toBe(200);
+        expect(await order()).toEqual([
+            [first.id, 0],
+            [first.id, 1],
+            [second.id, 1],
+            [second.id, 1],
+            [first.id, 0],
+            [first.id, 1],
+        ]);
     });
 
     test('takes out and moves entries by position', async ({ api, playlists }) => {
@@ -111,15 +149,17 @@ test.describe('queue', () => {
         expect((await api.delete('/queue', { revision: revision + 100 })).error?.code).toBe('queueChanged');
         expect((await api.post('/queue/remove', { positions: [5] })).error?.code).toBe('itemNotFound');
         expect((await api.post('/queue/remove', {})).error?.code).toBe('invalidBody');
-        expect((await api.post('/queue/items', { playlistId: playlist.id, indexes: [9] })).error?.code).toBe(
-            'itemNotFound',
-        );
-        expect((await api.post('/queue/items', { playlistId: playlist.id, except: [0] })).error?.code).toBe(
+        const part = (playlistId: string, selection: object) => ({ playlists: [{ playlistId, ...selection }] });
+        expect((await api.post('/queue/items', part(playlist.id, { indexes: [9] }))).error?.code).toBe('itemNotFound');
+        expect(
+            (await api.post('/queue/items', { search: 'a', ...part(playlist.id, { indexes: [0] }) })).error?.code,
+        ).toBe('invalidBody');
+        expect((await api.post('/queue/items', { playlistId: playlist.id, indexes: [0] })).error?.code).toBe(
             'invalidBody',
         );
-        expect((await api.post('/queue/items', { playlistId: unknownId, indexes: [0] })).error?.code).toBe(
-            'playlistNotFound',
-        );
+        const unknown = await api.post('/queue/items', part(unknownId, { indexes: [0] }));
+        expect(unknown.error?.code).toBe('playlistNotFound');
+        expect(unknown.error?.playlistId).toBe(unknownId);
         expect((await api.patch('/queue', { suspended: 'yes' })).error?.code).toBe('invalidBody');
         expect(((await api.get<Queue>('/queue')).body as Queue).items).toHaveLength(2);
     });

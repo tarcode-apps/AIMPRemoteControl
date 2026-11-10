@@ -1,5 +1,12 @@
 export { FastScroll, topGroupName, type FastScrollProps } from './FastScroll';
-export { groupPositions, positionsCheckState, useCollapsedGroups, useFoldingItems } from './groups';
+export {
+    groupPositions,
+    groupRange,
+    positionsCheckState,
+    useCollapsedGroups,
+    useFoldingItems,
+    type PositionRange,
+} from './groups';
 export {
     DragHandle,
     GroupRow,
@@ -26,3 +33,5 @@ export { useActiveRow } from './useActiveRow';
 export { usePlaylistDrag, type DragSource, type DragState, type PlaylistDragOptions } from './useListDrag';
 export { useListHeading, type ListHeading, type ListHeadingOptions } from './useListHeading';
 export { useRowKeys } from './useRowKeys';
+export { useSearchKeys, type SearchKeysOptions } from './useSearchKeys';
+export { useSelectionKeys, type SelectionKeys, type SelectionKeysOptions } from './useSelectionKeys';

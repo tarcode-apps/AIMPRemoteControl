@@ -3,9 +3,19 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { MenuItem } from '../menus';
 
-// The positions of a group's items.
+// An inclusive span of positions.
+export type PositionRange = [number, number];
+
+export function positions([from, to]: PositionRange): number[] {
+    return Array.from({ length: to - from + 1 }, (_, i) => from + i);
+}
+
+export function groupRange(group: PlaylistGroup): PositionRange {
+    return [group.firstPosition, group.firstPosition + group.count - 1];
+}
+
 export function groupPositions(group: PlaylistGroup): number[] {
-    return Array.from({ length: group.count }, (_, i) => group.firstPosition + i);
+    return positions(groupRange(group));
 }
 
 // A group's checkbox from its rows one by one, for lists that hold every row.

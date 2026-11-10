@@ -1,6 +1,6 @@
 import type { TestPlaylist } from '../fixtures';
 import { expect, test } from './fixtures';
-import { ListScreen } from './pages/list-screen';
+import type { ListScreen } from './pages/list-screen';
 import { t, withBadge } from './strings';
 
 test.describe('queue', () => {
@@ -11,7 +11,7 @@ test.describe('queue', () => {
         playlist = await playlists.create({ tracks: [{ title: 'Alpha' }, { title: 'Bravo' }, { title: 'Charlie' }] });
         await api.enqueue(playlist.id, [2]);
         await api.enqueue(playlist.id, [0]);
-        queue = new ListScreen(app, app.main.getByRole('listbox', { name: t('screens.queue') }));
+        queue = app.listScreen(t('screens.queue'));
         await app.goto('/queue/');
         await expect(app.heading).toHaveText(t('queue.title'));
     });
@@ -52,8 +52,9 @@ test.describe('queue', () => {
         await queue.selectedAction(t('queue.remove'));
         await expect.poll(async () => (await api.queue()).items.map(item => item.index)).toEqual([2]);
 
-        // The changed queue ends the selection.
-        await expect(queue.toolbarButton(t('playlist.select'))).toBeVisible();
+        // The selection goes with the tracks, the mode stays.
+        await expect(queue.checkbox('Charlie')).not.toBeChecked();
+        await queue.toolbarButton(t('playlist.closeSelection')).click();
         await queue.more(t('queue.clear'));
         await expect(queue.list.getByText(t('queue.empty'))).toBeVisible();
         expect((await api.queue()).items).toEqual([]);

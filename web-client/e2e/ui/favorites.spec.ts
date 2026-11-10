@@ -1,7 +1,6 @@
 import type { TestPlaylist } from '../fixtures';
 import { expect, test } from './fixtures';
 import type { App } from './pages/app';
-import { ListScreen } from './pages/list-screen';
 import { PlaylistScreen } from './pages/playlist-screen';
 import { t, withBadge } from './strings';
 
@@ -10,10 +9,7 @@ test.describe('favorites', () => {
     let playlist: TestPlaylist;
     let screen: PlaylistScreen;
 
-    const openFavorites = async (app: App) => {
-        await app.openScreen(t('screens.favorites'));
-        return new ListScreen(app, app.main.getByRole('listbox', { name: t('screens.favorites') }));
-    };
+    const openFavorites = (app: App) => app.openListScreen(t('screens.favorites'));
 
     test.beforeEach(async ({ app, playlists }) => {
         playlist = await playlists.create({
@@ -41,7 +37,7 @@ test.describe('favorites', () => {
     });
 
     test('a track removed from its playlist stays, dimmed', async ({ api, app }) => {
-        await api.post(`/playlists/${encodeURIComponent(playlist.id)}/items/remove`, { indexes: [1] });
+        await api.post('/items/remove', { playlists: [{ playlistId: playlist.id, indexes: [1] }] });
         const favorites = await openFavorites(app);
         await expect(favorites.row('Bravo')).toHaveAttribute('title', t('favorites.missing'));
         // Nothing is known about it beyond its name: its menu offers to find it, not to describe it.

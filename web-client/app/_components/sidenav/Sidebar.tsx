@@ -7,15 +7,27 @@ import { useQueue } from '@/app/_api/queue';
 import { useSettings } from '@/app/_api/settings';
 import { useTimer } from '@/app/_api/timer';
 import type { Playlist } from '@/app/_api/types';
+import { useFocusReturn } from '@/app/_hooks/useFocusReturn';
+import { useGlobalKey } from '@/app/_hooks/useGlobalKey';
+import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { useFavorites } from '@/app/_state/Favorites';
 import { hasFiles, useFileDrag } from '@/app/_state/FileDrag';
 import { useNavigation } from '@/app/_state/Navigation';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import { useUploads } from '@/app/_state/Uploads';
+import { media } from '@/app/_styles/media';
 import clsx from 'clsx';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, type CSSProperties, type DragEvent, type KeyboardEvent, type ReactNode } from 'react';
+import {
+    useRef,
+    useState,
+    type CSSProperties,
+    type DragEvent,
+    type KeyboardEvent,
+    type MouseEvent,
+    type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '../buttons';
 import { Icon } from '../icons';
@@ -101,17 +113,42 @@ function matches(playlist: Playlist, filter: string) {
     return playlist.name.toLocaleLowerCase().includes(filter);
 }
 
+// A click the keys made has no detail.
+const byKeyboard = (event: MouseEvent) => event.detail === 0;
+
 function Playlists() {
     const { t } = useTranslation();
     const pathname = usePathname();
-    const { openScreen } = useNavigation();
-    const { closeThen } = useDrawer();
+    const { openScreen, focusScreen } = useNavigation();
+    const { closeThen, open: openDrawer } = useDrawer();
     const { error, isPending, isError, refetch, isRefetching } = usePlaylists();
+    // Ctrl+K (Cmd+K on a Mac) is the quick switch: the search of the playlists
+    // takes the focus, the arrows walk them from it, and Escape on the emptied
+    // field sends the focus back.
+    const focus = useFocusReturn();
+    const searchInput = useRef<HTMLInputElement>(null);
+    const docked = useMediaQuery(media.drawerDocked);
+    useGlobalKey(
+        event => (event.ctrlKey || event.metaKey) && event.code === 'KeyK',
+        () => {
+            focus.remember();
+            if (!docked) openDrawer();
+            searchInput.current?.focus();
+        },
+        { inFields: true },
+    );
     const { playlists, selected, select } = usePlaylistSelection();
     const [filter, setFilter] = useState('');
     const actions = usePlaylistActions(() => setFilter(''));
     const menu = useRowMenu((playlist: Playlist) => [actions.renameItem(playlist), actions.removeItem(playlist)]);
     const shown = playlists?.filter(playlist => matches(playlist, filter.trim().toLocaleLowerCase()));
+    // The playlists are one stop of the Tab key, the arrows walking them: the row
+    // last focused takes the stop, else the selected playlist, else the first.
+    const [focused, setFocused] = useState<string | null>(null);
+    const tabStop =
+        shown?.find(playlist => playlist.id === focused) ??
+        shown?.find(playlist => playlist === selected) ??
+        shown?.[0];
 
     // Files dragged in go to the end of the playlist they are dropped on, or into a
     // new one at the zone that takes the place of the search meanwhile.
@@ -154,9 +191,11 @@ function Playlists() {
     };
     const newPlaylistJobs = uploads.jobs.filter(job => job.playlistId === null);
 
-    const open = (playlist: Playlist) =>
+    // Opened with the keys, the playlist takes the focus, for the keys to go on there.
+    const open = (playlist: Playlist, byKeys: boolean) =>
         closeThen(() => {
             select(playlist.id);
+            if (byKeys) focusScreen('/');
             openScreen('/');
         });
 
@@ -200,9 +239,16 @@ function Playlists() {
                                     isDropRow(playlist) && styles.dropOver,
                                 )}
                                 aria-current={active ? 'true' : undefined}
+                                tabIndex={playlist === tabStop ? 0 : -1}
+                                onFocus={() => setFocused(playlist.id)}
                                 onClick={event => {
                                     event.preventDefault();
-                                    open(playlist);
+                                    open(playlist, byKeyboard(event));
+                                }}
+                                onKeyDown={event => {
+                                    if (event.key !== 'Delete') return;
+                                    event.preventDefault();
+                                    actions.removeItem(playlist).onSelect();
                                 }}
                             >
                                 <Icon>queue_music</Icon>
@@ -274,7 +320,7 @@ function Playlists() {
                 onKeyDown={event => {
                     if (event.key !== 'Enter' || !(event.target instanceof HTMLInputElement) || !shown?.length) return;
                     event.preventDefault();
-                    open(shown[0]);
+                    open(shown[0], true);
                 }}
             >
                 {fileDrag.active ? (
@@ -298,6 +344,8 @@ function Playlists() {
                         className={styles.search}
                         value={filter}
                         onChange={setFilter}
+                        onEscape={focus.back}
+                        inputRef={searchInput}
                         placeholder={t('playlists.searchPlaceholder')}
                         actions={
                             <IconButton
@@ -319,7 +367,7 @@ function Playlists() {
 
 export function Sidebar() {
     const pathname = usePathname();
-    const { openScreen, openSecondScreen } = useNavigation();
+    const { openScreen, openSecondScreen, focusScreen } = useNavigation();
     const { closeThen } = useDrawer();
     const { expand } = usePlayerPanel();
     const { t } = useTranslation();
@@ -355,7 +403,12 @@ export function Sidebar() {
                     aria-current={active ? 'page' : undefined}
                     onClick={event => {
                         event.preventDefault();
-                        closeThen(() => (second ? openSecondScreen(href) : openScreen(href)));
+                        const byKeys = byKeyboard(event);
+                        closeThen(() => {
+                            if (byKeys) focusScreen(href);
+                            if (second) openSecondScreen(href);
+                            else openScreen(href);
+                        });
                     }}
                 >
                     <Icon>{icon}</Icon>

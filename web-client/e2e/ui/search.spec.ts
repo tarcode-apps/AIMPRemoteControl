@@ -59,6 +59,16 @@ test.describe('extended search', () => {
         await expect(screen.row('Zephyr two')).toHaveAttribute('aria-selected', 'true');
     });
 
+    test('the cursor follows the track that plays next', async ({ api }) => {
+        await search.search('zephyr');
+        await search.play('Zephyr one');
+        await expect(search.row('Zephyr one')).toHaveAttribute('aria-selected', 'true');
+
+        await api.command('next');
+        await expect(search.row('Zephyr Band')).toHaveAttribute('aria-selected', 'true');
+        await expect(search.row('Zephyr one')).toHaveAttribute('aria-selected', 'false');
+    });
+
     test('the fields and the playlists searched can be narrowed', async ({ app }) => {
         await search.search('zephyr');
         await expect(search.row('Zephyr Band')).toBeVisible();

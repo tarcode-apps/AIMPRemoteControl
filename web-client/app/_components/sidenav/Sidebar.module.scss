@@ -5,6 +5,7 @@
     flex-direction: column;
     min-height: 100%;
     padding: var(--safe-top) 0 var(--safe-bottom);
+    user-select: none;
 }
 
 .list {
@@ -93,6 +94,8 @@
     --search-field-height: 48px;
     --search-field-inset: 16px;
     --search-field-gap: 20px;
+    --search-field-button-size: 36px;
+    --search-field-button-inset: 6px;
 
     flex: 1;
     min-width: 0;
@@ -101,8 +104,6 @@
 // The size and place of the badges and menu buttons below; the field ends 4 px after it.
 .createButton {
     --icon-button-size: 36px;
-
-    margin-right: 2px;
 }
 
 .notFound {

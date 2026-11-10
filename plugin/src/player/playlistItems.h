@@ -4,6 +4,7 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "coverSource.h"
@@ -55,6 +56,7 @@ namespace player
 	// An item with the tag fields a client keeps for its own lists.
 	struct ItemDetails
 	{
+		std::string PlaylistId;
 		PlaylistItem Item;
 		std::string Artist;
 		std::string Album;
@@ -117,16 +119,51 @@ namespace player
 
 	PlaylistItem ReadPlaylistItem(const PlaylistItemContext &ctx, std::int32_t index, const SecondLineFormatter &secondLine);
 
-	// Items of a playlist named in a request: what matches `Search` (everything when
-	// it is empty), only in `Groups` when they are given, but the indexes in
-	// `Except`; and the `Indexes` besides. Without a search, only the `Indexes`.
-	struct ItemSelection
+	// What a selection names in one playlist: the `Indexes`, or the `Ranges`,
+	// inclusive spans of positions in the list the selection's search gives, each
+	// `[from, to]` with `0 <= from <= to`.
+	struct PlaylistSelection
 	{
-		std::optional<std::string> Search;
-		SearchFields Fields;
-		std::optional<std::vector<std::int32_t>> Groups;
-		std::vector<std::int32_t> Except;
+		std::string PlaylistId;
 		std::vector<std::int32_t> Indexes;
+		std::vector<std::pair<std::int32_t, std::int32_t>> Ranges;
+	};
+
+	// Items named in a request, in one playlist or several. The ranges count the
+	// items `Search` lists in each playlist, matched in `Fields`; an empty search
+	// lists every item.
+	struct ItemsSelection
+	{
+		std::string Search;
+		SearchFields Fields;
+		std::vector<PlaylistSelection> Playlists;
+	};
+
+	// A playlist of a selection, held for as long as this lives, with the indexes
+	// the selection names in it, sorted.
+	struct ResolvedPlaylist
+	{
+		std::string PlaylistId;
+		IAIMPPlaylist *Playlist = nullptr;
+		std::vector<std::int32_t> Indexes;
+
+		ResolvedPlaylist() = default;
+		ResolvedPlaylist(const ResolvedPlaylist &) = delete;
+		ResolvedPlaylist &operator=(const ResolvedPlaylist &) = delete;
+		ResolvedPlaylist(ResolvedPlaylist &&other) noexcept
+			: PlaylistId(std::move(other.PlaylistId)), Playlist(std::exchange(other.Playlist, nullptr)), Indexes(std::move(other.Indexes)) {}
+		ResolvedPlaylist &operator=(ResolvedPlaylist &&other) noexcept
+		{
+			std::swap(PlaylistId, other.PlaylistId);
+			std::swap(Playlist, other.Playlist);
+			std::swap(Indexes, other.Indexes);
+			return *this;
+		}
+		~ResolvedPlaylist()
+		{
+			if (Playlist)
+				Playlist->Release();
+		}
 	};
 
 	void AddToSummary(const PlaylistItemContext &ctx, ItemsSummary &summary);
@@ -136,9 +173,7 @@ namespace player
 	// Sorts the indexes, drops repeats and tells whether they all lie in `0..count-1`.
 	bool NormalizeIndexes(std::vector<std::int32_t> &indexes, std::int32_t count);
 
-	// Calls `visit` for the selected items in playlist order; false when an index or
-	// a group is outside the playlist.
-	bool VisitSelectedItems(IAIMPCore *core, IAIMPPlaylist *playlist, const ItemSelection &selection, const ItemVisitor &visit);
+	void VisitResolvedItems(IAIMPCore *core, const ResolvedPlaylist &playlist, const ItemVisitor &visit);
 
 	// Calls `visit` for the items selected by `query`, in playlist order. Returns how
 	// many items match `Search` in the whole playlist, or the item count when the
@@ -172,10 +207,20 @@ namespace player
 	// The item at `index`, for the caller to release.
 	MutationResult FindPlaylistItem(IAIMPCore *core, const std::string &playlistId, std::int32_t index, IAIMPPlaylistItem *&item);
 
-	// The selected items with their tag fields, in playlist order; the second line is
-	// formatted whether or not the playlist shows it.
-	MutationResult DescribePlaylistItems(IAIMPCore *core, const std::string &playlistId, const ItemSelection &selection,
-										 std::vector<ItemDetails> &items);
+	// The selection's playlists with the items each names; with `writable`, playlists
+	// that may be changed. Checked as a whole before anything is done: a failure
+	// holds nothing and names the playlist in `failedPlaylist`, by its place in the
+	// selection.
+	MutationResult ResolveSelection(IAIMPCore *core, const ItemsSelection &selection, bool writable,
+									std::vector<ResolvedPlaylist> &resolved, std::size_t &failedPlaylist);
+
+	// The selected items with their tag fields, playlist by playlist and in playlist
+	// order; the second line is formatted whether or not the playlist shows it.
+	MutationResult DescribeItems(IAIMPCore *core, const ItemsSelection &selection, std::vector<ItemDetails> &items,
+								 std::size_t &failedPlaylist);
+
+	MutationResult SummarizeItems(IAIMPCore *core, const ItemsSelection &selection, ItemsSummary &summary,
+								  std::size_t &failedPlaylist);
 
 	// The user's stars, 0 for none.
 	MutationResult SetItemMark(IAIMPCore *core, const std::string &playlistId, std::int32_t index, std::int32_t mark);
@@ -183,8 +228,8 @@ namespace player
 	// The switch in front of the track: off takes it out of playback.
 	MutationResult SetItemEnabled(IAIMPCore *core, const std::string &playlistId, std::int32_t index, bool enabled);
 
-	// The same for the selected items, as one change of the playlist.
-	MutationResult SetItemsEnabled(IAIMPCore *core, const std::string &playlistId, const ItemSelection &selection, bool enabled);
+	// The same for the selected items, as one change of each playlist.
+	MutationResult SetItemsEnabled(IAIMPCore *core, const ItemsSelection &selection, bool enabled, std::size_t &failedPlaylist);
 
 	// Collapses or expands one group, or every group when `index` is nullopt.
 	MutationResult SetGroupExpanded(IAIMPCore *core, const std::string &playlistId, std::optional<std::int32_t> index, bool expanded);
@@ -225,6 +270,6 @@ namespace player
 	// is refused as a whole when it has a part of a container file, or files that
 	// cannot be deleted, which `undeletable` then names: the player reports a failed
 	// deletion in a dialog of its own, or not at all, so it is ruled out beforehand.
-	MutationResult RemovePlaylistItems(IAIMPCore *core, const std::string &playlistId, const ItemSelection &selection,
-									   bool physically, std::vector<std::string> &undeletable);
+	MutationResult RemoveItems(IAIMPCore *core, const ItemsSelection &selection, bool physically,
+							   std::vector<std::string> &undeletable, std::size_t &failedPlaylist);
 }

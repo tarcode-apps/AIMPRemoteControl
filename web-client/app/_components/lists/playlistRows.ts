@@ -24,9 +24,12 @@ export class PlaylistRows {
     readonly count: number;
     // Items, folded ones included: what the pages are counted in.
     readonly itemCount: number;
+    // In order; none in a flat playlist.
+    readonly groups: readonly PlaylistGroup[];
 
     constructor(itemCount: number, groups: PlaylistGroup[] | undefined) {
         this.itemCount = itemCount;
+        this.groups = groups ?? [];
         let row = 0;
         if (!groups?.length) {
             this.count = itemCount;
@@ -46,6 +49,12 @@ export class PlaylistRows {
         const { group, startRow } = span;
         if (row === startRow) return { kind: 'group', group };
         return { kind: 'item', position: group.firstPosition + row - startRow - 1, group };
+    }
+
+    // The row of the first item shown, past the headers; null without one.
+    get firstItemRow(): number | null {
+        for (let row = 0; row < this.count; row++) if (this.at(row).kind === 'item') return row;
+        return null;
     }
 
     // The group `row` belongs to, header included; null in a flat playlist.

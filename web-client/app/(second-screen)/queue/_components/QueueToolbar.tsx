@@ -1,7 +1,8 @@
 'use client';
 
-import { groupByPlaylist, usePlaylists } from '@/app/_api/playlists';
-import { useClearQueue, useQueue, useRemoveFromQueue, useSetQueueSuspended } from '@/app/_api/queue';
+import { selectionOfTracks } from '@/app/_api/items';
+import { usePlaylists } from '@/app/_api/playlists';
+import { useClearQueue, useQueue, useSetQueueSuspended } from '@/app/_api/queue';
 import { ToolbarButton } from '@/app/_components/buttons';
 import { Icon } from '@/app/_components/icons';
 import { ListToolbar } from '@/app/_components/lists';
@@ -18,27 +19,14 @@ export function QueueToolbar() {
     const { data: playlists } = usePlaylists();
     const suspend = useSetQueueSuspended();
     const clear = useClearQueue();
-    const remove = useRemoveFromQueue();
     const favoriteActions = useFavoriteActions();
+    const selected = mode.selectedItems();
 
     const addSelectedToFavorites = () => {
         const revisions = new Map(playlists?.map(playlist => [playlist.id, playlist.revision]));
-        const selected = mode.items.filter(item => mode.isSelected(item.position));
-        return favoriteActions.addSelections(
-            [...groupByPlaylist(selected)].map(([playlistId, items]) => ({
-                playlistId,
-                revision: revisions.get(playlistId),
-                selection: { indexes: items.map(item => item.index) },
-            })),
+        return favoriteActions.addSelection(
+            selectionOfTracks(selected.map(item => ({ ...item, revision: revisions.get(item.playlistId) }))),
         );
-    };
-
-    const removeSelected = () => {
-        const positions = mode.items.filter(item => mode.isSelected(item.position)).map(item => item.position);
-        if (positions.length) remove.mutate({ positions, revision: queue?.revision }, { onError: showError });
-        // The positions renumber, so the selection cannot stay.
-        if (mode.mode === 'select') mode.setMode(null);
-        else mode.clearSelection();
     };
 
     return (
@@ -79,7 +67,12 @@ export function QueueToolbar() {
                     disabled: mode.nothingSelected,
                     onSelect: () => void addSelectedToFavorites().catch(showError),
                 },
-                { label: t('queue.remove'), icon: 'delete', disabled: mode.nothingSelected, onSelect: removeSelected },
+                {
+                    label: t('queue.remove'),
+                    icon: 'delete',
+                    disabled: mode.nothingSelected,
+                    onSelect: () => mode.removeFromQueue(selected),
+                },
             ]}
         />
     );

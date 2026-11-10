@@ -23,33 +23,35 @@ export function useActiveRow(rows: PlaylistRows, scrollTo: (row: number) => void
         setByKeyboard(false);
     };
 
-    // False for keys that do not move the active row.
-    const move = (eventKey: string, count: number, pageRows: number) => {
+    // The row a moving key takes the cursor to; null for a key that is not one.
+    const move = (eventKey: string, count: number, pageRows: number): number | null => {
         const current = row ?? -1;
         const clamp = (next: number) => Math.min(Math.max(next, 0), count - 1);
+        let next: number;
         switch (eventKey) {
             case 'ArrowDown':
-                activate(clamp(current + 1));
+                next = clamp(current + 1);
                 break;
             case 'ArrowUp':
-                activate(clamp(current < 0 ? 0 : current - 1));
+                next = clamp(current < 0 ? 0 : current - 1);
                 break;
             case 'PageDown':
-                activate(clamp(current + pageRows));
+                next = clamp(current + pageRows);
                 break;
             case 'PageUp':
-                activate(clamp(current - pageRows));
+                next = clamp(current - pageRows);
                 break;
             case 'Home':
-                activate(0);
+                next = 0;
                 break;
             case 'End':
-                activate(count - 1);
+                next = count - 1;
                 break;
             default:
-                return false;
+                return null;
         }
-        return true;
+        activate(next);
+        return next;
     };
 
     return { row, byKeyboard, select, move };

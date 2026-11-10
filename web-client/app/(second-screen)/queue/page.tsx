@@ -32,7 +32,7 @@ function QueueScreen() {
         name: t('queue.title'),
         searchPlaceholder: t('queue.searchPlaceholder'),
         totals: queue && sumSummaries(queue.items.map(summaryOf)),
-        selectedTotals: sumSummaries(mode.items.filter(item => mode.isSelected(item.position)).map(summaryOf)),
+        selectedTotals: sumSummaries(mode.selectedItems().map(summaryOf)),
     });
 
     return (

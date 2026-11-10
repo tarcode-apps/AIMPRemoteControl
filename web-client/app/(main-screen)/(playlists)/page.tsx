@@ -1,6 +1,7 @@
 'use client';
 
 import { errorMessage } from '@/app/_api/helpers/errors';
+import { useSelectionSummary } from '@/app/_api/items';
 import { TextButton } from '@/app/_components/buttons';
 import { Icon } from '@/app/_components/icons';
 import { useListHeading } from '@/app/_components/lists';
@@ -8,15 +9,12 @@ import { Screen } from '@/app/_components/pages';
 import screenStyles from '@/app/_components/pages/Screen.module.scss';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import { useUploads, type UploadJob } from '@/app/_state/Uploads';
-import { summaryOf } from '@/app/_utils/summary';
 import clsx from 'clsx';
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PlaylistModeProvider, usePlaylistMode } from './_components/PlaylistMode';
 import { PlaylistPager } from './_components/PlaylistPager';
 import { PlaylistTabs } from './_components/PlaylistTabs';
 import { PlaylistToolbar } from './_components/PlaylistToolbar';
-import { usePlaylistView } from './_components/usePlaylistLayout';
 
 export default function Playlists() {
     return (
@@ -30,18 +28,13 @@ function PlaylistsScreen() {
     const { t } = useTranslation();
     const { selected } = usePlaylistSelection();
     const mode = usePlaylistMode();
-    const view = usePlaylistView(selected, mode.text);
-    const groupTotals = useMemo(() => new Map(view.groups?.map(group => [group.index, group])), [view.groups]);
+    const selectedTotals = useSelectionSummary(mode.itemsSelection, mode.allSelected ? mode.totals : undefined);
     const heading = useListHeading({
         mode,
         name: selected?.name,
         searchPlaceholder: t('playlist.searchPlaceholder'),
         totals: selected && { count: selected.itemCount, duration: selected.duration, size: selected.size },
-        selectedTotals: mode.selectedTotals({
-            all: view.totals,
-            group: group => groupTotals.get(group),
-            row: summaryOf,
-        }),
+        selectedTotals,
     });
 
     const uploads = useUploads();

@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { startsWith, t } from '../strings';
+import { ListScreen } from './list-screen';
 
 // The widths from which the client docks the drawer and the player beside the
 // screen (app/_styles/_breakpoints.scss); below them both slide over it.
@@ -85,6 +86,16 @@ export class App {
         await this.openDrawer();
         await this.navigationLink(name).click();
         await expect(this.heading).toHaveText(heading);
+    }
+
+    // The list of a screen of the tools, named as its screen is.
+    listScreen(name: string): ListScreen {
+        return new ListScreen(this, this.main.getByRole('listbox', { name }));
+    }
+
+    async openListScreen(name: string, heading = name): Promise<ListScreen> {
+        await this.openScreen(name, heading);
+        return this.listScreen(name);
     }
 
     // The playlist's row in the drawer.

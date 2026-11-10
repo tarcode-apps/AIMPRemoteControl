@@ -1,6 +1,6 @@
 'use client';
 
-import { useEnqueueSelections } from '@/app/_api/queue';
+import { useEnqueue } from '@/app/_api/queue';
 import { ToolbarButton } from '@/app/_components/buttons';
 import { SortDialog } from '@/app/_components/dialogs';
 import { Icon } from '@/app/_components/icons';
@@ -13,7 +13,7 @@ import { favoritesSortModes, useFavorites } from '@/app/_state/Favorites';
 import { media } from '@/app/_styles/media';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { removalOf, selectionByPlaylist, useFavoritesMode } from './FavoritesMode';
+import { selectionOf, useFavoritesMode } from './FavoritesMode';
 import { GroupingDialog } from './GroupingDialog';
 
 export function FavoritesToolbar() {
@@ -22,19 +22,14 @@ export function FavoritesToolbar() {
     const docked = useMediaQuery(media.drawerDocked);
     const mode = useFavoritesMode();
     const favorites = useFavorites();
-    const enqueueSelections = useEnqueueSelections();
+    const enqueue = useEnqueue();
     const removal = useItemRemoval();
     const [dialog, setDialog] = useState<'grouping' | 'sort' | null>(null);
     const closeDialog = () => setDialog(null);
     const empty = mode.entries.length === 0;
-
+    const selected = mode.selectedEntries();
     const enqueueSelected = (atBeginning: boolean) =>
-        enqueueSelections(selectionByPlaylist(mode.selectedEntries()), atBeginning);
-
-    const removeSelected = () => {
-        favorites.remove(mode.selectedEntries().map(({ record }) => record.fileUri));
-        if (mode.mode === 'select') mode.setMode(null);
-    };
+        enqueue.mutate({ ...selectionOf(selected), atBeginning }, { onError: showError });
 
     return (
         <>
@@ -70,24 +65,21 @@ export function FavoritesToolbar() {
                         label: t('playlist.enqueue'),
                         icon: 'playlist_add',
                         disabled: mode.nothingSelected,
-                        onSelect: () => void enqueueSelected(false).catch(showError),
+                        onSelect: () => enqueueSelected(false),
                     },
                     {
                         label: t('playlist.enqueueFirst'),
                         icon: 'playlist_play',
                         disabled: mode.nothingSelected,
-                        onSelect: () => void enqueueSelected(true).catch(showError),
+                        onSelect: () => enqueueSelected(true),
                     },
                     {
                         label: t('favorites.remove'),
                         icon: 'heart_minus',
                         disabled: mode.nothingSelected,
-                        onSelect: removeSelected,
+                        onSelect: () => mode.removeFavorites(selected),
                     },
-                    ...removal.selectionItems(
-                        () => removalOf(mode.selectedEntries(), favorites.remove),
-                        mode.nothingSelected,
-                    ),
+                    ...removal.selectionItems(() => selectionOf(selected), mode.afterRemoval(selected)),
                 ]}
                 sorting={
                     <>

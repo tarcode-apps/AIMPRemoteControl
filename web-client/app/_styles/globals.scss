@@ -88,6 +88,14 @@ body {
     -webkit-tap-highlight-color: transparent;
 }
 
+// The interface is not a document: its bars, lists and controls take no text
+// selection (each sets `user-select: none`), and the text meant to be read or
+// copied says so again. A field's text is the user's wherever the field sits.
+input,
+textarea {
+    user-select: text;
+}
+
 @include mixins.drawer-modal {
     body.drawer-open {
         overflow: hidden;

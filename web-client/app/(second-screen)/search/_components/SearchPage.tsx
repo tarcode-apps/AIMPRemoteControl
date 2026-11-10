@@ -2,7 +2,7 @@
 
 import { errorMessage } from '@/app/_api/helpers/errors';
 import { usePlayer } from '@/app/_api/player';
-import { queueMark, trackKey, useEnqueueSelections, useQueuePositions } from '@/app/_api/queue';
+import { queueMark, trackKey, useEnqueue, useQueuePositions } from '@/app/_api/queue';
 import { useSearchPages } from '@/app/_api/search';
 import type { PlaylistGroup, SearchHit } from '@/app/_api/types';
 import { Checkbox } from '@/app/_components/inputs';
@@ -22,13 +22,17 @@ import {
     useActiveRow,
     useFoldingItems,
     useRowKeys,
+    useSearchKeys,
+    useSelectionKeys,
     type PlaylistRow,
+    type PlaylistRowKey,
 } from '@/app/_components/lists';
 import styles from '@/app/_components/lists/ListPage.module.scss';
 import { menuSeparator, useRowMenu } from '@/app/_components/menus';
 import { useItemRemoval } from '@/app/_components/playlists';
 import { useErrorToast } from '@/app/_components/toast';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
+import { useOnChange } from '@/app/_hooks/useOnChange';
 import { useFavoriteRelink } from '@/app/_state/Favorites';
 import { useNavigation } from '@/app/_state/Navigation';
 import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
@@ -36,7 +40,7 @@ import { useTrackActions } from '@/app/_state/useTrackActions';
 import { media } from '@/app/_styles/media';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import clsx from 'clsx';
-import { useId, useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent } from 'react';
+import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchMode } from './SearchMode';
 
@@ -89,6 +93,44 @@ export function SearchPage() {
     const playing = player?.track;
     const isPlaying = (hit: SearchHit) => playing?.playlistId === hit.playlistId && playing.index === hit.index;
 
+    // The cursor follows the track, as in a playlist: on a mobile it is the track's
+    // alone, docked a track outside the results leaves it be. Where the track is in
+    // the results is known only once its page has loaded, so the cursor waits for
+    // that, which may be when the user scrolls that far.
+    const playingKey = playing ? `${playing.playlistId}|${playing.index}` : null;
+    const [followsTrack, setFollowsTrack] = useState(playingKey !== null);
+    useOnChange(playingKey, () => {
+        setFollowsTrack(playingKey !== null);
+        if (!docked) active.select(null);
+    });
+    // The positions are the result's: the cursor goes with a change of the search,
+    // and finds the playing track again among the new hits.
+    useOnChange(JSON.stringify(params), () => {
+        active.select(null);
+        setFollowsTrack(playingKey !== null);
+    });
+    if (followsTrack && playing) {
+        for (const [page, data] of loaded) {
+            const at = data.items.findIndex(hit => isPlaying(hit) && hit.revision === playing.playlistRevision);
+            if (at < 0) continue;
+            setFollowsTrack(false);
+            active.select({ kind: 'item', position: page * pageSize + at });
+            break;
+        }
+    }
+    // A cursor moved by hand is the user's, not the playing track's any more.
+    const cursor = {
+        ...active,
+        select: (key: PlaylistRowKey | null) => {
+            setFollowsTrack(false);
+            active.select(key);
+        },
+        move: (eventKey: string, count: number, pageRows: number) => {
+            setFollowsTrack(false);
+            return active.move(eventKey, count, pageRows);
+        },
+    };
+
     // As a picker for a favorite that lost its track, the screen hands the chosen
     // track to the record and goes back.
     const { relinking, finishRelink } = useFavoriteRelink();
@@ -118,82 +160,86 @@ export function SearchPage() {
 
     // As a playlist's, over the group's hits. Picking a track for a favorite
     // leaves only the folding.
-    const enqueueSelections = useEnqueueSelections();
+    const enqueue = useEnqueue();
     const foldingItems = useFoldingItems();
     const groupMenu = useRowMenu((group: PlaylistGroup) => {
         const folding = foldingItems(group, { toggle: mode.toggleGroup, setAll: mode.setAllExpanded });
         if (relinking) return folding;
-        const parts = () => {
-            const part = mode.groupSelection(group);
-            return part ? [part] : [];
+        const enqueueGroup = (atBeginning: boolean) => {
+            const selection = mode.groupSelection(group);
+            if (selection) enqueue.mutate({ ...selection, atBeginning }, { onError: showError });
         };
         return [
             {
                 label: t('playlist.enqueue'),
                 icon: 'playlist_add',
-                onSelect: () => void enqueueSelections(parts(), false).catch(showError),
+                onSelect: () => enqueueGroup(false),
             },
             {
                 label: t('playlist.enqueueFirst'),
                 icon: 'playlist_play',
-                onSelect: () => void enqueueSelections(parts(), true).catch(showError),
+                onSelect: () => enqueueGroup(true),
             },
             {
                 label: t('favorites.add'),
                 icon: 'heart_plus',
-                onSelect: () => void favoriteActions.addSelections(parts()).catch(showError),
+                onSelect: () => {
+                    const selection = mode.groupSelection(group);
+                    if (selection) void favoriteActions.addSelection(selection).catch(showError);
+                },
             },
             menuSeparator,
             ...folding,
             menuSeparator,
-            ...removal.selectionItems(() => {
-                const part = mode.groupSelection(group);
-                return part && { parts: [part] };
-            }, mode.groupReadOnly(group)),
+            ...removal.selectionItems(() => mode.groupSelection(group)),
         ];
     });
 
     // The results are always in groups, one per playlist, which a row goes with.
-    const toggleRow = (position: number, group: PlaylistGroup | undefined) =>
-        mode.setSelected([position], !mode.isSelected(position, group?.index), rows, group);
-    const toggleSelected = (row: PlaylistRow) => {
-        if (row.kind === 'group')
-            mode.setGroupSelected(row.group.index, !mode.groupCheckState(row.group.index).checked, rows);
-        // A row still loading has no hit to keep, so it cannot be picked yet.
-        else if (hitAt(row.position)) toggleRow(row.position, row.group);
+    const keys = useSelectionKeys({ mode, rows, active: cursor, list: scrollRef, disabled: relinking !== null });
+    // Enter: a header folds, a hit plays, or takes the favorite's place.
+    const activate = (row: PlaylistRow) => {
+        if (row.kind === 'group') mode.toggleGroup(row.group);
+        else {
+            const hit = hitAt(row.position);
+            if (hit && relinking) void relinkTo(hit);
+            else if (hit) play(hit);
+        }
     };
-
+    useSearchKeys({ mode, rows, active: cursor, list: scrollRef, onEnter: activate });
     const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
         if (rows.count === 0) return;
         const pageRows = Math.max(1, Math.floor(event.currentTarget.clientHeight / twoLineRowHeight) - 1);
+        if (keys.onKeyDown(event, rows.count, pageRows)) return;
         const current = active.row === null ? null : rows.at(active.row);
-        if (active.move(event.key, rows.count, pageRows)) event.preventDefault();
+        if (cursor.move(event.key, rows.count, pageRows) !== null) event.preventDefault();
         else if (event.key === 'Enter' && current) {
-            if (current.kind === 'group') mode.toggleGroup(current.group);
-            else {
-                const hit = hitAt(current.position);
-                if (hit && relinking) void relinkTo(hit);
-                else if (hit) play(hit);
-            }
+            activate(current);
             event.preventDefault();
         } else if (event.key === ' ' && current && selecting) {
-            toggleSelected(current);
+            keys.toggle(current);
+            event.preventDefault();
+        } else if (event.key === 'Delete' && !relinking) {
+            const hit = current?.kind === 'item' ? hitAt(current.position) : undefined;
+            if (selecting) removal.removeSelection(mode.itemsSelection);
+            else if (current?.kind === 'group') removal.removeSelection(mode.groupSelection(current.group));
+            else if (hit) removal.removeTrack({ ...hit, name: hit.displayText });
             event.preventDefault();
         }
     };
 
     // Decided per gesture, as in a playlist: a tap plays at once, a mouse click only
     // moves the cursor and the double click plays.
-    const onItemClick = (event: MouseEvent, row: number, position: number, hit: SearchHit) => {
+    const onItemClick = (event: MouseEvent, row: number, hit: SearchHit) => {
         if (selecting) {
-            toggleRow(position, rows.at(row).group);
+            keys.pick(row, () => keys.toggle(rows.at(row)));
             return;
         }
         if (relinking) {
             void relinkTo(hit);
             return;
         }
-        active.select(rows.keyAt(row));
+        cursor.select(rows.keyAt(row));
         const { pointerType } = event.nativeEvent as PointerEvent;
         if (pointerType !== 'mouse') play(hit);
     };
@@ -262,6 +308,7 @@ export function SearchPage() {
                                 aria-selected={isActive}
                                 className={clsx(styles.groupRow, isActive && styles.active)}
                                 style={{ height: groupRowHeight, transform }}
+                                onClickCapture={event => keys.onRowClick(event, index)}
                             >
                                 {selecting && (
                                     <Checkbox
@@ -271,7 +318,7 @@ export function SearchPage() {
                                         className={styles.groupCheckbox}
                                         {...mode.groupCheckState(row.group.index)}
                                         onChange={event =>
-                                            mode.setGroupSelected(row.group.index, event.target.checked, rows)
+                                            keys.pick(index, () => keys.setSelected(row, event.target.checked))
                                         }
                                     />
                                 )}
@@ -299,7 +346,8 @@ export function SearchPage() {
                                 hit && isPlaying(hit) && styles.playing,
                             )}
                             style={{ height: twoLineRowHeight, transform }}
-                            onClick={event => hit && onItemClick(event, index, row.position, hit)}
+                            onClickCapture={event => keys.onRowClick(event, index)}
+                            onClick={event => hit && onItemClick(event, index, hit)}
                             onDoubleClick={() => hit && !selecting && !relinking && play(hit)}
                         >
                             {hit ? (
@@ -311,7 +359,7 @@ export function SearchPage() {
                                     number={hit.index + 1}
                                     queueMark={queueMark(queuePositions.get(trackKey(hit.playlistId, hit.index)))}
                                     selected={selecting && mode.isSelected(row.position, row.group?.index)}
-                                    onSelect={selected => mode.setSelected([row.position], selected, rows, row.group)}
+                                    onSelect={selected => keys.pick(index, () => keys.setSelected(row, selected))}
                                     menu={selecting || relinking ? undefined : rowMenu.button(index, hit)}
                                 />
                             ) : (
@@ -332,10 +380,6 @@ export function SearchPage() {
             tabIndex={0}
             aria-activedescendant={active.row === null ? undefined : rowId(active.row)}
             onKeyDown={onKeyDown}
-            // Word selection starts on the second press of a double click.
-            onMouseDown={event => {
-                if (event.detail > 1) event.preventDefault();
-            }}
         >
             {content}
             {rowMenu.popover}

@@ -1,13 +1,14 @@
 'use client';
 
 import { useLocatedFavorites } from '@/app/_api/favorites';
-import { groupByPlaylist, usePlaylists } from '@/app/_api/playlists';
-import type { ItemsSummary, LocatedItem, PlaylistGroup, SelectionInPlaylist } from '@/app/_api/types';
+import { selectionOfTracks } from '@/app/_api/items';
+import { usePlaylists } from '@/app/_api/playlists';
+import type { ItemsSelection, ItemsSummary, LocatedItem, PlaylistGroup } from '@/app/_api/types';
 import { PlaylistRows, useCollapsedGroups, useListMode, type ListModeValue } from '@/app/_components/lists';
-import type { SelectionRemoval } from '@/app/_components/playlists';
+import { useOnChange } from '@/app/_hooks/useOnChange';
 import { useFavorites, type FavoriteRecord } from '@/app/_state/Favorites';
 import { sumSummaries } from '@/app/_utils/summary';
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 // A favorite as the list shows it: the record, and the track in its playlist
@@ -25,6 +26,12 @@ export type FavoritesModeContextValue = ListModeValue & {
     toggleGroup(group: PlaylistGroup): void;
     setAllExpanded(expanded: boolean): void;
     selectedEntries(): FavoriteEntry[];
+    // Takes the entries out of the favorites, not out of their playlists. The menu
+    // items and the Delete key share it; the mode stays for the next pick.
+    removeFavorites(entries: FavoriteEntry[]): void;
+    // What follows a removal of the entries' tracks from their playlists: deleted
+    // from disk, their favorites go too.
+    afterRemoval(entries: FavoriteEntry[]): (physically: boolean) => void;
 };
 
 const FavoritesModeContext = createContext<FavoritesModeContextValue | null>(null);
@@ -35,27 +42,9 @@ export function useFavoritesMode(): FavoritesModeContextValue {
     return value;
 }
 
-// The tracks of the entries that are still in their playlists, as a selection
-// per playlist.
-export function selectionByPlaylist(entries: FavoriteEntry[]): SelectionInPlaylist[] {
-    const tracks = entries.flatMap(({ located }) => (located ? [located] : []));
-    return [...groupByPlaylist(tracks)].map(([playlistId, located]) => ({
-        playlistId,
-        revision: located[0].revision,
-        selection: { indexes: located.map(track => track.index) },
-    }));
-}
-
-// Removing the entries' tracks from their playlists; a favorite whose file is
-// deleted goes with it.
-export function removalOf(entries: FavoriteEntry[], removeFavorites: (files: string[]) => void): SelectionRemoval {
-    const files = entries.flatMap(({ record, located }) => (located ? [record.fileUri] : []));
-    return {
-        parts: selectionByPlaylist(entries),
-        onRemoved: physically => {
-            if (physically) removeFavorites(files);
-        },
-    };
+// The tracks of the entries that are still in their playlists, as a selection.
+export function selectionOf(entries: FavoriteEntry[]): ItemsSelection {
+    return selectionOfTracks(entries.flatMap(({ located }) => (located ? [located] : [])));
 }
 
 // The live values of the tracks still in their playlists, the snapshots of the rest.
@@ -71,14 +60,10 @@ export function totalsOf(entries: FavoriteEntry[]): ItemsSummary {
 export function FavoritesModeProvider({ children }: { children: ReactNode }) {
     const { t } = useTranslation();
     const list = useListMode('favorites');
-    const { records, grouping, revision } = useFavorites();
+    const { records, grouping, revision, remove } = useFavorites();
     // The selection names entries by position, which any change of the favorites
     // may move, an addition from the player included.
-    const [seenRevision, setSeenRevision] = useState(revision);
-    if (seenRevision !== revision) {
-        setSeenRevision(revision);
-        list.clearSelection();
-    }
+    useOnChange(revision, list.clearSelection);
     const { data: located } = useLocatedFavorites(records);
     const { data: playlists } = usePlaylists();
     const { text } = list;
@@ -131,6 +116,11 @@ export function FavoritesModeProvider({ children }: { children: ReactNode }) {
     }, [entries, grouping, playlists, collapsed, t]);
     const rows = useMemo(() => new PlaylistRows(entries.length, groups), [entries.length, groups]);
 
+    const removeFavorites = (removed: FavoriteEntry[]) => {
+        if (!removed.length) return;
+        remove(removed.map(({ record }) => record.fileUri));
+        list.clearSelection();
+    };
     const value: FavoritesModeContextValue = {
         ...list,
         entries,
@@ -138,6 +128,10 @@ export function FavoritesModeProvider({ children }: { children: ReactNode }) {
         toggleGroup: group => toggle(keys[group.index]),
         setAllExpanded: expanded => setAll(expanded, keys),
         selectedEntries: () => entries.filter((_, position) => list.isSelected(position)),
+        removeFavorites,
+        afterRemoval: removed => physically => {
+            if (physically) removeFavorites(removed.filter(({ located }) => located));
+        },
     };
     return <FavoritesModeContext value={value}>{children}</FavoritesModeContext>;
 }

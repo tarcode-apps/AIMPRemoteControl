@@ -1,6 +1,7 @@
 import type { Viewport } from 'next';
 import { ApiProvider } from './_api/helpers/ApiProvider';
 import { ConnectionBanner } from './_components/connection';
+import { AppKeys } from './_components/keys';
 import { PlayerPanel, PlayerPanelProvider } from './_components/player';
 import { Drawer, DrawerContainer, DrawerContent, Sidebar } from './_components/sidenav';
 import { DocumentTitle } from './_components/title';
@@ -35,6 +36,7 @@ export default function RootLayout({
             <body>
                 <DetectLanguage />
                 <DocumentTitle />
+                <AppKeys />
                 <ApiProvider>
                     <ConnectionBanner />
                     <ToastProvider>

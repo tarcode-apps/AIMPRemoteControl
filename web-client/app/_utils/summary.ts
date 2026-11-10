@@ -16,3 +16,7 @@ export function sumSummaries(summaries: Iterable<ItemsSummary>): ItemsSummary {
 export function summaryOf({ duration, size }: { duration: number; size: number }): ItemsSummary {
     return { count: 1, duration, size };
 }
+
+export function sameSummary(a: ItemsSummary, b: ItemsSummary): boolean {
+    return a.count === b.count && a.duration === b.duration && a.size === b.size;
+}

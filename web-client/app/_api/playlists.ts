@@ -13,11 +13,8 @@ import { playerKeys, type PlayerSnapshot } from './player';
 import { trackKey } from './queue';
 import type {
     CreatedPlaylist,
-    ItemDetailsResponse,
     ItemEnabledRequest,
     ItemMarkRequest,
-    ItemSelection,
-    ItemsEnabledRequest,
     Lyrics,
     MoveRequest,
     Playlist,
@@ -298,57 +295,6 @@ export function useSetItemEnabled() {
     });
 }
 
-// Whole groups are predicted, or their switch would show up empty until the
-// player reports the change; any other selection is the player's to resolve,
-// and the `playlists` event reloads the rows and the groups.
-export function useSetItemsEnabled() {
-    const client = useQueryClient();
-    return useMutation({
-        mutationFn: ({ playlistId, ...body }: ItemsEnabledRequest) =>
-            request<unknown>('POST', `/playlists/${encodeURIComponent(playlistId)}/items/enabled`, { body }),
-        onMutate: async variables => {
-            if (
-                !('search' in variables) ||
-                !variables.groups?.length ||
-                variables.except.length ||
-                variables.indexes?.length
-            )
-                return [];
-            const { playlistId, search, groups: chosen, enabled } = variables;
-            const groupsKey = playlistKeys.groupsView(playlistId, search);
-            await client.cancelQueries({ queryKey: playlistKeys.playlist(playlistId) });
-            const groups = client.getQueryData<PlaylistGroups>(groupsKey);
-            if (!groups) return [];
-            const predictions: Prediction[] = [
-                predict(client, groupsKey, groups, {
-                    ...groups,
-                    groups: groups.groups.map(group =>
-                        chosen.includes(group.index) ? { ...group, enabledCount: enabled ? group.count : 0 } : group,
-                    ),
-                }),
-            ];
-            // In a search the groups count matches by position, not by index.
-            if (search !== '') return predictions;
-            const ranges = groups.groups
-                .filter(group => chosen.includes(group.index))
-                .map(group => [group.firstPosition, group.firstPosition + group.count]);
-            const inRange = (index: number) => ranges.some(([first, end]) => index >= first && index < end);
-            for (const [queryKey, page] of client.getQueriesData<PlaylistItemsPage>({
-                queryKey: playlistKeys.itemPages(playlistId),
-            })) {
-                if (!page || (queryKey[3] as ItemsRange).search) continue;
-                const items = page.items.map(item =>
-                    item.enabled !== enabled && inRange(item.index) ? { ...item, enabled } : item,
-                );
-                if (items.some((item, i) => item !== page.items[i]))
-                    predictions.push(predict(client, queryKey, page, { ...page, items }));
-            }
-            return predictions;
-        },
-        onError: (_error, _variables, predictions) => revert(client, predictions ?? []),
-    });
-}
-
 export function useSortPlaylist(id: string) {
     return useMutation({
         mutationFn: (body: SortRequest) =>
@@ -360,36 +306,6 @@ export function useMovePlaylistItems(id: string) {
     return useMutation({
         mutationFn: (body: MoveRequest) =>
             request<unknown>('POST', `/playlists/${encodeURIComponent(id)}/items/move`, { body }),
-    });
-}
-
-export type ItemDetailsRequest = ItemSelection & {
-    playlistId: string;
-    revision?: number;
-};
-
-export type RemoveItemsRequest = ItemSelection & {
-    playlistId: string;
-    revision?: number;
-    // The files go from disk too.
-    physically: boolean;
-};
-
-// Not predicted: the pages are windows over the playlist, which the `playlists`
-// event reloads once the player has taken the items out.
-export function useRemovePlaylistItems() {
-    return useMutation({
-        mutationFn: ({ playlistId, ...body }: RemoveItemsRequest) =>
-            request<unknown>('POST', `/playlists/${encodeURIComponent(playlistId)}/items/remove`, { body }),
-    });
-}
-
-export function useItemDetails() {
-    return useMutation({
-        mutationFn: ({ playlistId, ...body }: ItemDetailsRequest) =>
-            request<ItemDetailsResponse>('POST', `/playlists/${encodeURIComponent(playlistId)}/items/details`, {
-                body,
-            }),
     });
 }
 

@@ -38,12 +38,6 @@ export type ItemEnabledRequest = {
     enabled: boolean;
 };
 
-export type ItemsEnabledRequest = ItemSelection & {
-    playlistId: string;
-    revision?: number;
-    enabled: boolean;
-};
-
 export type CreatedPlaylist = {
     id: string;
 };
@@ -78,6 +72,9 @@ export type PlaylistItem = {
 
 // An item with the tags a client keeps for lists of its own.
 export type ItemDetails = PlaylistItem & {
+    playlistId: string;
+    // The playlist's, which `index` belongs to.
+    revision: number;
     artist: string;
     album: string;
     genre: string;
@@ -223,21 +220,31 @@ export type SearchField = 'title' | 'artist' | 'album' | 'genre' | 'file';
 
 export const searchFields: readonly SearchField[] = ['title', 'artist', 'album', 'genre', 'file'];
 
-// Which items of a playlist a request means: these indexes, or everything the
-// search finds but the indexes in `except`. With `fields` the search is the
-// extended one, without it the playlist's own.
-export type ItemSelection =
-    | { indexes: number[] }
-    | {
-          // Everything when empty.
-          search: string;
-          fields?: SearchField[];
-          // Only the matches in these groups of the playlist.
-          groups?: number[];
-          except: number[];
-          // Items besides the matches.
-          indexes?: number[];
-      };
+// What a selection names in one playlist: these indexes, or these ranges of
+// positions, inclusive, in the list the selection's search gives.
+export type PlaylistSelection = {
+    playlistId: string;
+    revision?: number;
+} & ({ indexes: number[] } | { ranges: [number, number][] });
+
+// A selection of items as the requests about them take it, in one playlist or
+// several. The ranges count the items `search` lists in each playlist, the whole
+// playlist without a search; with `fields` the search is the extended one,
+// without them the playlist's own.
+export type ItemsSelection = {
+    search?: string;
+    fields?: SearchField[];
+    playlists: PlaylistSelection[];
+};
+
+export type ItemsEnabledRequest = ItemsSelection & {
+    enabled: boolean;
+};
+
+export type RemoveItemsRequest = ItemsSelection & {
+    // The files go from disk too.
+    physically: boolean;
+};
 
 export type SearchHit = PlaylistItem & {
     playlistId: string;
@@ -280,18 +287,8 @@ export type Queue = {
     items: QueueItem[];
 };
 
-// The part of a selection that lies in one playlist, as that playlist's requests
-// take it.
-export type SelectionInPlaylist = {
-    playlistId: string;
-    revision?: number;
-    selection: ItemSelection;
-};
-
-export type EnqueueRequest = ItemSelection & {
-    playlistId: string;
+export type EnqueueRequest = ItemsSelection & {
     atBeginning?: boolean;
-    revision?: number;
 };
 
 export type QueueRemoveRequest = {

@@ -12,7 +12,8 @@ import type {
 } from '@/app/_api/types';
 import type { APIRequestContext } from '@playwright/test';
 
-export type ApiErrorBody = { code: string; message: string; files?: string[] };
+// With `playlistId`, the part of a selection the error is about.
+export type ApiErrorBody = { code: string; message: string; files?: string[]; playlistId?: string };
 
 export type ApiResponse<T = unknown> = {
     status: number;
@@ -219,7 +220,10 @@ export class Api {
     }
 
     enqueue(playlistId: string, indexes: number[], atBeginning = false) {
-        return this.expectOk(this.post('/queue/items', { playlistId, indexes, atBeginning }), 'queueing items');
+        return this.expectOk(
+            this.post('/queue/items', { playlists: [{ playlistId, indexes }], atBeginning }),
+            'queueing items',
+        );
     }
 
     clearQueue() {

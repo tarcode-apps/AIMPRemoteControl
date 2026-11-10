@@ -1,0 +1,45 @@
+{
+  "name": "web-client",
+  "version": "0.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "next dev --webpack --hostname localhost --port 3334",
+    "build": "next build --webpack && node fix-build.mjs",
+    "lint": "eslint",
+    "e2e": "playwright test --config e2e/playwright.config.ts",
+    "e2e:api": "playwright test --config e2e/playwright.config.ts --project api",
+    "e2e:ui": "playwright test --config e2e/playwright.config.ts --project ui-mobile --project ui-desktop --project ui-desktop-wide",
+    "e2e:report": "playwright show-report e2e/runtime/report"
+  },
+  "dependencies": {
+    "@fontsource-utils/scss": "^0.2.4",
+    "@fontsource-variable/material-symbols-outlined": "^5.3.9",
+    "@tanstack/react-query": "^5.107.0",
+    "@tanstack/react-virtual": "^3.14.26",
+    "clsx": "^2.1.1",
+    "i18next": "^27.1.0",
+    "i18next-browser-languagedetector": "^8.3.0",
+    "next": "16.4.6",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-i18next": "^18.0.1"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.65.0",
+    "@types/node": "^26",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "16.4.6",
+    "prettier": "^3.9.10",
+    "prettier-plugin-organize-imports": "^4.3.0",
+    "sass": "^1.108.0",
+    "typescript": "^5.9.3",
+    "webpack-license-plugin": "^4.5.1"
+  }
+}

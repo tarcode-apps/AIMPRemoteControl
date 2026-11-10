@@ -1,0 +1,25 @@
+// Set from outside through --icon-size, --icon-fill (0 for the outline) and
+// --icon-display, never by overriding these properties: which of two rules of
+// equal specificity wins depends on the order of the stylesheets, which the
+// bundler decides.
+.icon {
+    display: var(--icon-display, inline-block);
+    flex: none;
+    width: 1em;
+    height: 1em;
+    overflow: hidden;
+    font-family: var(--font-family-icon);
+    font-weight: var(--font-weight-regular);
+    font-style: normal;
+    font-variation-settings: "FILL" var(--icon-fill, 1);
+    font-size: var(--icon-size);
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    direction: ltr;
+    font-feature-settings: "liga";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    user-select: none;
+}

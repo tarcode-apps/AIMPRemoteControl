@@ -1,0 +1,113 @@
+@use "../../_styles/mixins" as mixins;
+
+.dialog {
+    margin: auto;
+    width: min(480px, calc(100% - 32px));
+    max-height: calc(100% - 32px);
+    padding: 0;
+    border: 0;
+    border-radius: 12px;
+    background: var(--color-dialog);
+    color: var(--color-text);
+    box-shadow: 0 8px 32px var(--color-shadow);
+
+    &[open] {
+        display: flex;
+        flex-direction: column;
+    }
+
+    &::backdrop {
+        background: var(--color-backdrop);
+    }
+
+    // A dialog of a list fills a phone's screen; a compact one, such as a question
+    // or a single field, floats as on the desktop.
+    @include mixins.drawer-modal {
+        &:not(.compact) {
+            width: 100%;
+            height: 100%;
+            max-width: none;
+            max-height: none;
+            border-radius: 0;
+        }
+    }
+}
+
+.form {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+// A button at the end of the title lines up with the radios and buttons at the
+// end of the rows: the bar keeps the room of the body's scrollbar too, and its
+// 48 px button centres on the 20 px column inside the body's 24 px padding.
+// It keeps its height when a long list fills the dialog: clipping makes it
+// shrinkable otherwise.
+.titleBar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    padding-right: 10px;
+    overflow: hidden;
+    scrollbar-gutter: stable;
+}
+
+// One line, so that a long title does not push the content down.
+.title {
+    @include mixins.ellipsis;
+
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    padding: 24px 24px 8px;
+    font-size: 20px;
+    font-weight: var(--font-weight-medium);
+    color: var(--color-accent);
+}
+
+.body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    padding: 0 24px;
+}
+
+.footer {
+    padding: 8px 24px 0;
+}
+
+.actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 16px;
+}
+
+// A row of the choices a dialog lists: a label and its radio or checkbox.
+.option {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 44px;
+    cursor: pointer;
+}
+
+// As in the player's Android app: a checkbox stands before its label, a radio after.
+.option:has(input[type="checkbox"]) {
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+}
+
+.label {
+    @include mixins.ellipsis;
+
+    flex: 1;
+}
+
+.disabled {
+    color: var(--color-text-secondary);
+    cursor: default;
+}

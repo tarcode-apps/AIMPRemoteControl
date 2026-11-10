@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+#
+# Builds the AIMP Remote Control plugin for Linux (x86_64).
+# Artifacts are copied to dist/linux-x64/.
+#
+# Runs unchanged locally (including WSL on a /mnt/c checkout) and on GitHub
+# Actions ubuntu runners.
+#
+# Usage:
+#   ./build-linux.sh              # Release
+#   ./build-linux.sh --debug
+#   ./build-linux.sh --clean
+
+set -euo pipefail
+
+CONFIG=Release
+CLEAN=0
+
+usage()
+{
+    cat <<'EOF'
+Builds the AIMP Remote Control plugin for Linux (x86_64) into dist/linux-x64/.
+
+Options:
+  --release   Release build (default)
+  --debug     Debug build
+  --clean     Delete the build directory before configuring
+EOF
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --release) CONFIG=Release ;;
+        --debug)   CONFIG=Debug ;;
+        --clean)   CLEAN=1 ;;
+        -h|--help) usage; exit 0 ;;
+        *) echo "error: unknown option '$1'" >&2; usage >&2; exit 2 ;;
+    esac
+    shift
+done
+
+PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PRESET="linux-$(echo "$CONFIG" | tr '[:upper:]' '[:lower:]')"
+BUILD_DIR="$PLUGIN_ROOT/out/build/$PRESET"
+DIST_DIR="$PLUGIN_ROOT/dist/linux-x64"
+ARTIFACT=aimp_remote_control.so
+
+step() { printf '\n==> %s\n' "$1"; }
+
+. "$PLUGIN_ROOT/scripts/linux-prerequisites.sh"
+check_prerequisites
+
+step "Building $PRESET"
+if [ "$CLEAN" -eq 1 ]; then
+    rm -rf "$BUILD_DIR"
+fi
+
+cd "$PLUGIN_ROOT"
+cmake --preset "$PRESET"
+cmake --build --preset "$PRESET" --target AIMPRemoteControlPlugin
+
+[ -f "$BUILD_DIR/$ARTIFACT" ] || { echo "error: build finished but $BUILD_DIR/$ARTIFACT is missing" >&2; exit 1; }
+
+step "Packaging"
+# Clear what a previous build left, but step over symlinks: a developer's
+# wwwroot link into web-client/out lives here and has to survive.
+mkdir -p "$DIST_DIR"
+find "$DIST_DIR" -mindepth 1 -maxdepth 1 ! -type l -exec rm -rf {} +
+cp "$BUILD_DIR/$ARTIFACT" "$DIST_DIR/"
+cp -r "$PLUGIN_ROOT/Langs" "$DIST_DIR/Langs"
+cp "$BUILD_DIR/THIRD-PARTY-NOTICES.txt" "$DIST_DIR/"
+
+if [ "$CONFIG" = Release ] && command -v strip >/dev/null 2>&1; then
+    strip --strip-unneeded "$DIST_DIR/$ARTIFACT"
+fi
+
+# The plugin is useless to AIMP if its entry point stopped being exported, and
+# must export nothing else: cheap guard against a visibility or linker-flag
+# regression.
+if command -v nm >/dev/null 2>&1; then
+    exported=$(nm -D --defined-only "$DIST_DIR/$ARTIFACT" | awk '{ print $NF }')
+    if [ "$exported" != "AIMPPluginGetHeader" ]; then
+        echo "error: $ARTIFACT must export AIMPPluginGetHeader and nothing else; it exports:" >&2
+        printf '%s\n' "$exported" >&2
+        exit 1
+    fi
+fi
+
+step "Done"
+ls -lh "$DIST_DIR/$ARTIFACT" | awk '{print "    " $NF " (" $5 ")"}'

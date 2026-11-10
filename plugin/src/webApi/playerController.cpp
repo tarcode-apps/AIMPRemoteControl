@@ -1,0 +1,179 @@
+#include "playerController.h"
+
+#include "apiErrors.h"
+
+#include <cmath>
+#include <optional>
+#include <string>
+
+#include "helpers/coverIndex.h"
+#include "helpers/requestHelpers.h"
+#include "mainThreadRunner.h"
+#include "player/playerState.h"
+#include "stateUpdateEvents.h"
+
+namespace
+{
+	using webapi::OptionalField;
+
+	const char *StateName(player::PlaybackState state)
+	{
+		switch (state)
+		{
+		case player::PlaybackState::Playing:
+			return "playing";
+		case player::PlaybackState::Paused:
+			return "paused";
+		default:
+			return "stopped";
+		}
+	}
+
+	const char *RepeatName(player::RepeatMode mode)
+	{
+		switch (mode)
+		{
+		case player::RepeatMode::Playlist:
+			return "playlist";
+		case player::RepeatMode::Track:
+			return "track";
+		default:
+			return "off";
+		}
+	}
+
+	player::RepeatMode RepeatNamed(const std::string &name)
+	{
+		if (name == "off")
+			return player::RepeatMode::Off;
+		if (name == "playlist")
+			return player::RepeatMode::Playlist;
+		if (name == "track")
+			return player::RepeatMode::Track;
+		throw ApiError(400, "invalidBody");
+	}
+
+	player::PlayerCommand CommandNamed(const std::string &name)
+	{
+		if (name == "pause")
+			return player::PlayerCommand::Pause;
+		if (name == "stop")
+			return player::PlayerCommand::Stop;
+		if (name == "next")
+			return player::PlayerCommand::Next;
+		return player::PlayerCommand::Previous;
+	}
+
+	void SendCommand(IAIMPCore *core, player::PlayerCommand command)
+	{
+		if (!RunOnMainThread(core, [&]
+							 { return player::SendPlayerCommand(core, command); }))
+			throw ApiError(500, "playerCommandFailed");
+	}
+
+	player::PlayerPatch PatchBody(const nlohmann::json &body)
+	{
+		if (!body.is_object() || body.empty())
+			throw ApiError(400, "invalidBody");
+		player::PlayerPatch patch;
+		patch.Position = OptionalField<double>(body, "position", &nlohmann::json::is_number);
+		patch.Volume = OptionalField<float>(body, "volume", &nlohmann::json::is_number);
+		patch.Mute = OptionalField<bool>(body, "mute", &nlohmann::json::is_boolean);
+		if (const auto repeat = OptionalField<std::string>(body, "repeat", &nlohmann::json::is_string))
+			patch.Repeat = RepeatNamed(*repeat);
+		patch.Shuffle = OptionalField<bool>(body, "shuffle", &nlohmann::json::is_boolean);
+		patch.RadioCapture = OptionalField<bool>(body, "radioCapture", &nlohmann::json::is_boolean);
+		if ((patch.Position && *patch.Position < 0) || (patch.Volume && (*patch.Volume < 0 || *patch.Volume > 1)))
+			throw ApiError(400, "invalidBody");
+		return patch;
+	}
+}
+
+nlohmann::json webapi::PlayerController::Snapshot(IAIMPCore *core, StateUpdateEvents &events, CoverIndex &covers)
+{
+	const player::PlayerState state = RunOnMainThread(core, [&]
+													  { return player::GetPlayerState(core); });
+	nlohmann::json track = nullptr;
+	if (state.Track)
+	{
+		// The cover is looked up here, once per track, so that the client can show it
+		// without asking for it first.
+		const std::string coverHash = covers.HashFor(CoverLocator{state.Track->Cover, state.Track->PlaylistId, state.Track->Index},
+													 events.TagWrites(state.Track->PlaylistId));
+		track = {
+			{"playlistId", state.Track->PlaylistId},
+			{"playlistRevision", events.PlaylistRevision(state.Track->PlaylistId)},
+			{"index", state.Track->Index},
+			{"trackNumber", state.Track->TrackNumber},
+			{"title", state.Track->Title},
+			{"artist", state.Track->Artist},
+			{"album", state.Track->Album},
+			{"isUrl", state.Track->IsUrl},
+			{"inContainer", state.Track->InContainer},
+			{"mark", state.Track->Marks.Mark},
+			{"rating", state.Track->Marks.Rating},
+			{"displayingMark", state.Track->Marks.DisplayingMark},
+			{"coverHash", coverHash},
+			{"fileUri", state.Track->FileUri},
+		};
+	}
+	return {
+		{"state", StateName(state.State)},
+		{"position", state.Position},
+		{"duration", state.Duration},
+		{"volume", std::round(state.Volume * 1000.0) / 1000.0},
+		{"mute", state.Mute},
+		{"repeat", RepeatName(state.Repeat)},
+		{"shuffle", state.Shuffle},
+		{"radioCapture", state.RadioCapture},
+		{"track", std::move(track)},
+	};
+}
+
+void webapi::PlayerController::Register(IEndpointRouteBuilder &endpoints)
+{
+	endpoints.MapApi(HttpMethod::Get, "/api/v1/player", [core = FCore, &events = FEvents, &covers = FCovers](const ApiRequest &) -> nlohmann::json
+			   { return Snapshot(core, events, covers); });
+
+	endpoints.MapApi(HttpMethod::Get, "/api/v1/player/cursor", [core = FCore](const ApiRequest &) -> nlohmann::json
+			   {
+		const std::optional<player::Cursor> cursor = RunOnMainThread(core, [&]
+																	  { return player::GetCursor(core); });
+		if (!cursor)
+			return nullptr;
+		return {
+			{"playlistId", cursor->PlaylistId},
+			{"index", cursor->Index ? nlohmann::json(*cursor->Index) : nlohmann::json(nullptr)},
+		}; });
+
+	endpoints.MapApi(HttpMethod::Post, "/api/v1/player/play", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
+			   {
+		const nlohmann::json &body = request.Body;
+		if (body.is_null() || (body.is_object() && body.empty()))
+		{
+			SendCommand(core, player::PlayerCommand::Play);
+			return nlohmann::json::object();
+		}
+		if (!body.is_object() || !body.contains("playlistId") || !body["playlistId"].is_string() ||
+			!body.contains("index") || !body["index"].is_number_unsigned())
+			throw ApiError(400, "invalidBody");
+		const std::string playlistId = body["playlistId"].get<std::string>();
+		const std::int32_t index = body["index"].get<std::int32_t>();
+		CheckRevision(body, events, playlistId);
+		ThrowUnlessOk(RunOnMainThread(core, [&]
+									  { return player::PlayPlaylistItem(core, playlistId, index); }));
+		return nlohmann::json::object(); });
+
+	endpoints.MapApi(HttpMethod::Post, "/api/v1/player/(pause|stop|next|previous)", [core = FCore](const ApiRequest &request) -> nlohmann::json
+			   {
+		SendCommand(core, CommandNamed(request.PathMatches.at(0)));
+		return nlohmann::json::object(); });
+
+	endpoints.MapApi(HttpMethod::Patch, "/api/v1/player", [core = FCore](const ApiRequest &request) -> nlohmann::json
+			   {
+		const player::PlayerPatch patch = PatchBody(request.Body);
+		if (!RunOnMainThread(core, [&]
+							 { return player::ApplyPlayerPatch(core, patch); }))
+			throw ApiError(500, "playerCommandFailed");
+		return nlohmann::json::object(); });
+}

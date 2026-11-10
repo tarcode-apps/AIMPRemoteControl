@@ -1,0 +1,90 @@
+.slider {
+    --track: linear-gradient(
+        to right,
+        var(--color-surface-raised) var(--fill-start),
+        var(--color-accent) var(--fill-start) var(--fill-end),
+        var(--color-surface-raised) var(--fill-end)
+    );
+
+    // A page may size and colour the parts.
+    --track-height: var(--slider-track-height, 4px);
+    --thumb-size: var(--slider-thumb-size, 14px);
+
+    appearance: none;
+    display: block;
+    width: 100%;
+    height: max(24px, var(--thumb-size));
+    margin: 0;
+    background: none;
+    cursor: pointer;
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-touch-callout: none;
+
+    &::-webkit-slider-runnable-track {
+        height: var(--track-height);
+        border-radius: calc(var(--track-height) / 2);
+        background: var(--track);
+    }
+
+    &::-webkit-slider-thumb {
+        appearance: none;
+        width: var(--thumb-size);
+        height: var(--thumb-size);
+        margin-top: calc((var(--track-height) - var(--thumb-size)) / 2);
+        border-radius: 50%;
+        background: var(--slider-thumb-color, var(--color-accent));
+    }
+
+    &::-moz-range-track {
+        height: var(--track-height);
+        border-radius: calc(var(--track-height) / 2);
+        background: var(--track);
+    }
+
+    &::-moz-range-thumb {
+        width: var(--thumb-size);
+        height: var(--thumb-size);
+        border: 0;
+        border-radius: 50%;
+        background: var(--slider-thumb-color, var(--color-accent));
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 2px;
+        border-radius: 12px;
+    }
+
+    &:disabled {
+        cursor: default;
+
+        &::-webkit-slider-thumb {
+            visibility: hidden;
+        }
+
+        &::-moz-range-thumb {
+            visibility: hidden;
+        }
+    }
+}
+
+// A horizontal slider turned on its side: the browsers' own vertical ranges
+// differ too much in how they are styled. The box is as tall as its parent and
+// the slider as long as the box is tall.
+.vertical {
+    position: relative;
+    display: block;
+    container-type: size;
+    width: max(24px, var(--slider-thumb-size, 14px));
+    height: 100%;
+}
+
+.upright {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100cqh;
+    transform: translate(-50%, -50%) rotate(-90deg);
+    touch-action: pan-x;
+}

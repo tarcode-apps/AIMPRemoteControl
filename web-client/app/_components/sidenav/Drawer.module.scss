@@ -1,0 +1,90 @@
+@use "../../_styles/mixins" as mixins;
+
+.container {
+    --drawer-transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+    display: flex;
+    height: 100dvh;
+
+    @include mixins.drawer-modal {
+        touch-action: pan-y pinch-zoom;
+    }
+}
+
+.drawer {
+    flex: none;
+    width: var(--drawer-width);
+    background: var(--color-bg);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+
+    @include mixins.drawer-docked {
+        position: sticky;
+        top: 0;
+        height: 100dvh;
+        border-right: 1px solid var(--color-divider);
+    }
+
+    @include mixins.drawer-modal {
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: 20;
+        width: min(var(--drawer-width), 85vw);
+        padding-left: var(--safe-left);
+        transform: translateX(-100%);
+        visibility: hidden;
+        box-shadow: 0 0 24px var(--color-shadow);
+        transition:
+            transform var(--drawer-transition),
+            visibility 0s linear 0.25s;
+        touch-action: pan-y pinch-zoom;
+
+        &.open {
+            transform: none;
+            visibility: visible;
+            transition:
+                transform var(--drawer-transition),
+                visibility 0s;
+        }
+
+        &.dragging {
+            transform: translateX(var(--drawer-offset));
+            visibility: visible;
+            transition: none;
+        }
+    }
+}
+
+.backdrop {
+    display: none;
+
+    @include mixins.drawer-modal {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        background: var(--color-backdrop);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--drawer-transition);
+
+        &.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        &.dragging {
+            opacity: var(--drawer-progress);
+            pointer-events: auto;
+            transition: none;
+        }
+    }
+}
+
+.content {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}

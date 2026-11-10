@@ -1,0 +1,54 @@
+.badge {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+}
+
+.ring {
+    position: absolute;
+    inset: 0;
+    // The ring runs clockwise from the top.
+    transform: rotate(-90deg);
+}
+
+.track,
+.arc,
+.segment,
+.done,
+.waiting {
+    fill: none;
+    stroke-width: 2.5;
+}
+
+.track,
+.done {
+    stroke: var(--color-divider);
+}
+
+.arc,
+.segment,
+.waiting {
+    stroke: var(--color-accent);
+}
+
+.arc {
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.3s linear;
+}
+
+.waiting {
+    stroke-dasharray: 3 3;
+}
+
+.icon {
+    --icon-size: 18px;
+}
+
+.count {
+    font-size: 14px;
+    font-weight: var(--font-weight-medium);
+    line-height: 1;
+}

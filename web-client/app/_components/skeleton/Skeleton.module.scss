@@ -1,0 +1,28 @@
+.skeleton {
+    display: inline-block;
+    background: var(--color-surface-raised);
+    animation: pulse 1.5s ease-in-out infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+}
+
+.text {
+    height: 1em;
+    border-radius: 4px;
+}
+
+.circle {
+    border-radius: 50%;
+}
+
+.rect {
+    border-radius: 4px;
+}
+
+@keyframes pulse {
+    50% {
+        opacity: 0.5;
+    }
+}

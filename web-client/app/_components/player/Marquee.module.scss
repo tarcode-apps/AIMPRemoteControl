@@ -1,0 +1,18 @@
+.marquee {
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.text {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: top;
+
+    &.scrolling {
+        max-width: none;
+        overflow: visible;
+    }
+}

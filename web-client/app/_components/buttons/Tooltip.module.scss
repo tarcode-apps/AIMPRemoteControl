@@ -1,0 +1,30 @@
+// A light plate with dark text in both themes, as the player draws its hints: centred
+// over the button, or hanging from its far side when that would leave the viewport.
+.tooltip {
+    inset: auto;
+    margin: 0 8px 28px;
+    position-area: block-start;
+    position-try-fallbacks:
+        flip-block,
+        --tooltip-start,
+        --tooltip-start flip-block,
+        --tooltip-end,
+        --tooltip-end flip-block;
+    padding: 8px 16px;
+    border: 0;
+    border-radius: 4px;
+    background: var(--color-tooltip-bg);
+    color: var(--color-tooltip-text);
+    font-size: 14px;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px var(--color-shadow);
+    pointer-events: none;
+}
+
+@position-try --tooltip-start {
+    position-area: block-start span-inline-start;
+}
+
+@position-try --tooltip-end {
+    position-area: block-start span-inline-end;
+}

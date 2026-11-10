@@ -1,6 +1,6 @@
 ﻿AIMP Remote Control {VERSION}
-Альтернативный сервер удалённого управления AIMP по локальной сети
-An alternative remote control server for AIMP over the local network
+Удалённое управление AIMP по локальной сети
+Remote control of AIMP over the local network
 
 https://github.com/tarcode-apps/AIMPRemoteControl
 (c) Artem Tarasov. MIT License. См. LICENSE.txt / see LICENSE.txt
@@ -15,23 +15,23 @@ Not affiliated with the AIMP or the app authors.
 
 ОПИСАНИЕ
 
-  Альтернативный сервер удалённого управления AIMP по локальной сети.
-  Управлять плеером можно с телефона из приложения "AIMP Remote Control"
-  для Android - оно работает с плагином без каких-либо изменений и
-  настроек. Поддерживаются сборки плеера для Windows и для Linux.
+  Удалённое управление AIMP по локальной сети: из браузера на мобильном,
+  планшете или другом компьютере или из приложения "AIMP Remote Control"
+  для Android. Поддерживаются сборки плеера для Windows и для Linux.
 
   Требуется AIMP 5 или более новый.
 
-  Возможности: плейлисты и очередь воспроизведения, управление
-  воспроизведением, громкость, перемотка, повтор и перемешивание,
-  18-полосный эквалайзер, обложки, тексты песен, рейтинги, поиск, обзор
-  файлов на компьютере, добавление файлов и интернет-потоков, загрузка и
-  скачивание треков, таймер сна, обновление состояния плеера в реальном
-  времени.
+  Возможности: плейлисты с группами, обложками и рейтингами, поиск по
+  плейлисту или по всем плейлистам, сортировка и перестановка треков,
+  управление воспроизведением, синхронизированные тексты песен, сведения
+  о треке, запись радио, очередь, таймер сна, звуковые эффекты и
+  20-полосный эквалайзер с пресетами, избранное, добавление файлов с
+  компьютера и интернет-потоков, загрузка файлов и целых папок,
+  скачивание треков.
 
-  Приложение "AIMP Remote Control" больше не поддерживается и удалено из
-  Google Play, официальной ссылки на APK не осталось. Плагин рассчитан на
-  последнюю выпущенную версию приложения - 2.0.31.
+  Приложение "AIMP Remote Control" работает с плагином без каких-либо
+  изменений и настроек. Оно больше не поддерживается и удалено из
+  Google Play; плагин рассчитан на последнюю выпущенную версию - 2.0.31.
 
 УСТАНОВКА
 
@@ -45,18 +45,22 @@ Not affiliated with the AIMP or the app authors.
 
   Настройки -> Плагины -> Удалённое управление:
 
-  - "Подключение" - список адресов, на которых работает сервер. Введите один
-    из них в приложении на телефоне или дайте приложению найти плеер в сети
-    самостоятельно. Снимите галочку с интерфейса, чтобы не слушать на нём.
-  - "Разрешения клиента" - что приложению позволено помимо управления
-    воспроизведением. Всё выключено по умолчанию, включая обзор файлов на
-    компьютере.
-  - "Требовать авторизацию" - имя пользователя и пароль для приложения.
-    Рекомендуется в любой сети, которой вы не доверяете полностью: без
-    авторизации управлять плеером может любой, кто находится в этой сети.
+  - "Подключение" - имя плеера, которое показывают браузер и приложение
+    (если не задано, это имя компьютера), и список адресов, на которых
+    работает сервер. Откройте один из них в браузере (http://<адрес>:3333/) или
+    введите в приложении, которое умеет и само найти плеер в сети.
+    Снимите галочку с интерфейса, чтобы не слушать на нём.
+  - "Разрешения клиента" - что браузеру и приложению позволено помимо
+    управления воспроизведением. Всё выключено по умолчанию, включая обзор
+    файлов на компьютере, кроме скачивания треков.
+  - "Требовать авторизацию" - имя пользователя и пароль для всех
+    клиентов; браузер спросит их один раз. Рекомендуется в любой сети,
+    которой вы не доверяете полностью: без авторизации управлять плеером
+    может любой, кто находится в этой сети.
 
-  Порты: TCP 3333 (управление), UDP 3332 (поиск плеера в сети). Разрешите
-  AIMP принимать подключения по ним в брандмауэре.
+  Порты: TCP 3333 (управление из браузера и из приложения), UDP 3332
+  (поиск плеера приложением). Разрешите AIMP принимать подключения по ним
+  в брандмауэре.
 
 УДАЛЕНИЕ
 
@@ -69,23 +73,23 @@ ENGLISH
 
 DESCRIPTION
 
-  An alternative remote control server for AIMP over the local network.
-  The player can be controlled from a phone with the "AIMP Remote Control"
-  Android app - it works with the plugin as is, with nothing to change or
-  configure on the phone. Both the Windows and the Linux builds of the
-  player are supported.
+  Remote control of AIMP over the local network: from a browser on a
+  mobile, a tablet or another computer, or from the "AIMP Remote Control"
+  Android app. Both the Windows and the Linux builds of the player are
+  supported.
 
   AIMP 5 or newer is required.
 
-  Features: playlists and playback queue, playback control, volume, seeking,
-  repeat and shuffle, 18-band equalizer, covers, lyrics, ratings, search,
-  browsing the computer's files, adding files and internet streams,
-  uploading and downloading tracks, sleep timer, real-time push of player
-  state.
+  Features: playlists with groups, covers and ratings, search in a playlist
+  or across all of them, sorting and reordering tracks, playback control,
+  synced lyrics, track information, radio capture, queue, sleep timer,
+  sound effects and the 20-band equalizer with presets, favorites, adding
+  files of the computer and internet streams, uploading files and whole
+  folders, downloading tracks.
 
-  The "AIMP Remote Control" app is no longer maintained and has been removed
-  from Google Play; there is no official APK download anymore. This plugin
-  targets the app's last released version - 2.0.31.
+  The "AIMP Remote Control" app works with the plugin as is, with nothing
+  to change or configure. It is no longer maintained and has been removed
+  from Google Play; the plugin targets its last released version - 2.0.31.
 
 INSTALLATION
 
@@ -99,18 +103,22 @@ SETUP
 
   Options -> Plugins -> Remote Control:
 
-  - "Connection" lists the addresses the server listens on. Enter one of them
-    in the app on your phone, or let the app discover the player on the local
+  - "Connection" names the player, as a browser and the app show it (the
+    computer's name unless set), and lists the addresses the server
+    listens on. Open one of them in a browser (http://<address>:3333/) or
+    enter it in the app, which can also discover the player on the local
     network. Untick an interface to stop listening on it.
-  - "Client permissions" - what the app is allowed to do beyond playback.
-    Everything here is off by default, including browsing the computer's
-    files.
-  - "Require authentication" - username and password the app must use.
-    Recommended on any network you do not fully trust: without it, anyone on
-    the network can control the player.
+  - "Client permissions" - what browsers and the app may do beyond
+    playback. Everything here is off by default, including browsing the
+    computer's files, except downloading tracks.
+  - "Require authentication" - username and password every client must
+    use; a browser asks for them once. Recommended on any network you do
+    not fully trust: without it, anyone on the network can control the
+    player.
 
-  Ports: TCP 3333 (control), UDP 3332 (discovery). Make sure the firewall
-  lets AIMP accept connections on them.
+  Ports: TCP 3333 (control, from a browser and from the app), UDP 3332
+  (discovery for the app). Make sure the firewall lets AIMP accept
+  connections on them.
 
 UNINSTALL
 

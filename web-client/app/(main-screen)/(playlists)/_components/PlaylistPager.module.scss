@@ -1,0 +1,32 @@
+.pager {
+    height: 100%;
+    overflow: hidden;
+    user-select: none;
+}
+
+.track {
+    display: flex;
+    height: 100%;
+    transform: translateX(calc(var(--page-index, 0) * -100% + var(--drag-x, 0px)));
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &.dragging {
+        transition: none;
+    }
+}
+
+.pane {
+    flex: none;
+    width: 100%;
+    height: 100%;
+
+    // Chrome resolves touch-action only up to the nearest scroll container, so the
+    // value on the drawer container never reaches a touch inside a scrollable page.
+    * {
+        touch-action: pan-y pinch-zoom;
+    }
+}
+
+.single {
+    height: 100%;
+}

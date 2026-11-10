@@ -1,0 +1,53 @@
+@use "breakpoints";
+
+@mixin drawer-modal() {
+    @media (max-width: breakpoints.$drawer-docked-from - 1px) {
+        @content;
+    }
+}
+
+@mixin drawer-docked() {
+    @media (min-width: breakpoints.$drawer-docked-from) {
+        @content;
+    }
+}
+
+@mixin player-docked() {
+    @media (min-width: breakpoints.$player-docked-from) {
+        @content;
+    }
+}
+
+@mixin drawer-wide() {
+    @media (min-width: breakpoints.$drawer-wide-from) {
+        @content;
+    }
+}
+
+@mixin player-sheet() {
+    @media (max-width: breakpoints.$player-docked-from - 1px) {
+        @content;
+    }
+}
+
+@mixin ellipsis() {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+// Out of sight, in the accessibility tree.
+@mixin visually-hidden() {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+@mixin hover-capable() {
+    @media (hover: hover) {
+        @content;
+    }
+}

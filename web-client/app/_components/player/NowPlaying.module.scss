@@ -1,0 +1,342 @@
+@use "../../_styles/mixins" as mixins;
+
+// The side padding puts the cover's edge on the visible lines of the menu glyph,
+// which sit 3px inside its icon box; the header pulls its buttons back out so
+// that their icon boxes keep the usual 16px.
+.nowPlaying {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: var(--safe-top) calc(19px + var(--safe-right)) calc(16px + var(--safe-bottom))
+        calc(19px + var(--safe-left));
+}
+
+.header {
+    flex: none;
+    display: flex;
+    align-items: center;
+    height: var(--app-bar-height);
+    margin: 0 -15px;
+}
+
+.header .nav {
+    @include mixins.drawer-docked {
+        display: none;
+    }
+}
+
+.header .collapse {
+    @include mixins.player-docked {
+        display: none;
+    }
+}
+
+// 20px from the menu glyph, as a heading; the first star's glyph sits 4px into
+// its slot. Beside a docked drawer, where the menu button is gone, the stars start
+// where a full-width cover does, 15px into the header.
+.rating {
+    margin-left: 4px;
+
+    @include mixins.drawer-docked {
+        margin-left: calc(15px - (var(--rating-slot) - var(--rating-star)) / 2);
+    }
+}
+
+// The buttons at the end of the header, kept there whichever of them show;
+// the open volume slider stretches the block over the rating's room.
+.actions {
+    flex: 0 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+
+    &.volumeOpen {
+        flex: 1;
+    }
+}
+
+.volumeArea {
+    flex: 0 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+
+    &.volumeOpen {
+        flex: 1;
+    }
+}
+
+// Beside the volume; while the volume is open the slider takes its place, as
+// it takes the rating's. Out of reach without a stream: greyed on a wide
+// screen, gone from a mobile's.
+.capture {
+    &:disabled {
+        @include mixins.drawer-modal {
+            display: none;
+        }
+    }
+}
+
+// Recording: the glyph beats in the accent colour, as the player's own button
+// does: it rests lit and unlit, and the change between them is quick.
+.capturing {
+    --icon-button-color: var(--color-accent);
+    animation: capture-beat 1.5s ease-in-out infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+}
+
+@keyframes capture-beat {
+    0%,
+    30% {
+        color: var(--color-accent);
+    }
+
+    50%,
+    80% {
+        color: var(--color-text);
+    }
+}
+
+.volumePanel {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding-right: 8px;
+
+    button {
+        flex: none;
+    }
+}
+
+// Drawn over the glyph like the font's own "off" icons; the gap beside the stroke is
+// cut out of the glyph, so it shows whatever is behind the button.
+.repeatIcon {
+    position: relative;
+    display: inline-flex;
+}
+
+.struck {
+    > * {
+        mask-image: linear-gradient(
+            45deg,
+            #000 calc(50% - 4px),
+            transparent calc(50% - 4px),
+            transparent calc(50% + 4px),
+            #000 calc(50% + 4px)
+        );
+    }
+
+    &::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 2px;
+        height: 24px;
+        background: currentcolor;
+        transform: translate(-50%, -50%) rotate(-45deg);
+    }
+}
+
+// Top-aligned; the free space goes below it, before the track, or to the lyrics.
+.cover {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 0;
+    container-type: size;
+}
+
+.coverLyrics {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    margin-top: 16px;
+}
+
+.coverBox {
+    // A share of the square, which the window may make small.
+    --icon-size: min(96px, 40cqw, 40cqh);
+
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: min(100%, 100cqh);
+    aspect-ratio: 1;
+    border-radius: 4px;
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+}
+
+// The title lines flanked by the favorite button and the track menu, as the
+// player draws them.
+.track {
+    flex: none;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    padding-bottom: 32px;
+    text-align: center;
+}
+
+// The buttons at the sides of the track block and the controls: smaller than
+// the icon buttons elsewhere, and placed so that the icon's outer edge lines up
+// with the cover's while the circle reaches a little past it.
+.sideButton {
+    --icon-button-size: 40px;
+}
+
+.sideStart {
+    margin-left: calc((var(--icon-size) - 40px) / 2);
+}
+
+.sideEnd {
+    margin-right: calc((var(--icon-size) - 40px) / 2);
+}
+
+// Six lyrics lines tall, see Lyrics.module.scss, whether the lyrics are on their
+// page or under the cover, so that nothing moves when they come and go; the
+// title lines sit in the middle of that height.
+$lyrics-page-height: 6 * 22px;
+
+.lines {
+    min-width: 0;
+    min-height: $lyrics-page-height;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+// The title lines and the lyrics, one page in view and the other beside it, on
+// the side `--other-side` names (1 right, -1 left). NowPlaying.tsx writes that
+// side, the drag and the slide's time to the pager's style.
+.pager {
+    position: relative;
+    height: $lyrics-page-height;
+    overflow: hidden;
+    touch-action: pan-y;
+}
+
+.page {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    transform: translateX(calc(var(--page-place) * 100% + var(--drag-x, 0px)));
+    transition: transform var(--slide-time, 0.3s) cubic-bezier(0.4, 0, 0.2, 1);
+
+    .dragging & {
+        transition: none;
+    }
+}
+
+.pageInView {
+    --page-place: 0;
+}
+
+// Hidden once it has slid out; shown while a finger holds the pages. It moves
+// from side to side only during a drag, where nothing slides.
+.otherPage {
+    --page-place: var(--other-side, 1);
+
+    visibility: hidden;
+    transition:
+        transform var(--slide-time, 0.3s) cubic-bezier(0.4, 0, 0.2, 1),
+        visibility 0s var(--slide-time, 0.3s);
+
+    .dragging & {
+        visibility: visible;
+        transition: none;
+    }
+}
+
+.unfilled {
+    --icon-fill: 0;
+}
+
+.title {
+    @include mixins.ellipsis;
+
+    font-size: var(--font-size-title);
+    font-weight: var(--font-weight-bold);
+    line-height: var(--line-height-title);
+}
+
+.details {
+    @include mixins.ellipsis;
+
+    margin-top: 12px;
+    font-size: var(--font-size-subtitle);
+    color: var(--color-text-secondary);
+}
+
+.controls {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 8px 0 16px;
+
+    @include mixins.hover-capable {
+        button:hover:not(:disabled) {
+            color: var(--color-accent);
+        }
+    }
+}
+
+.controls .big {
+    --icon-button-size: 72px;
+    --icon-button-background: var(--color-surface-raised);
+    --icon-button-pressed: var(--color-selection);
+}
+
+.controls .wide {
+    --icon-button-size: 56px;
+}
+
+// The mode toggles are drawn a little smaller than the transport, as in the player.
+.controls .toggle {
+    --icon-size: 22px;
+}
+
+.controls .repeat {
+    --icon-size: 20px;
+}
+
+.toggle {
+    --icon-button-color: var(--color-text-dim);
+}
+
+.on {
+    --icon-button-color: var(--color-accent);
+}
+
+.times {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    margin-top: 4px;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-secondary);
+
+    span:last-child {
+        text-align: right;
+    }
+}
+
+// The track as it was when the player was lost.
+.offline {
+    opacity: 0.4;
+}

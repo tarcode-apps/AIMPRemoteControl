@@ -1,0 +1,56 @@
+@use "../../_styles/mixins" as mixins;
+
+.menu {
+    inset: auto;
+    margin: 0;
+    position-area: block-start span-inline-start;
+    position-try-fallbacks: flip-block;
+    min-width: 200px;
+    padding: 8px 0;
+    border: 0;
+    border-radius: 8px;
+    background: var(--color-menu);
+    color: var(--color-text);
+    box-shadow: 0 4px 16px var(--color-shadow);
+}
+
+.heading {
+    max-width: 320px;
+    margin: 0;
+    padding: 6px 16px 10px;
+    color: var(--color-text-secondary);
+    font-size: 0.875em;
+}
+
+// Inset to the items' content, from the icons' edge to the text's far edge.
+.separator {
+    margin: 8px 16px;
+    border: 0;
+    border-top: 1px solid var(--color-menu-divider);
+}
+
+.item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 16px;
+    text-align: left;
+    white-space: nowrap;
+
+    @include mixins.hover-capable {
+        &:hover:not(:disabled) {
+            background: var(--color-hover);
+        }
+    }
+
+    &:disabled {
+        color: var(--color-menu-disabled);
+        cursor: default;
+    }
+}
+
+.item:focus-visible {
+    outline: none;
+    background: var(--color-hover);
+}

@@ -1,0 +1,117 @@
+'use client';
+
+import { useNavigation } from '@/app/_state/Navigation';
+import clsx from 'clsx';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { IconButton } from '../buttons';
+import { Icon } from '../icons';
+import { useDrawer } from '../sidenav';
+import styles from './Screen.module.scss';
+
+export type ScreenProps = {
+    title?: string;
+    subtitle?: string;
+    tabs?: ReactNode;
+    // Takes the heading's place at the same height, so the content does not move.
+    search?: ReactNode;
+    // Shows a back arrow that does this instead of the usual navigation.
+    onBack?(): void;
+    // Another icon and title for that button, such as an arrow up a folder.
+    backIcon?: string;
+    backTitle?: string;
+    actions?: ReactNode;
+    // A strip under the app bar for a state the whole list is in.
+    notice?: ReactNode;
+    toolbar?: ReactNode;
+    // Keeps the mini player in view on a phone, as the main screen does; a second
+    // screen says so when playback can start from it.
+    player?: boolean;
+    children?: ReactNode;
+};
+
+export function Screen({
+    title,
+    subtitle,
+    tabs,
+    search,
+    onBack,
+    backIcon = 'arrow_back',
+    backTitle,
+    actions,
+    notice,
+    toolbar,
+    player,
+    children,
+}: ScreenProps) {
+    const { secondary, detail, open } = useDrawer();
+    const { goBack, takeScreenFocus } = useNavigation();
+    const { t } = useTranslation();
+    const root = useRef<HTMLDivElement>(null);
+    const hasToolbar = toolbar != null;
+    const withPlayer = player ?? !secondary;
+
+    // The focus asked for this screen goes to its list, else to the screen itself;
+    // checked after each render, as the asking may come before the screen shows.
+    useEffect(() => {
+        if (!takeScreenFocus()) return;
+        const element = root.current;
+        (element?.querySelector<HTMLElement>('[role="listbox"]') ?? element)?.focus();
+    });
+
+    useEffect(() => {
+        if (!hasToolbar) return;
+        document.body.classList.add('has-toolbar');
+        return () => document.body.classList.remove('has-toolbar');
+    }, [hasToolbar]);
+
+    // The player panel lives outside the screen and reads the class.
+    useEffect(() => {
+        if (!withPlayer) return;
+        document.body.classList.add('has-player');
+        return () => document.body.classList.remove('has-player');
+    }, [withPlayer]);
+
+    return (
+        <div ref={root} tabIndex={-1} className={clsx(styles.screen, withPlayer && styles.withPlayer)}>
+            <header className={clsx(styles.appBar, tabs && styles.withTabs, search && styles.withSearch)}>
+                {secondary || onBack ? (
+                    <IconButton
+                        title={backTitle ?? t('nav.back')}
+                        // A detail screen is left by its arrow even beside the docked
+                        // drawer, whose links lead elsewhere; a second screen is one of those.
+                        className={clsx(styles.nav, detail && styles.navDocked)}
+                        onClick={onBack ?? goBack}
+                    >
+                        <Icon>{backIcon}</Icon>
+                    </IconButton>
+                ) : (
+                    <IconButton title={t('nav.menu')} className={styles.nav} onClick={open}>
+                        <Icon>menu</Icon>
+                    </IconButton>
+                )}
+                {tabs && <div className={styles.tabs}>{tabs}</div>}
+                {search ? (
+                    <div className={styles.search}>{search}</div>
+                ) : (
+                    <div className={styles.heading}>
+                        <h1 className={styles.title}>{title}</h1>
+                        {subtitle && (
+                            <p className={styles.subtitle} data-testid="screen-subtitle">
+                                {subtitle}
+                            </p>
+                        )}
+                    </div>
+                )}
+                <div className={styles.actions}>{actions}</div>
+            </header>
+            {notice && (
+                <div className={styles.notice} role="status">
+                    {notice}
+                </div>
+            )}
+            <div className={styles.body}>{children}</div>
+            {hasToolbar && <footer className={styles.toolbar}>{toolbar}</footer>}
+        </div>
+    );
+}

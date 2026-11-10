@@ -1,0 +1,118 @@
+#pragma once
+
+#include <array>
+#include <bitset>
+#include <chrono>
+#include <condition_variable>
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <vector>
+
+#include "player/queue.h"
+
+class IAIMPCore;
+class IAIMPPlaylist;
+class PlaylistChangeFilter;
+
+class StateUpdateEvents
+{
+public:
+	enum Kind
+	{
+		ControlPanel, // playback state, track, volume, mute, repeat, shuffle, radio capture, seek
+		Playlists,	  // playlist added/removed/renamed or its content changed
+		Queue,		  // playback queue changed
+		Timer,		  // sleep timer set/cancelled/fired (SleepTimer)
+		Effects,	  // balance, speed, tempo, pitch, a sound effect or the equalizer
+		Settings,	  // the plugin's settings were saved (OptionsFrame)
+		KindCount
+	};
+
+	StateUpdateEvents();
+	~StateUpdateEvents();
+	StateUpdateEvents(const StateUpdateEvents &) = delete;
+	StateUpdateEvents &operator=(const StateUpdateEvents &) = delete;
+
+	void Start(IAIMPCore *core);
+	void Stop();
+
+	// Waits end early, without a change, once `cancelled` says so; it is asked
+	// every CancelCheckInterval.
+	using Cancellation = std::function<bool()>;
+	static constexpr std::chrono::milliseconds CancelCheckInterval{500};
+
+	bool Wait(Kind kind, std::chrono::milliseconds timeout, const Cancellation &cancelled = {});
+
+	using Versions = std::array<std::uint64_t, KindCount>;
+	Versions Current();
+	std::bitset<KindCount> WaitAny(Versions &seen, std::chrono::milliseconds timeout, const Cancellation &cancelled = {});
+
+	// Per-playlist change counters keyed by AIMP playlist id; a playlist that is not
+	// loaded has no entry.
+	using PlaylistRevisions = std::map<std::string, std::uint64_t>;
+	PlaylistRevisions CurrentPlaylistRevisions();
+	std::uint64_t PlaylistRevision(const std::string &playlistId);
+
+	// Counts the tag writes reported for the playlist; a reader of file-bound data
+	// such as covers may want to look again after one.
+	std::uint64_t TagWrites(const std::string &playlistId);
+
+	struct QueueInfo
+	{
+		std::uint64_t Revision = 1; // changes of the queue, counted from 1
+		std::int32_t Count = 0;
+		bool Suspended = false;
+	};
+	// Read on the player thread when the queue changes, so that a reader needs no trip there.
+	QueueInfo CurrentQueue();
+	std::uint64_t QueueRevision();
+
+	void Notify(Kind kind);
+	bool IsStopped();
+
+	// Called on the player's thread when a stream ends, with the AIMP_MES_* flags;
+	// set and cleared on that thread too.
+	void OnStreamEnd(std::function<void(unsigned flags)> handler);
+
+private:
+	class MessageHook;
+	class PlaylistListener;
+	class PlaylistManagerListener;
+	class QueueListener;
+
+	void WatchPlaylist(IAIMPPlaylist *playlist);
+	void PlayerChanged(bool trackStarted);
+	void PlaylistChanged(const std::string &playlistId, bool tagsWritten);
+	void FilterChange(const std::string &playlistId, unsigned long flags, std::int32_t itemCount);
+	void PlaylistRemoved(const std::string &playlistId);
+	void QueueChanged();
+	void StreamEnded(unsigned flags);
+	void AllPlaylistsChanged();
+	void PollPlaylistSettings();
+
+	IAIMPCore *FCore = nullptr;
+	MessageHook *FMessageHook = nullptr;
+	std::vector<PlaylistListener *> FPlaylistListeners;
+	PlaylistManagerListener *FPlaylistManagerListener = nullptr;
+	QueueListener *FQueueListener = nullptr;
+	std::thread FSettingsPoller;
+	std::unique_ptr<PlaylistChangeFilter> FChangeFilter;
+	std::function<void(unsigned)> FStreamEnd;
+
+	std::mutex FMutex;
+	std::condition_variable FChanged;
+	std::uint64_t FVersions[KindCount] = {};
+	PlaylistRevisions FPlaylistRevisions;
+	PlaylistRevisions FTagWrites;
+	std::uint64_t FQueueRevision = 1;
+	// The queue as last seen, to tell real changes from the player's empty notifications.
+	player::QueueState FQueueState;
+	// Its changes move the playing item's index, so they count as player changes too.
+	std::string FPlayingPlaylistId;
+	bool FStopped = false;
+};

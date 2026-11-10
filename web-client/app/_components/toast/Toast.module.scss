@@ -1,0 +1,23 @@
+// The plate of the tooltips, as a pill above the toolbar.
+.toast {
+    position: fixed;
+    inset: auto 16px calc(var(--toolbar-height) + 16px);
+    width: fit-content;
+    max-width: calc(100% - 32px);
+    margin: 0 auto;
+    padding: 14px 28px;
+    border: 0;
+    border-radius: 28px;
+    background: var(--color-tooltip-bg);
+    color: var(--color-tooltip-text);
+    // Android's TextAppearance.Toast: 14sp.
+    font-size: 14px;
+    text-align: center;
+    box-shadow: 0 2px 8px var(--color-shadow);
+    pointer-events: none;
+    transition: opacity 0.2s;
+
+    @starting-style {
+        opacity: 0;
+    }
+}

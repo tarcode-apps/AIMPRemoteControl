@@ -1,0 +1,525 @@
+@use "../../_styles/mixins" as mixins;
+
+.page {
+    height: 100%;
+    outline: none;
+    padding: 0 var(--safe-right) 0 var(--safe-left);
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    user-select: none;
+}
+
+.list {
+    position: relative;
+}
+
+.row {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    padding: 0 16px;
+}
+
+// A row whose track the player no longer has, such as a favorite that left its
+// playlist: shown from its snapshot, but nothing can be done with it.
+.row.missing .text,
+.row.missing .duration,
+.row.missing .thumbnail {
+    opacity: 0.45;
+}
+
+.number {
+    font-variant-numeric: tabular-nums;
+
+    &::after {
+        content: attr(data-widest);
+        display: block;
+        height: 0;
+        visibility: hidden;
+    }
+}
+
+// One slot for the playback switch, the checkbox or the drag handle, so the
+// titles stay put when one replaces the other. The width of the checkbox,
+// which the group rows share (their checkbox sits 16px in, as this slot does
+// after the row's padding), so that everything in the column lines up.
+.leading {
+    flex: none;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 16px;
+}
+
+// The playback switch as the player draws it: a light grey square with a dark
+// mark, a hollow outline when off; the active row lights it. The colours are
+// the player's own, picked from its light and dark skins, and belong to no
+// token of the page.
+.switch {
+    --switch-fill: #e5e5e3;
+    --switch-border: #c7c7c7;
+    --switch-mark: #444444;
+
+    position: relative;
+    flex: none;
+    width: 12px;
+    height: 12px;
+    margin: 0;
+    appearance: none;
+    border: 1px solid var(--switch-border);
+    border-radius: 2px;
+    background: none;
+    cursor: pointer;
+
+    &:checked,
+    &:indeterminate {
+        border-color: var(--switch-fill);
+        background: var(--switch-fill);
+    }
+
+    &::after {
+        content: "";
+        position: absolute;
+        display: none;
+        background: var(--switch-mark);
+    }
+
+    // A drawn mark, which stays straight where a rotated border would not.
+    &:checked::after {
+        display: block;
+        inset: 0;
+        mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M4.5 12.5l5 5L19.5 7' fill='none' stroke='black' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'/></svg>")
+            center / 10px no-repeat;
+    }
+
+    &:indeterminate::after {
+        display: block;
+        top: 4px;
+        left: 2px;
+        width: 6px;
+        height: 2px;
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 2px;
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    .switch {
+        --switch-fill: #a4a4a0;
+        --switch-border: #6c6d70;
+        --switch-mark: #0a0a09;
+    }
+}
+
+@include mixins.hover-capable {
+    .switch:hover {
+        --switch-border: var(--color-text-dim);
+    }
+}
+
+// On the selection fill the player draws the box white with a dark mark.
+.row.active .switch,
+.page.keyboard .groupRow.active .switch {
+    --switch-fill: #ffffff;
+    --switch-border: #ffffff;
+    --switch-mark: #3c4043;
+}
+
+// A switched-off track on a mobile, which has no switch column: an icon before
+// the details, or before the duration in a one-line row, away from the numbers.
+.switchedOff {
+    flex: none;
+    // The glyph sits a pixel right of its box; moved back onto the text's edge.
+    margin-left: -1px;
+    --icon-size: 18px;
+    // As the filled stars beside it.
+    color: var(--color-text-secondary);
+}
+
+// Sized by ItemRow from the row height, the icon along with it.
+.thumbnail {
+    flex: none;
+    border-radius: 4px;
+    background: var(--color-surface-raised);
+    color: var(--color-text-secondary);
+}
+
+.text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+// A line of the text with what ends it on the right: the queue mark and the
+// duration on the first, the stars on the second.
+.line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.title {
+    @include mixins.ellipsis;
+
+    flex: 1;
+}
+
+.details {
+    @include mixins.ellipsis;
+
+    flex: 1;
+    font-size: var(--font-size-subtitle);
+    color: var(--color-text-details);
+}
+
+.duration {
+    flex: none;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-secondary);
+}
+
+.rating {
+    flex: none;
+}
+
+.queueMark {
+    flex: none;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-secondary);
+}
+
+.menuButton {
+    --icon-button-size: 32px;
+    flex: none;
+    margin: 0 -8px;
+}
+
+.menuButtonOpen {
+    --icon-button-background: var(--color-hover);
+}
+
+.message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 32px 16px;
+    text-align: center;
+    user-select: text;
+    color: var(--color-text-secondary);
+}
+
+.retry {
+    padding: 8px 16px;
+    border-radius: 20px;
+    color: var(--color-accent);
+    font-weight: var(--font-weight-medium);
+
+    @include mixins.hover-capable {
+        &:hover {
+            background: var(--color-hover);
+        }
+    }
+}
+
+// Laid out as the item rows: the same padding, the same leading slot and the
+// same gap after it, so that the slots and the texts line up.
+.groupRow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    padding: 0 16px;
+    background: var(--color-surface);
+}
+
+.groupButton {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 100%;
+    padding: 0;
+    color: var(--color-accent);
+    text-align: left;
+}
+
+@include mixins.hover-capable {
+    .groupRow:has(button):hover {
+        background: var(--color-surface-raised);
+
+        // The raised fill is the switch's own grey; the switch lightens to stand out.
+        .switch {
+            --switch-fill: #ffffff;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .switch {
+                --switch-fill: #bdbdb9;
+            }
+        }
+    }
+}
+
+.groupName {
+    @include mixins.ellipsis;
+
+    flex: 1;
+    min-width: 0;
+}
+
+.groupCount {
+    flex: none;
+    font-variant-numeric: tabular-nums;
+}
+
+.groupChevron {
+    flex: none;
+    // The glyph ends short of its box; its edge is brought onto the durations' edge.
+    margin-right: -6px;
+}
+
+.groupCheckbox {
+    flex: none;
+}
+
+@include mixins.drawer-modal {
+    .title,
+    .duration,
+    .queueMark {
+        font-size: 14px;
+    }
+
+    .details {
+        font-size: 12px;
+    }
+
+    .groupButton {
+        font-size: 15px;
+    }
+}
+
+@include mixins.drawer-docked {
+    // A lone line is centered in the track the menu button sets; two lines are
+    // laid out by their text, and the thumbnail and the menu button span them,
+    // since an implicit second row would take their height and push a lone line up.
+    .row {
+        display: grid;
+        grid-template-columns: auto auto auto minmax(0, 1fr) auto;
+        grid-template-rows: auto;
+        column-gap: 0;
+        row-gap: 2px;
+        align-content: center;
+        align-items: center;
+    }
+
+    .row:has(.line + .line) {
+        grid-template-rows: auto auto;
+        align-items: baseline;
+    }
+
+    .row.odd {
+        background: var(--color-stripe);
+    }
+
+    .text {
+        display: contents;
+    }
+
+    // Spanning the lines like the thumbnail: the drag handle is taller than a
+    // line and would stretch the first one, moving the text between the modes.
+    .row .leading {
+        grid-column: 1;
+        grid-row: 1 / -1;
+        align-self: center;
+        margin-right: 12px;
+    }
+
+    .groupRow {
+        gap: 12px;
+    }
+
+    .number {
+        grid-column: 2;
+        grid-row: 1;
+        padding-right: 1ch;
+        text-align: right;
+    }
+
+    .thumbnail {
+        grid-column: 3;
+        grid-row: 1 / -1;
+        align-self: center;
+        margin-right: 12px;
+    }
+
+    .line {
+        grid-column: 4;
+        gap: 16px;
+    }
+
+    .line:first-child {
+        grid-row: 1;
+    }
+
+    .line + .line {
+        grid-row: 2;
+    }
+
+    .row .menuButton {
+        grid-column: 5;
+        grid-row: 1 / -1;
+        align-self: center;
+        margin: 0 -4px 0 12px;
+    }
+
+    .groupRow .menuButton {
+        margin: 0 -4px 0 0;
+    }
+}
+
+// The active row's fill already marks it, so the colour steps back there.
+.row.playing:not(.active) {
+    .title,
+    .number,
+    .rating {
+        color: var(--color-accent);
+    }
+}
+
+.row.active,
+.page.keyboard .groupRow.active {
+    background: var(--color-selection);
+
+    .details,
+    .duration,
+    .number,
+    .switchedOff {
+        color: var(--color-text);
+    }
+
+    // The stars, their outlines and the dots alike.
+    .rating {
+        --color-text-secondary: var(--color-text);
+        --color-text-dim: var(--color-text);
+        color: var(--color-text);
+    }
+}
+
+.groupButton:focus {
+    outline: none;
+}
+
+.handle {
+    color: var(--color-text);
+    cursor: grab;
+}
+
+// Outranks the pager's `.pane *` rule, which allows vertical panning on mobile.
+.page .handle,
+.page .handle * {
+    touch-action: none;
+}
+
+// Kept in the DOM: a touch is cancelled when its target is removed.
+.hidden {
+    visibility: hidden;
+}
+
+.ghost {
+    z-index: 1;
+    background: var(--color-surface-raised);
+    box-shadow: 0 4px 16px var(--color-shadow);
+    pointer-events: none;
+}
+
+.dragging {
+    .row,
+    .groupRow {
+        transition: transform 0.15s;
+    }
+
+    .ghost {
+        transition: none;
+    }
+}
+
+// Files dragged in from outside: the line between the rows they would go
+// between lies in the list's own coordinates, so it scrolls with the rows.
+.droppable {
+    position: relative;
+}
+
+.dropLine {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    z-index: 1;
+    height: 2px;
+    margin-top: -1px;
+    background: var(--color-accent);
+    pointer-events: none;
+
+    &::before {
+        content: "";
+        position: absolute;
+        top: -4px;
+        left: -10px;
+        width: 6px;
+        height: 6px;
+        border: 2px solid var(--color-accent);
+        border-radius: 50%;
+        background: var(--color-bg);
+    }
+}
+
+// Where the menu opens when there is no place to show, as in a search. Not
+// hidden: an anchor that is hides what is anchored to it.
+.dropAnchor {
+    height: 0;
+    background: none;
+
+    &::before {
+        content: none;
+    }
+}
+
+// Over the list, not scrolling with it.
+.dropFrame {
+    position: absolute;
+    inset: 4px;
+    border: 2px dashed var(--color-accent);
+    border-radius: 8px;
+    pointer-events: none;
+}
+
+.dropRefused {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 16px;
+    background: color-mix(in srgb, var(--color-bg) 85%, transparent);
+    color: var(--color-text-secondary);
+    text-align: center;
+    pointer-events: none;
+
+    --icon-size: 40px;
+}

@@ -1,0 +1,201 @@
+import {
+    useEffect,
+    useLayoutEffect,
+    useRef,
+    useState,
+    type PointerEvent as ReactPointerEvent,
+    type SyntheticEvent,
+} from 'react';
+
+export type DragRelease = {
+    delta: number;
+    // Pixels per millisecond at the release.
+    velocity: number;
+    cancelled: boolean;
+};
+
+// A release faster than this carries on in its direction, however short the drag.
+export const flingVelocity = 0.5;
+
+export type PointerDragOptions = {
+    axis: 'x' | 'y';
+    enabled?: boolean;
+    // Pixels to travel before the drag begins; with 0 it begins at the first move,
+    // whatever its direction.
+    threshold?: number;
+    // Milliseconds the pointer must stay still before a drag may begin; moving earlier
+    // abandons the gesture.
+    hold?: number;
+    onStart?(event: ReactPointerEvent): boolean | void;
+    onHold?(): void;
+    onMove(delta: number): void;
+    onRelease(release: DragRelease): void;
+    // Called after the render that drops `dragging`, so that any inline offset can be
+    // cleared without the element ever showing the dragging styles with no offset.
+    onDragEnd?(): void;
+};
+
+type Gesture = {
+    pointerId: number;
+    start: number;
+    crossStart: number;
+    startTime: number;
+    // The gesture is on once the pointer travelled past the threshold or the hold elapsed.
+    active: boolean;
+    dragged: boolean;
+    detach(): void;
+};
+
+export function usePointerDrag({
+    axis,
+    enabled = true,
+    threshold = 8,
+    hold = 0,
+    onStart,
+    onHold,
+    onMove,
+    onRelease,
+    onDragEnd,
+}: PointerDragOptions) {
+    const [dragging, setDragging] = useState(false);
+    const gesture = useRef<Gesture | null>(null);
+    // Set when a drag ends; the click a mouse drag produces must not act, but a touch
+    // drag produces none, so the next pointer down cancels it instead of a timer.
+    const suppressClick = useRef<AbortController | null>(null);
+
+    const cancelClickSuppression = () => {
+        suppressClick.current?.abort();
+        suppressClick.current = null;
+    };
+
+    const suppressNextClick = () => {
+        cancelClickSuppression();
+        const controller = new AbortController();
+        window.addEventListener('pointerdown', cancelClickSuppression, { capture: true, signal: controller.signal });
+        suppressClick.current = controller;
+    };
+
+    // Chrome keeps tracking a touch as a scroll gesture even where touch-action forbids
+    // the scroll, and a tap that interrupts the resulting fling never becomes a click.
+    // Consuming the moves marks the sequence as handled. Whether a sequence is cancelable
+    // at all is decided at touchstart from the listeners present then, so this one is
+    // registered for the lifetime of the hook rather than per gesture.
+    useEffect(() => {
+        const consumeTouch = (event: TouchEvent) => {
+            if (gesture.current?.dragged) event.preventDefault();
+        };
+        window.addEventListener('touchmove', consumeTouch, { passive: false });
+        return () => {
+            window.removeEventListener('touchmove', consumeTouch);
+            gesture.current?.detach();
+            cancelClickSuppression();
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!dragging) onDragEnd?.();
+    }, [dragging, onDragEnd]);
+
+    // Whether the screen shows the drag. One that ends before React draws it leaves
+    // the state as it was, so React skips the render and the effect above with it.
+    const shown = useRef(false);
+    useLayoutEffect(() => {
+        shown.current = dragging;
+    }, [dragging]);
+
+    const position = (event: { clientX: number; clientY: number }) => (axis === 'x' ? event.clientX : event.clientY);
+    const crossPosition = (event: { clientX: number; clientY: number }) =>
+        axis === 'x' ? event.clientY : event.clientX;
+
+    const onPointerDown = (event: ReactPointerEvent) => {
+        if (!enabled || event.button !== 0 || gesture.current) return;
+        if (onStart?.(event) === false) return;
+
+        const holdTimer = hold
+            ? window.setTimeout(() => {
+                  current.active = true;
+                  setDragging(true);
+                  onHold?.();
+              }, hold)
+            : undefined;
+        const current: Gesture = {
+            pointerId: event.pointerId,
+            start: position(event),
+            crossStart: crossPosition(event),
+            startTime: event.timeStamp,
+            active: false,
+            dragged: false,
+            detach: () => {
+                window.clearTimeout(holdTimer);
+                window.removeEventListener('pointermove', move);
+                window.removeEventListener('pointerup', up);
+                window.removeEventListener('pointercancel', cancel);
+                window.removeEventListener('dragstart', preventNativeDrag);
+            },
+        };
+
+        const finish = (end: PointerEvent, cancelled: boolean) => {
+            if (end.pointerId !== current.pointerId) return;
+            current.detach();
+            gesture.current = null;
+            if (!current.active) return;
+            if (current.dragged) suppressNextClick();
+            const delta = position(end) - current.start;
+            setDragging(false);
+            onRelease({ delta, velocity: delta / Math.max(end.timeStamp - current.startTime, 1), cancelled });
+            if (!shown.current) onDragEnd?.();
+        };
+
+        // Tracked on the window rather than the element: a fast mouse move can leave it
+        // before the threshold is reached, and the button may be released outside it.
+        const move = (event: PointerEvent) => {
+            if (event.pointerId !== current.pointerId) return;
+            if ((event.buttons & 1) === 0) return finish(event, true);
+            const delta = position(event) - current.start;
+            if (!current.dragged) {
+                // A move mostly along the other axis is another gesture's, such as the
+                // sheet's under a seek bar: the pointer is let go of before the hold.
+                const across = Math.abs(crossPosition(event) - current.crossStart);
+                if (threshold > 0 && !current.active && across >= threshold && across > Math.abs(delta)) {
+                    current.detach();
+                    gesture.current = null;
+                    return;
+                }
+                if (Math.abs(delta) < threshold) return;
+                if (hold && !current.active) {
+                    current.detach();
+                    gesture.current = null;
+                    return;
+                }
+                current.dragged = true;
+            }
+            if (!current.active) {
+                current.active = true;
+                setDragging(true);
+            }
+            onMove(delta);
+        };
+        const up = (event: PointerEvent) => finish(event, false);
+        const cancel = (event: PointerEvent) => finish(event, true);
+        // A mouse moving over a link or image would start native drag-and-drop, and the
+        // browser cancels pointer events when that happens.
+        const preventNativeDrag = (event: DragEvent) => event.preventDefault();
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+        window.addEventListener('pointercancel', cancel);
+        window.addEventListener('dragstart', preventNativeDrag);
+        gesture.current = current;
+    };
+
+    const onClickCapture = (event: SyntheticEvent) => {
+        if (!suppressClick.current) return;
+        cancelClickSuppression();
+        event.stopPropagation();
+        event.preventDefault();
+    };
+
+    return {
+        dragging,
+        handlers: { onPointerDown, onClickCapture },
+    };
+}

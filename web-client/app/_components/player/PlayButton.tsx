@@ -1,0 +1,39 @@
+'use client';
+
+import { useConnection } from '@/app/_api/helpers/connection';
+import { usePlayer, usePlayerCommand } from '@/app/_api/player';
+import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
+import { IconButton } from '../buttons';
+import { Icon } from '../icons';
+import { useErrorToast } from '../toast';
+import styles from './TransportButton.module.scss';
+
+const stopHoldDelay = 500;
+
+// Play or pause on a tap, stop on a hold: the layouts without a stop button.
+export function PlayButton({ className }: { className?: string }) {
+    const { t } = useTranslation();
+    const { data: player } = usePlayer();
+    const command = usePlayerCommand();
+    const showError = useErrorToast();
+    const { online } = useConnection();
+    const playing = player?.state === 'playing';
+
+    return (
+        <IconButton
+            title={t('player.holdToStop', { action: t(playing ? 'player.pause' : 'player.play') })}
+            className={clsx(styles.button, className)}
+            disabled={!online}
+            hold={{
+                delay: stopHoldDelay,
+                action: () => {
+                    if (player && player.state !== 'stopped') command.mutate('stop', { onError: showError });
+                },
+            }}
+            onClick={() => command.mutate(playing ? 'pause' : 'play', { onError: showError })}
+        >
+            <Icon>{playing ? 'pause' : 'play_arrow'}</Icon>
+        </IconButton>
+    );
+}

@@ -2,7 +2,9 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Build Windows x64 (Debug)",
+            // Closes AIMP, links it at the build and builds Debug; the debugger
+            // starts AIMP itself.
+            "label": "Deploy to AIMP (Debug)",
             "type": "shell",
             "command": "powershell",
             "args": [
@@ -10,42 +12,31 @@
                 "-ExecutionPolicy",
                 "Bypass",
                 "-File",
-                "${workspaceFolder}\\build-windows.ps1",
-                "-Arch",
-                "x64",
+                "${workspaceFolder}\\plugin\\deploy-windows.ps1",
                 "-Config",
-                "Debug"
+                "Debug",
+                "-NoStart"
             ],
             "problemMatcher": ["$msCompile"],
             "group": "build"
         },
         {
-            "label": "Build Linux (Debug)",
+            // The same for the AIMP installed in WSL.
+            "label": "Deploy to WSL AIMP (Debug)",
             "type": "shell",
-            "command": "wsl",
+            "command": "powershell",
             "args": [
-                "-e",
-                "bash",
-                "-lc",
-                "cd \"$(wslpath '${workspaceFolder}')\" && ./build-linux.sh --debug"
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\plugin\\deploy-wsl.ps1",
+                "-Config",
+                "Debug",
+                "-NoStart"
             ],
             "problemMatcher": ["$gcc"],
             "group": "build"
-        },
-        {
-            // Puts the fresh build where the WSL AIMP loads plugins from and
-            // stops a running AIMP so the .so is not busy.
-            "label": "Install into WSL AIMP",
-            "type": "shell",
-            "command": "wsl",
-            "args": [
-                "-e",
-                "bash",
-                "-lc",
-                "pkill -x aimp; sleep 1; D=/opt/aimp/Plugins/aimp_remote_control; rm -rf \"$D\" && mkdir -p \"$D\" && cp -r \"$(wslpath '${workspaceFolder}')\"/dist/linux-x64/. \"$D/\""
-            ],
-            "dependsOn": ["Build Linux (Debug)"],
-            "problemMatcher": []
         }
     ]
 }

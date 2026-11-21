@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures';
+import { PlayerPanel } from './pages/player-panel';
 import { PlaylistScreen } from './pages/playlist-screen';
 import { t } from './strings';
 
@@ -128,5 +129,49 @@ test.describe('playlists', () => {
             window.dispatchEvent(new PointerEvent('pointerup', pointer(260, 0)));
         });
         await expect.poll(async () => Math.round((await screen.list.boundingBox())!.x)).toBe(0);
+    });
+
+    test('a lone playlist shows its name and totals for tabs, and no swipe moves it', async ({
+        app,
+        page,
+        playlists,
+    }) => {
+        test.skip(app.drawerDocked, 'a docked drawer has neither tabs nor a pager');
+        const only = await playlists.create({ name: 'rc-e2e Dunlin', tracks: 3 });
+        await page.route('**/api/v1/playlists', async route => {
+            const response = await route.fetch();
+            const all: { id: string }[] = await response.json();
+            await route.fulfill({ response, json: all.filter(playlist => playlist.id === only.id) });
+        });
+        await app.goto('/');
+        await new PlayerPanel(app).collapse();
+        const screen = new PlaylistScreen(app, only.name);
+        await expect(app.heading).toHaveText(only.name);
+        await expect(app.subtitle).toBeVisible();
+        await expect(app.main.getByRole('tablist')).toHaveCount(0);
+
+        await expect(screen.list).toBeInViewport();
+        const x = await screen.list.evaluate(async list => {
+            const box = list.getBoundingClientRect();
+            const pointer = (x: number, buttons: number) => ({
+                bubbles: true,
+                pointerId: 7,
+                pointerType: 'touch',
+                isPrimary: true,
+                clientX: x,
+                clientY: box.y + box.height / 2,
+                buttons,
+            });
+            list.dispatchEvent(new PointerEvent('pointerdown', pointer(300, 1)));
+            for (const at of [280, 240, 200]) {
+                await new Promise(resolve => setTimeout(resolve, 30));
+                window.dispatchEvent(new PointerEvent('pointermove', pointer(at, 1)));
+            }
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            const held = list.getBoundingClientRect().x;
+            window.dispatchEvent(new PointerEvent('pointerup', pointer(200, 0)));
+            return held;
+        });
+        expect(Math.round(x)).toBe(0);
     });
 });

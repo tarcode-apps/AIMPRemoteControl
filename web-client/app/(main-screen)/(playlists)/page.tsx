@@ -26,7 +26,7 @@ export default function Playlists() {
 
 function PlaylistsScreen() {
     const { t } = useTranslation();
-    const { selected } = usePlaylistSelection();
+    const { playlists, selected } = usePlaylistSelection();
     const mode = usePlaylistMode();
     const selectedTotals = useSelectionSummary(mode.itemsSelection, mode.allSelected ? mode.totals : undefined);
     const heading = useListHeading({
@@ -91,13 +91,16 @@ function PlaylistsScreen() {
         </div>
     );
 
-    // The tabs and the search field share the lower bar of a phone.
+    // The tabs and the search field share the lower bar of a phone. A lone playlist
+    // needs no tabs: the phone shows its name and totals, as the other lists do.
+    const single = playlists?.length === 1;
     return (
         <Screen
             title={heading.title}
             subtitle={heading.subtitle}
             onBack={heading.onBack}
-            tabs={heading.search || <PlaylistTabs />}
+            tabs={single ? undefined : heading.search || <PlaylistTabs />}
+            search={single ? heading.search : undefined}
             notice={notice}
             toolbar={<PlaylistToolbar />}
         >

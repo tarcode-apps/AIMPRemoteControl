@@ -23,8 +23,8 @@ export function PlaylistPager() {
 
     const drag = usePointerDrag({
         axis: 'x',
-        // A swipe would leave the mode.
-        enabled: paged && index >= 0 && mode.mode === null,
+        // A swipe would leave the mode; a lone playlist has nowhere to go.
+        enabled: paged && index >= 0 && last > 0 && mode.mode === null,
         onStart: () => {
             const track = trackRef.current;
             if (!track) return false;

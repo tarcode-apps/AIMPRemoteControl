@@ -340,13 +340,18 @@
         display: contents;
     }
 
-    // Spanning the lines like the thumbnail: the drag handle is taller than a
-    // line and would stretch the first one, moving the text between the modes.
+    // On the first line, as the number is and as the player draws its switch.
     .row .leading {
         grid-column: 1;
-        grid-row: 1 / -1;
+        grid-row: 1;
         align-self: center;
         margin-right: 12px;
+    }
+
+    // As high as the checkbox whose slot it takes: its icon is taller than a line
+    // and would stretch the first one, moving the text between the modes.
+    .row .handle {
+        height: 16px;
     }
 
     .groupRow {
@@ -427,10 +432,21 @@
 .handle {
     color: var(--color-text);
     cursor: grab;
+
+    // Grabbed over the whole height of its row, wherever in it the icon stands:
+    // laid out against the row, around the place the handle has in it.
+    &::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 32px;
+    }
 }
 
 // Outranks the pager's `.pane *` rule, which allows vertical panning on mobile.
 .page .handle,
+.page .handle::before,
 .page .handle * {
     touch-action: none;
 }

@@ -213,7 +213,7 @@ export function ItemRow({
                 </span>
             )}
             {label && docked && (
-                <div className={styles.number} data-widest={widestNumber}>
+                <div className={styles.number} data-widest={widestNumber} data-testid="item-number">
                     {label}
                 </div>
             )}

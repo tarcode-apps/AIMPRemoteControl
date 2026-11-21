@@ -1,3 +1,4 @@
+import type { Locator } from '@playwright/test';
 import fs from 'node:fs';
 import type { TestPlaylist } from '../fixtures';
 import { expect, test, withPluginSettings } from './fixtures';
@@ -120,6 +121,44 @@ test.describe('playlist', () => {
         await expect(app.toast).toHaveText(t('playlist.nonExistentRemoved', { number: 1 }));
         await expect(screen.row('Bravo')).toBeHidden();
         expect(await api.playlistItemCount(playlist.id)).toBe(2);
+    });
+
+    test('the number, the switch and the drag handle stand on the first line of a row', async ({ app, page }) => {
+        test.skip(!app.drawerDocked, 'a mobile row has neither');
+        await page.route('**/api/v1/playlists', async route => {
+            const response = await route.fetch();
+            const all: object[] = await response.json();
+            const shown = { showNumbers: true, showSecondLine: true, showThumbnails: true, showSwitches: true };
+            await route.fulfill({ response, json: all.map(playlist => ({ ...playlist, ...shown })) });
+        });
+        await page.reload();
+        await screen.show();
+        const row = screen.row('Alpha');
+        await expect(row.getByTestId('item-number')).toBeVisible();
+        const middle = async (locator: Locator) => {
+            const box = (await locator.boundingBox())!;
+            return box.y + box.height / 2;
+        };
+        const firstLine = await middle(row.getByText('Alpha'));
+        expect(Math.abs((await middle(row.getByTestId('item-number'))) - firstLine)).toBeLessThan(1.5);
+        expect(Math.abs((await middle(screen.switch('Alpha'))) - firstLine)).toBeLessThan(1.5);
+        // The second line is there, so the first is not the middle of the row.
+        expect((await middle(row)) - firstLine).toBeGreaterThan(4);
+
+        // The handle takes the switch's place without moving the text, and is
+        // grabbed anywhere down the row.
+        await screen.toolbarButton(t('playlist.sort')).click();
+        const handle = row.getByTitle(t('playlist.dragHandle'));
+        expect(Math.abs((await middle(handle)) - firstLine)).toBeLessThan(1.5);
+        expect(await middle(row.getByText('Alpha'))).toBe(firstLine);
+        const rowBox = (await row.boundingBox())!;
+        for (const y of [rowBox.y + 2, rowBox.y + rowBox.height - 2])
+            expect(
+                await handle.evaluate((element, at) => {
+                    const box = element.getBoundingClientRect();
+                    return element.contains(document.elementFromPoint(box.x + box.width / 2, at));
+                }, y),
+            ).toBe(true);
     });
 
     test('a refused action says why in the toast', async ({ app, page }) => {

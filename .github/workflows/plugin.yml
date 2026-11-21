@@ -157,22 +157,16 @@ jobs:
 
       # What the AIMP addons catalog asks for, see docs/catalog/README.md:
       # the same folder under the name the rules want, the description file with
-      # the version filled in, and the screenshot when the repo carries one.
+      # the version filled in, and the screenshots: the preview, and the web
+      # client under the name the catalog opens on a click.
       - name: Build the catalog bundle
         run: |
           set -eu
           mkdir catalog
           cp aimp_remote_control.aimppack catalog/aimp_remote_control.zip
           sed "s/{VERSION}/$PLUGIN_VERSION/" docs/catalog/aimp_remote_control.txt > catalog/aimp_remote_control.txt
-          shots=()
-          for f in docs/catalog/aimp_remote_control_{sm,full}.{png,jpg}; do
-            if [ -f "$f" ]; then shots+=("$f"); fi
-          done
-          if [ ${#shots[@]} -gt 0 ]; then
-            cp "${shots[@]}" catalog/
-          else
-            echo "::warning::no docs/catalog/aimp_remote_control_sm.png - the bundle ships without screenshots"
-          fi
+          cp docs/catalog/aimp_remote_control_sm.png catalog/
+          cp docs/catalog/aimp_remote_control_web_en.png catalog/aimp_remote_control_full.png
           if ! grep -q "^Topic: http" catalog/aimp_remote_control.txt; then
             echo "::warning::Topic: has no forum link - fill it in before sending the bundle to the catalog"
           fi
@@ -191,6 +185,10 @@ jobs:
           set -eu
           mkdir forum
           sed "s/{VERSION}/$PLUGIN_VERSION/" docs/catalog/forum-topic.txt > forum/forum-topic.txt
+          # The section's rules want the changes of a new version listed in the topic.
+          if ! grep -qF "[b]$PLUGIN_VERSION[/b]" forum/forum-topic.txt; then
+            echo "::warning::docs/catalog/forum-topic.txt does not list the changes of $PLUGIN_VERSION"
+          fi
 
       - uses: actions/upload-artifact@v6
         with:

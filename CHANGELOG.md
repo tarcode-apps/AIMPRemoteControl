@@ -1,14 +1,14 @@
 # Changelog
 
-## 2.0.0 — 2026-11-08
+## 2.0.0 — 2026-11-21
 
 AIMP can now be controlled from a browser on any device of the local network. The AIMP Remote Control app keeps working
 unchanged.
 
 ### In a browser
 
-- Every playlist with its groups, covers and ratings; creating, renaming and deleting playlists, sorting and moving
-  tracks.
+- Every playlist with its groups, covers and ratings; creating, renaming and deleting playlists; sorting, moving and
+  removing tracks.
 - Search in a playlist or across all playlists.
 - Playback, seeking, volume, shuffle and repeat, synced lyrics, track information, radio capture.
 - The queue, the sleep timer, sound effects and the 20-band equalizer with its presets.
@@ -21,7 +21,8 @@ unchanged.
 
 - A permission to download tracks, on by default.
 - Uploads of up to 16 GB (4 GB in the 32-bit build); an upload that fails leaves nothing behind.
-- Stricter authentication.
+- Authentication refuses a request sent twice and slows down password guessing.
+- The options page marks the addresses whose port another program has taken.
 - Error messages in the language of the player's interface.
 
 ### The AIMP Remote Control app

@@ -6,6 +6,8 @@ the Linux builds of AIMP.
 
 Not affiliated with the AIMP or the app authors.
 
+![The web client in a browser](docs/catalog/aimp_remote_control_web_en.png)
+
 ## Features
 
 - **Playlists:** every playlist of the player with its groups, covers and ratings; search in a playlist or across all of
@@ -26,8 +28,8 @@ above is there; the API behind it is documented in [docs/web-api.md](docs/web-ap
 **The AIMP Remote Control app.** The original Android app (2.0.31) works with this plugin unchanged: the plugin speaks
 the protocol of the original one, documented in [docs/remote-control-protocol.md](docs/remote-control-protocol.md).
 Playlists, queue, playback, the equalizer, covers, lyrics, the file browser, uploads, downloads and the timer all work
-as the app expects. The app is fading into the past: it is no longer maintained, it has been removed from Google Play,
-and its [official site](https://aimpremote.blogspot.com) has no APK; in practice it is found in the
+as the app expects. The app is no longer maintained and has been removed from Google Play, and its
+[official site](https://aimpremote.blogspot.com) has no APK; in practice it is found in the
 [4PDA thread](https://4pda.to/forum/index.php?showtopic=499539). Its protocol stays frozen, so new features come to the
 browser.
 
@@ -45,9 +47,9 @@ Android app reaches the file browser through its upload menu, so there it needs 
    Plugins_ and click _install_. The package contains the builds for all platforms; AIMP picks the right one.
 3. Enable the plugin in _Options → Plugins_, then open `http://<address>:3333/` in a browser (see [Setup](#setup)).
 
-The plugin needs AIMP 5.00 or later and does not start in an older player. Tested with AIMP 5.00 to 5.40 on Windows and
-AIMP 6.0 on Windows and Linux. AIMP 6.0 build 3090 or later reports its playlist view settings and their changes itself;
-the plugin works around their absence in older versions.
+The plugin requires AIMP 5.00 or later and does not start in an older player. Tested with AIMP 5.00 to 5.40 on Windows
+and AIMP 6.0 on Windows and Linux. Two things depend on the player's version: shuffling a playlist by groups needs AIMP
+5.10, and marking the tracks whose files the player did not find needs AIMP 6.0.
 
 ## Setup
 
@@ -55,9 +57,9 @@ Open _Options → Plugins → Remote Control_:
 
 - **Connection** names the player, as a browser and the app show it (the computer's name unless set), and lists the
   addresses the server listens on — open one in a browser as `http://<address>:3333/`, or enter it in the app, which can
-  also discover the player on the local network. Untick an interface to stop listening on it.
-- **Client permissions** — what browsers and the app may do beyond playback. Everything here is off by default,
-  including browsing the computer's files, except downloading tracks to the client.
+  also discover the player on the local network. Untick an interface to stop listening on it. An address whose port
+  another program has taken is marked as such.
+- **Client permissions** — what browsers and the app may do beyond playback. Only downloading tracks is on by default.
 - **Require authentication** — a username and password to control the player; a browser asks for them once. Recommended
   on any network you do not fully trust: without it, anyone on the network can control the player.
 

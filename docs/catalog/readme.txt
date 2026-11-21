@@ -19,19 +19,19 @@ Not affiliated with the AIMP or the app authors.
   планшете или другом компьютере или из приложения "AIMP Remote Control"
   для Android. Поддерживаются сборки плеера для Windows и для Linux.
 
-  Требуется AIMP 5 или более новый.
+  Требуется AIMP 5.00 или новее.
 
   Возможности: плейлисты с группами, обложками и рейтингами, поиск по
-  плейлисту или по всем плейлистам, сортировка и перестановка треков,
-  управление воспроизведением, синхронизированные тексты песен, сведения
-  о треке, запись радио, очередь, таймер сна, звуковые эффекты и
-  20-полосный эквалайзер с пресетами, избранное, добавление файлов с
+  плейлисту или по всем плейлистам, сортировка, перестановка и удаление
+  треков, управление воспроизведением, синхронизированные тексты песен,
+  сведения о треке, запись радио, очередь, таймер сна, звуковые эффекты
+  и 20-полосный эквалайзер с пресетами, избранное, добавление файлов с
   компьютера и интернет-потоков, загрузка файлов и целых папок,
   скачивание треков.
 
-  Приложение "AIMP Remote Control" работает с плагином без каких-либо
-  изменений и настроек. Оно больше не поддерживается и удалено из
-  Google Play; плагин рассчитан на последнюю выпущенную версию - 2.0.31.
+  Приложение "AIMP Remote Control" работает с плагином без изменений и
+  настроек. Оно больше не поддерживается и удалено из Google Play;
+  плагин рассчитан на его последнюю версию - 2.0.31.
 
 УСТАНОВКА
 
@@ -47,12 +47,13 @@ Not affiliated with the AIMP or the app authors.
 
   - "Подключение" - имя плеера, которое показывают браузер и приложение
     (если не задано, это имя компьютера), и список адресов, на которых
-    работает сервер. Откройте один из них в браузере (http://<адрес>:3333/) или
-    введите в приложении, которое умеет и само найти плеер в сети.
-    Снимите галочку с интерфейса, чтобы не слушать на нём.
+    работает сервер. Откройте один из них в браузере
+    (http://<адрес>:3333/) или введите в приложении - оно умеет и само
+    найти плеер в сети. Снимите галочку с интерфейса, чтобы не слушать на
+    нём. Адрес, порт которого занят другой программой, там отмечен.
   - "Разрешения клиента" - что браузеру и приложению позволено помимо
-    управления воспроизведением. Всё выключено по умолчанию, включая обзор
-    файлов на компьютере, кроме скачивания треков.
+    управления воспроизведением. По умолчанию включено только скачивание
+    треков.
   - "Требовать авторизацию" - имя пользователя и пароль для всех
     клиентов; браузер спросит их один раз. Рекомендуется в любой сети,
     которой вы не доверяете полностью: без авторизации управлять плеером
@@ -78,18 +79,18 @@ DESCRIPTION
   Android app. Both the Windows and the Linux builds of the player are
   supported.
 
-  AIMP 5 or newer is required.
+  AIMP 5.00 or later is required.
 
   Features: playlists with groups, covers and ratings, search in a playlist
-  or across all of them, sorting and reordering tracks, playback control,
-  synced lyrics, track information, radio capture, queue, sleep timer,
-  sound effects and the 20-band equalizer with presets, favorites, adding
-  files of the computer and internet streams, uploading files and whole
-  folders, downloading tracks.
+  or across all of them, sorting, reordering and removing tracks, playback
+  control, synced lyrics, track information, radio capture, queue, sleep
+  timer, sound effects and the 20-band equalizer with presets, favorites,
+  adding files of the computer and internet streams, uploading files and
+  whole folders, downloading tracks.
 
   The "AIMP Remote Control" app works with the plugin as is, with nothing
   to change or configure. It is no longer maintained and has been removed
-  from Google Play; the plugin targets its last released version - 2.0.31.
+  from Google Play; the plugin targets its last version - 2.0.31.
 
 INSTALLATION
 
@@ -107,12 +108,12 @@ SETUP
     computer's name unless set), and lists the addresses the server
     listens on. Open one of them in a browser (http://<address>:3333/) or
     enter it in the app, which can also discover the player on the local
-    network. Untick an interface to stop listening on it.
+    network. Untick an interface to stop listening on it. An address
+    whose port another program has taken is marked as such.
   - "Client permissions" - what browsers and the app may do beyond
-    playback. Everything here is off by default, including browsing the
-    computer's files, except downloading tracks.
-  - "Require authentication" - username and password every client must
-    use; a browser asks for them once. Recommended on any network you do
+    playback. Only downloading tracks is on by default.
+  - "Require authentication" - a username and password for every client;
+    a browser asks for them once. Recommended on any network you do
     not fully trust: without it, anyone on the network can control the
     player.
 

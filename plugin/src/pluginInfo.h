@@ -2,7 +2,7 @@
 
 #define PLUGIN_NAME "AIMP Remote Control"
 #define PLUGIN_AUTHOR "Artem Tarasov"
-#define PLUGIN_DESCRIPTION "Alternate Remote control server for Android devices"
+#define PLUGIN_DESCRIPTION "Remote control from a browser or the AIMP Remote Control app"
 #define PLUGIN_LICENSE "MIT License"
 
 #define PLUGIN_URL_GITHUB "https://github.com/tarcode-apps/AIMPRemoteControl"

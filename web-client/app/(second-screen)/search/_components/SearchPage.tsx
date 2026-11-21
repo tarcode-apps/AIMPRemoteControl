@@ -339,10 +339,12 @@ export function SearchPage() {
                             role="option"
                             data-testid="item-row"
                             aria-selected={isActive}
+                            title={hit?.dead ? t('playlist.dead') : undefined}
                             className={clsx(
                                 styles.row,
                                 index % 2 && styles.odd,
                                 isActive && styles.active,
+                                hit?.dead && styles.missing,
                                 hit && isPlaying(hit) && styles.playing,
                             )}
                             style={{ height: twoLineRowHeight, transform }}

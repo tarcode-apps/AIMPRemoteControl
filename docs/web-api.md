@@ -152,6 +152,7 @@ index is what actions take, and it is only valid for the `revision` the page was
       "rating": 0.8,
       "displayingMark": 4,
       "enabled": true,
+      "dead": false,
       "isUrl": false,
       "inContainer": false,
       "cover": "7068c7442182d15a",
@@ -165,12 +166,14 @@ index is what actions take, and it is only valid for the `revision` the page was
 templates; `secondLine` is empty when the playlist hides its second line. `duration` is in seconds, `size` in bytes,
 `mark` is the stars the user gave, `0..5`; `rating` is the player's own rating of the track from its statistics, `0..1`;
 `displayingMark` is what the player shows, in halves of a star: the mark, or, when there is none, the rating as stars,
-which the player draws hollow. `enabled` is the check box in front of the track, `isUrl` marks streams, `inContainer`
-marks a part of a container file, such as one track of a CUE sheet, which cannot be deleted from disk on its own.
-`cover` is the key the item's [cover URL](#get-apiv1playlistsiditemsindexcoverkeysize) takes: it names the file, so it
-only changes when the file is replaced. The client shows the covers of the playlists whose `showThumbnails` is on.
-`fileUri` is the track's URI as the player stores it: a path, an URL, or a part of a container such as a CUE sheet; it
-is the one stable name of a track across playlist changes, and is compared byte for byte (the player runs on
+which the player draws hollow. `enabled` is the check box in front of the track. `dead` says the player did not find the
+file the last time it tried to play the track and skipped it; it clears once the track plays, and a player older than
+v6.00 build 3095 always reports `false`. Either change counts in the playlist's `revision`. `isUrl` marks streams,
+`inContainer` marks a part of a container file, such as one track of a CUE sheet, which cannot be deleted from disk on
+its own. `cover` is the key the item's [cover URL](#get-apiv1playlistsiditemsindexcoverkeysize) takes: it names the
+file, so it only changes when the file is replaced. The client shows the covers of the playlists whose `showThumbnails`
+is on. `fileUri` is the track's URI as the player stores it: a path, an URL, or a part of a container such as a CUE
+sheet; it is the one stable name of a track across playlist changes, and is compared byte for byte (the player runs on
 case-sensitive file systems too). Every page is read from the player at request time, nothing is cached in the plugin; a
 search is one pass over the whole playlist per page.
 
@@ -384,6 +387,7 @@ Finds remembered files in the playlists they were remembered from:
       "rating": 0.8,
       "displayingMark": 4,
       "enabled": true,
+      "dead": false,
       "isUrl": false,
       "inContainer": false,
       "cover": "7068c7442182d15a"
@@ -450,7 +454,9 @@ Sorts the playlist in the player. `by` names the order, `descending` (optional, 
 sorting and only makes sense for the orders by a field: `title`, `fileName`, `duration`, `artist` and `template`. With
 `template` the body also carries the `template` itself, a file info formatter template such as `%Album %TrackNumber`,
 which the player evaluates for every item. `inverse` reverses the current order; `random`, `randomGroups`,
-`randomGroupItems` and `randomAll` shuffle the items, the groups, the items inside each group, or both.
+`randomGroupItems` and `randomAll` shuffle the items, the groups, the items inside each group, or both; players older
+than v5.10 know only `random` of the four and refuse the others with `500 playlistUpdateFailed`, which the `hello`
+[event](#get-apiv1events) tells in `features.groupShuffle`.
 
 ```json
 { "by": "template", "template": "%Year %Album", "descending": true, "revision": 7 }
@@ -477,6 +483,18 @@ Moving items across group boundaries is allowed; the player splits or merges gro
 
 Errors: `400 invalidBody`, `403 playlistReadOnly`, `404 playlistNotFound`, `404 itemNotFound`, `409 playlistChanged`,
 `500 playlistUpdateFailed`.
+
+### `POST /api/v1/playlists/{id}/items/removeNonExistent`
+
+Takes the tracks whose files are gone out of the playlist, as the player's own command does in its active playlist.
+Streams stay; a part of a container file goes when the audio it is cut from is gone. Nothing is deleted from disk. No
+body; the response says how many went:
+
+```json
+{ "removed": 3 }
+```
+
+Errors: `403 playlistReadOnly`, `404 playlistNotFound`, `500 playlistUpdateFailed`.
 
 ## Items
 
@@ -557,6 +575,7 @@ The selected items with the tag fields a client keeps for lists of its own, such
       "rating": 0.8,
       "displayingMark": 4,
       "enabled": true,
+      "dead": false,
       "isUrl": false,
       "inContainer": false,
       "cover": "7068c7442182d15a",
@@ -647,6 +666,7 @@ the playlists in the player's order, and are paged as a whole.
       "rating": 0.8,
       "displayingMark": 4,
       "enabled": true,
+      "dead": false,
       "isUrl": false,
       "inContainer": false,
       "cover": "7068c7442182d15a",
@@ -692,6 +712,7 @@ is, `index` being valid for the playlist's current revision.
       "rating": 0,
       "displayingMark": 0,
       "enabled": true,
+      "dead": false,
       "isUrl": false,
       "inContainer": false,
       "cover": "3f9a1c2e5b7d8e01",
@@ -1137,17 +1158,17 @@ A [Server-Sent Events](https://html.spec.whatwg.org/multipage/server-sent-events
 server sends `retry: 3000` first, so a browser `EventSource` reconnects three seconds after a drop, then one event per
 change; the payload is a JSON object.
 
-| `event`     | When                                                                                                                                                   | `data`                                                                                                                                                                                                                                                                         |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `hello`     | right after connecting, and again when the player is renamed in the plugin settings                                                                    | `{"pluginVersion": "2.0.0.0", "aimpVersion": "v6.00.3090", "name": "DESKTOP-OFFICE"}` — `name` is the one set in the plugin settings, else the computer's; compare `pluginVersion` with the previous connection's to learn that the plugin was updated while the page was open |
-| `player`    | playback state, track, a seek, volume, mute, repeat, shuffle, radio capture, or a change of the playing playlist that may have moved the track's index | the same object as [`GET /api/v1/player`](#get-apiv1player)                                                                                                                                                                                                                    |
-| `playlists` | a playlist was added, removed, renamed or its content changed                                                                                          | `{"playlists": [{"id": "{A1B2C3D4-...}", "revision": 7}, …]}` — every loaded playlist with its current revision                                                                                                                                                                |
-| `queue`     | an entry was added, removed or moved, the player took the next track out, or the queue was suspended or resumed                                        | `{"revision": 12, "count": 3, "suspended": false}` — enough for a badge; the list itself is [`GET /api/v1/queue`](#get-apiv1queue)                                                                                                                                             |
-| `timer`     | the sleep timer was set, cancelled or fired, or began to wait for the end of the playing track                                                         | the same object as [`GET /api/v1/timer`](#get-apiv1timer)                                                                                                                                                                                                                      |
-| `effects`   | the balance, speed, tempo, pitch, a sound effect or the equalizer changed, in the player's window or through the API                                   | the same object as [`GET /api/v1/effects`](#get-apiv1effects)                                                                                                                                                                                                                  |
-| `settings`  | the plugin's settings were saved on its options page                                                                                                   | the same object as [`GET /api/v1/settings`](#get-apiv1settings)                                                                                                                                                                                                                |
-| `ping`      | after 30 s without events                                                                                                                              | `{}` — nothing changed                                                                                                                                                                                                                                                         |
-| `shutdown`  | the player is closing; the stream ends after it                                                                                                        | `{}` — tells a closed player from a lost connection, which ends the stream without a word                                                                                                                                                                                      |
+| `event`     | When                                                                                                                                                   | `data`                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hello`     | right after connecting, and again when the player is renamed in the plugin settings                                                                    | `{"pluginVersion": "2.0.0.0", "aimpVersion": "v6.00.3090", "name": "DESKTOP-OFFICE", "features": {"groupShuffle": true}}` — `name` is the one set in the plugin settings, else the computer's; `features.groupShuffle` tells whether the player has the group shuffles of the [sort](#post-apiv1playlistsidsort); compare `pluginVersion` with the previous connection's to learn that the plugin was updated while the page was open |
+| `player`    | playback state, track, a seek, volume, mute, repeat, shuffle, radio capture, or a change of the playing playlist that may have moved the track's index | the same object as [`GET /api/v1/player`](#get-apiv1player)                                                                                                                                                                                                                                                                                                                                                                           |
+| `playlists` | a playlist was added, removed, renamed or its content changed                                                                                          | `{"playlists": [{"id": "{A1B2C3D4-...}", "revision": 7}, …]}` — every loaded playlist with its current revision                                                                                                                                                                                                                                                                                                                       |
+| `queue`     | an entry was added, removed or moved, the player took the next track out, or the queue was suspended or resumed                                        | `{"revision": 12, "count": 3, "suspended": false}` — enough for a badge; the list itself is [`GET /api/v1/queue`](#get-apiv1queue)                                                                                                                                                                                                                                                                                                    |
+| `timer`     | the sleep timer was set, cancelled or fired, or began to wait for the end of the playing track                                                         | the same object as [`GET /api/v1/timer`](#get-apiv1timer)                                                                                                                                                                                                                                                                                                                                                                             |
+| `effects`   | the balance, speed, tempo, pitch, a sound effect or the equalizer changed, in the player's window or through the API                                   | the same object as [`GET /api/v1/effects`](#get-apiv1effects)                                                                                                                                                                                                                                                                                                                                                                         |
+| `settings`  | the plugin's settings were saved on its options page                                                                                                   | the same object as [`GET /api/v1/settings`](#get-apiv1settings)                                                                                                                                                                                                                                                                                                                                                                       |
+| `ping`      | after 30 s without events                                                                                                                              | `{}` — nothing changed                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `shutdown`  | the player is closing; the stream ends after it                                                                                                        | `{}` — tells a closed player from a lost connection, which ends the stream without a word                                                                                                                                                                                                                                                                                                                                             |
 
 A track switch raises several player changes within a few milliseconds, with a stopped player in between, and a slider
 dragged in the player's window raises an effects change per step, as one queue request raises a queue change per item;

@@ -60,6 +60,8 @@ export type PlaylistItem = {
     rating: number;
     displayingMark: number;
     enabled: boolean;
+    // The player did not find the file when it last tried to play it.
+    dead: boolean;
     isUrl: boolean;
     // A part of a container file, such as one track of a CUE sheet.
     inContainer: boolean;
@@ -197,6 +199,9 @@ export const sortModes: readonly SortBy[] = [
     'randomGroupItems',
     'randomAll',
 ];
+
+// The shuffles that players before v5.10 do not have.
+export const groupShuffles: readonly SortBy[] = ['randomGroups', 'randomGroupItems', 'randomAll'];
 
 // The orders `descending` applies to.
 export const fieldSorts: readonly SortBy[] = ['title', 'fileName', 'duration', 'artist', 'template'];

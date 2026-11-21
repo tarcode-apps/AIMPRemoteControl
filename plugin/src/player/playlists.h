@@ -33,7 +33,7 @@ namespace player
 		bool GroupAutoMerge = false;
 	};
 
-	std::vector<PlaylistInfo> GetPlaylists(IAIMPCore *core);
+	std::vector<PlaylistInfo> GetPlaylists(IAIMPCore *core, const PlayerFeatures &features);
 
 	// The id the player keeps for a playlist across its restarts.
 	std::string GetPlaylistAIMPId(IAIMPPlaylist *playlist);

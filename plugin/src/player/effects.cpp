@@ -1,6 +1,7 @@
 #include "effects.h"
 
 #include <cmath>
+#include <stdexcept>
 #include <utility>
 
 #include "apiCore.h"
@@ -54,14 +55,24 @@ namespace
 		IAIMPServiceMessageDispatcher *FService;
 	};
 
+	// The plugin refuses to initialize without the equalizer services, so a missing one is a bug.
+	template <typename T>
+	T *RequireService(IAIMPCore *core, const GUID &iid)
+	{
+		T *service = AcquireService<T>(core, iid);
+		if (!service)
+			throw std::logic_error("An equalizer service is not available");
+		return service;
+	}
+
 	IAIMPServicePlayerEqualizer *Equalizer(IAIMPCore *core)
 	{
-		return AcquireService<IAIMPServicePlayerEqualizer>(core, IID_IAIMPServicePlayerEqualizer);
+		return RequireService<IAIMPServicePlayerEqualizer>(core, IID_IAIMPServicePlayerEqualizer);
 	}
 
 	IAIMPServicePlayerEqualizerPresets *Presets(IAIMPCore *core)
 	{
-		return AcquireService<IAIMPServicePlayerEqualizerPresets>(core, IID_IAIMPServicePlayerEqualizerPresets);
+		return RequireService<IAIMPServicePlayerEqualizerPresets>(core, IID_IAIMPServicePlayerEqualizerPresets);
 	}
 
 	std::vector<double> Gains(IAIMPEqualizerBands *bands)
@@ -110,8 +121,6 @@ namespace
 	std::optional<std::string> MatchingPreset(IAIMPCore *core, const std::vector<double> &gains)
 	{
 		IAIMPServicePlayerEqualizerPresets *presets = Presets(core);
-		if (!presets)
-			return std::nullopt;
 		std::optional<std::string> match;
 		const INT32 count = presets->GetPresetCount();
 		for (INT32 i = 0; i < count && !match; ++i)
@@ -131,8 +140,6 @@ namespace
 	PresetResult WithPreset(IAIMPCore *core, const std::string &name, Fn &&fn)
 	{
 		IAIMPServicePlayerEqualizerPresets *presets = Presets(core);
-		if (!presets)
-			return PresetResult::Failed;
 		IAIMPEqualizerPreset *preset = FindPreset(core, presets, name);
 		PresetResult result = PresetResult::NotFound;
 		if (preset)
@@ -161,28 +168,25 @@ player::EffectsState player::GetEffects(IAIMPCore *core)
 	state.Enhancer = dispatcher.Get(AIMP_MSG_PROPERTY_ENHANCER, state.Enhancer);
 	state.Equalizer.Auto = dispatcher.Get<BOOL>(AIMP_MSG_PROPERTY_EQUALIZER_AUTO, 0) != 0;
 
-	if (IAIMPServicePlayerEqualizer *equalizer = Equalizer(core))
+	IAIMPServicePlayerEqualizer *equalizer = Equalizer(core);
+	// The service's own GetActive cannot be called from C++ in a 32-bit build.
+	state.Equalizer.Active = dispatcher.Get<BOOL>(AIMP_MSG_PROPERTY_EQUALIZER, 0) != 0;
+	equalizer->GetPreamp(&state.Equalizer.Preamp);
+	const std::vector<double> gains = Gains(equalizer);
+	state.Equalizer.Bands.resize(gains.size());
+	for (std::size_t i = 0; i < gains.size(); ++i)
 	{
-		state.Equalizer.Active = equalizer->GetActive() != 0;
-		equalizer->GetPreamp(&state.Equalizer.Preamp);
-		const std::vector<double> gains = Gains(equalizer);
-		state.Equalizer.Bands.resize(gains.size());
-		for (std::size_t i = 0; i < gains.size(); ++i)
-		{
-			equalizer->GetBandFrequency(static_cast<INT32>(i), &state.Equalizer.Bands[i].Frequency);
-			state.Equalizer.Bands[i].Gain = gains[i];
-		}
-		state.Equalizer.Preset = MatchingPreset(core, gains);
-		equalizer->Release();
+		equalizer->GetBandFrequency(static_cast<INT32>(i), &state.Equalizer.Bands[i].Frequency);
+		state.Equalizer.Bands[i].Gain = gains[i];
 	}
+	state.Equalizer.Preset = MatchingPreset(core, gains);
+	equalizer->Release();
 	return state;
 }
 
 int player::EqualizerBandCount(IAIMPCore *core)
 {
 	IAIMPServicePlayerEqualizer *equalizer = Equalizer(core);
-	if (!equalizer)
-		return 0;
 	const int count = equalizer->GetBandCount();
 	equalizer->Release();
 	return count;
@@ -206,8 +210,6 @@ bool player::ApplyEffectsPatch(IAIMPCore *core, const EffectsPatch &patch)
 	if (!patch.EqualizerActive && !patch.Preamp && patch.Bands.empty())
 		return ok;
 	IAIMPServicePlayerEqualizer *equalizer = Equalizer(core);
-	if (!equalizer)
-		return false;
 	if (patch.EqualizerActive)
 		ok = Succeeded(equalizer->SetActive(*patch.EqualizerActive ? 1 : 0)) && ok;
 	if (patch.Preamp)
@@ -222,8 +224,6 @@ std::vector<std::string> player::EqualizerPresetNames(IAIMPCore *core)
 {
 	std::vector<std::string> names;
 	IAIMPServicePlayerEqualizerPresets *presets = Presets(core);
-	if (!presets)
-		return names;
 	const INT32 count = presets->GetPresetCount();
 	for (INT32 i = 0; i < count; ++i)
 	{
@@ -242,8 +242,6 @@ player::PresetResult player::ApplyEqualizerPreset(IAIMPCore *core, const std::st
 	return WithPreset(core, name, [&](IAIMPServicePlayerEqualizerPresets *, IAIMPEqualizerPreset *preset)
 					  {
 		IAIMPServicePlayerEqualizer *equalizer = Equalizer(core);
-		if (!equalizer)
-			return false;
 		const bool ok = Succeeded(equalizer->SetPreset(preset));
 		equalizer->Release();
 		return ok; });
@@ -252,8 +250,6 @@ player::PresetResult player::ApplyEqualizerPreset(IAIMPCore *core, const std::st
 player::PresetResult player::SaveEqualizerPreset(IAIMPCore *core, const std::string &name)
 {
 	IAIMPServicePlayerEqualizer *equalizer = Equalizer(core);
-	if (!equalizer)
-		return PresetResult::Failed;
 	const std::vector<double> gains = Gains(equalizer);
 	equalizer->Release();
 
@@ -268,8 +264,6 @@ player::PresetResult player::SaveEqualizerPreset(IAIMPCore *core, const std::str
 
 	// A new preset takes the current gains as it is added.
 	IAIMPServicePlayerEqualizerPresets *presets = Presets(core);
-	if (!presets)
-		return PresetResult::Failed;
 	PresetResult result = PresetResult::Failed;
 	if (IAIMPString *s = StringToIAIMPString(core, name))
 	{

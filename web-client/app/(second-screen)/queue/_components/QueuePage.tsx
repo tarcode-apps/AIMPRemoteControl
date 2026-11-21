@@ -233,10 +233,12 @@ export function QueuePage() {
                                     role="option"
                                     data-testid="item-row"
                                     aria-selected={isActive}
+                                    title={item.dead ? t('playlist.dead') : undefined}
                                     className={clsx(
                                         styles.row,
                                         index % 2 && styles.odd,
                                         isActive && styles.active,
+                                        item.dead && styles.missing,
                                         isPlaying(item) && styles.playing,
                                         drag.hidden(index) && styles.hidden,
                                     )}

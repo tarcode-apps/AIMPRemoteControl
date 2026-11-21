@@ -17,7 +17,7 @@
 
 void webapi::SearchController::Register(IEndpointRouteBuilder &endpoints)
 {
-	endpoints.MapApi(HttpMethod::Get, "/api/v1/search", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
+	endpoints.MapApi(HttpMethod::Get, "/api/v1/search", [core = FCore, &features = FFeatures, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {
 		player::SearchQuery query;
 		query.Search = SearchText(request);
@@ -34,7 +34,7 @@ void webapi::SearchController::Register(IEndpointRouteBuilder &endpoints)
 		// older, never newer, than it is.
 		const StateUpdateEvents::PlaylistRevisions revisions = events.CurrentPlaylistRevisions();
 		const std::optional<player::SearchResults> results = RunOnMainThread(core, [&]
-																			  { return player::SearchItems(core, query); });
+																			  { return player::SearchItems(core, features, query); });
 		if (!results)
 			throw ApiError(404, "playlistNotFound");
 

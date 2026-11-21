@@ -302,6 +302,13 @@ export function useSortPlaylist(id: string) {
     });
 }
 
+export function useRemoveNonExistent() {
+    return useMutation({
+        mutationFn: (id: string) =>
+            request<{ removed: number }>('POST', `/playlists/${encodeURIComponent(id)}/items/removeNonExistent`),
+    });
+}
+
 export function useMovePlaylistItems(id: string) {
     return useMutation({
         mutationFn: (body: MoveRequest) =>

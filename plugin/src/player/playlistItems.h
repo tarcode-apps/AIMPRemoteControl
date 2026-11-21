@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "coverSource.h"
+#include "playerFeatures.h"
 #include "playlistItemContext.h"
 
 class IAIMPCore;
@@ -47,6 +48,7 @@ namespace player
 		std::int64_t Size = 0;	 // bytes
 		TrackMarks Marks;
 		bool Enabled = true;
+		bool Dead = false; // the player did not find the file when it last tried to play it
 		bool IsUrl = false;
 		bool InContainer = false; // a part of a container file, such as one track of a CUE sheet
 		CoverSource Cover;
@@ -117,7 +119,8 @@ namespace player
 		IAIMPServiceFileInfoFormatter *FFormatter = nullptr;
 	};
 
-	PlaylistItem ReadPlaylistItem(const PlaylistItemContext &ctx, std::int32_t index, const SecondLineFormatter &secondLine);
+	PlaylistItem ReadPlaylistItem(const PlaylistItemContext &ctx, std::int32_t index, const SecondLineFormatter &secondLine,
+								  const PlayerFeatures &features);
 
 	// What a selection names in one playlist: the `Indexes`, or the `Ranges`,
 	// inclusive spans of positions in the list the selection's search gives, each
@@ -184,7 +187,8 @@ namespace player
 
 	// Nullopt when the playlist is not loaded. `Total` counts the matches of `Search`
 	// over the whole playlist, or every item when the search is empty.
-	std::optional<ItemsPage> GetPlaylistItems(IAIMPCore *core, const std::string &playlistId, const ItemsQuery &query);
+	std::optional<ItemsPage> GetPlaylistItems(IAIMPCore *core, const PlayerFeatures &features, const std::string &playlistId,
+											  const ItemsQuery &query);
 
 	// Nullopt when the playlist is not loaded; empty when it is not grouped. With a
 	// search, `Count`, `Duration` and `FirstPosition` describe the matching items only,
@@ -216,7 +220,7 @@ namespace player
 
 	// The selected items with their tag fields, playlist by playlist and in playlist
 	// order; the second line is formatted whether or not the playlist shows it.
-	MutationResult DescribeItems(IAIMPCore *core, const ItemsSelection &selection, std::vector<ItemDetails> &items,
+	MutationResult DescribeItems(IAIMPCore *core, const PlayerFeatures &features, const ItemsSelection &selection, std::vector<ItemDetails> &items,
 								 std::size_t &failedPlaylist);
 
 	MutationResult SummarizeItems(IAIMPCore *core, const ItemsSelection &selection, ItemsSummary &summary,
@@ -265,6 +269,10 @@ namespace player
 	// Takes the items at the sorted `indexes` out of the playlist in one pass, with
 	// `physically` also deleting their files from disk, as the player's own command does.
 	HRESULT DeleteItems(IAIMPPlaylist *playlist, const std::vector<std::int32_t> &indexes, bool physically);
+
+	// Takes the tracks whose files are gone out of the playlist, as the player's own
+	// command does in the active one; streams stay. `removed` is how many went.
+	MutationResult RemoveNonExistent(IAIMPCore *core, const std::string &playlistId, std::int32_t &removed);
 
 	// Removes the selected items; with `physically` their files go too. A selection
 	// is refused as a whole when it has a part of a container file, or files that

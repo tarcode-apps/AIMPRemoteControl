@@ -53,6 +53,7 @@ function snapshotItem(record: FavoriteRecord): PlaylistItem {
         rating: 0,
         displayingMark: 0,
         enabled: true,
+        dead: false,
         isUrl: record.isUrl,
         inContainer: false,
         cover: '',
@@ -383,12 +384,18 @@ export function FavoritesPage() {
                                     role="option"
                                     data-testid="item-row"
                                     aria-selected={isActive}
-                                    title={located ? undefined : t('favorites.missing')}
+                                    title={
+                                        !located
+                                            ? t('favorites.missing')
+                                            : located.dead
+                                              ? t('playlist.dead')
+                                              : undefined
+                                    }
                                     className={clsx(
                                         styles.row,
                                         index % 2 && styles.odd,
                                         isActive && styles.active,
-                                        !located && styles.missing,
+                                        (!located || located.dead) && styles.missing,
                                         located && isPlaying(located) && styles.playing,
                                         hidden && styles.hidden,
                                     )}

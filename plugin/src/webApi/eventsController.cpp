@@ -22,12 +22,13 @@ namespace
 	constexpr std::chrono::seconds KeepAliveInterval{30};
 	constexpr std::chrono::milliseconds BurstInterval{100};
 
-	std::string HelloData(const std::string &aimpVersion, const SharedSettings &settings)
+	std::string HelloData(const std::string &aimpVersion, const player::PlayerFeatures &features, const SharedSettings &settings)
 	{
 		return nlohmann::json{
 			{"pluginVersion", PLUGIN_VERSION_STRING},
 			{"aimpVersion", aimpVersion},
 			{"name", settings.Get().EffectivePlayerName()},
+			{"features", {{"groupShuffle", features.GroupShuffle}}},
 		}.dump();
 	}
 
@@ -89,18 +90,18 @@ namespace
 	}
 }
 
-webapi::EventsController::EventsController(IAIMPCore *core, StateUpdateEvents &events, CoverIndex &covers,
-										   const SharedSettings &settings, const SleepTimer &timer)
-	: FCore(core), FEvents(events), FCovers(covers), FSettings(settings), FTimer(timer),
+webapi::EventsController::EventsController(IAIMPCore *core, const player::PlayerFeatures &features, StateUpdateEvents &events,
+										   CoverIndex &covers, const SharedSettings &settings, const SleepTimer &timer)
+	: FCore(core), FFeatures(features), FEvents(events), FCovers(covers), FSettings(settings), FTimer(timer),
 	  FAIMPVersion(player::AIMPVersion(core))
 {
 }
 
 void webapi::EventsController::Register(IEndpointRouteBuilder &endpoints)
 {
-	endpoints.MapEventStream("/api/v1/events", [core = FCore, &events = FEvents, &covers = FCovers, &settings = FSettings, &timer = FTimer, &aimpVersion = FAIMPVersion](IEventStream &stream)
+	endpoints.MapEventStream("/api/v1/events", [core = FCore, &features = FFeatures, &events = FEvents, &covers = FCovers, &settings = FSettings, &timer = FTimer, &aimpVersion = FAIMPVersion](IEventStream &stream)
 					   {
-		std::string hello = HelloData(aimpVersion, settings);
+		std::string hello = HelloData(aimpVersion, features, settings);
 		if (!stream.Send("hello", hello))
 			return;
 
@@ -136,7 +137,7 @@ void webapi::EventsController::Register(IEndpointRouteBuilder &endpoints)
 					return;
 			if (changed.test(StateUpdateEvents::Settings))
 			{
-				std::string renamed = HelloData(aimpVersion, settings);
+				std::string renamed = HelloData(aimpVersion, features, settings);
 				if (renamed != hello && !stream.Send("hello", renamed))
 					return;
 				hello = std::move(renamed);

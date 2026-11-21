@@ -101,6 +101,7 @@ test.describe('items', () => {
             duration: expect.closeTo(2, 0),
             mark: 0,
             enabled: true,
+            dead: false,
             isUrl: false,
             inContainer: false,
             fileUri: playlist.files[0],
@@ -109,6 +110,30 @@ test.describe('items', () => {
         const listed = await api.playlist(playlist.id);
         expect(listed!.duration).toBeCloseTo(5, 0);
         expect(listed!.size).toBe(page.items[0].size + page.items[1].size);
+    });
+
+    test('a track the player skipped for want of its file is dead until it plays again', async ({
+        api,
+        events,
+        playlists,
+    }) => {
+        const playlist = await playlists.create({ tracks: [{ seconds: 20 }, { seconds: 20 }, { seconds: 20 }] });
+        const missing = playlist.files[1];
+        const kept = `${missing}.kept`;
+        fs.renameSync(missing, kept);
+        const before = (await api.playlist(playlist.id))!.revision;
+        const announced = events.next<{ playlists: { id: string; revision: number }[] }>('playlists', data =>
+            data.playlists.some(p => p.id === playlist.id && p.revision > before),
+        );
+
+        await api.play(playlist.id, 1);
+        await expect.poll(async () => (await api.player()).track?.index).toBe(2);
+        await announced;
+        expect((await api.items(playlist.id)).items.map(item => item.dead)).toEqual([false, true, false]);
+
+        fs.renameSync(kept, missing);
+        await api.play(playlist.id, 1);
+        await expect.poll(async () => (await api.items(playlist.id)).items[1].dead).toBe(false);
     });
 
     test('pages and refuses pages out of bounds', async ({ api, playlists }) => {

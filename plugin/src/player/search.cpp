@@ -43,7 +43,7 @@ namespace
 	}
 }
 
-std::optional<player::SearchResults> player::SearchItems(IAIMPCore *core, const SearchQuery &query)
+std::optional<player::SearchResults> player::SearchItems(IAIMPCore *core, const PlayerFeatures &features, const SearchQuery &query)
 {
 	std::optional<std::vector<IAIMPPlaylist *>> playlists = ScopePlaylists(core, query.PlaylistIds);
 	if (!playlists)
@@ -72,7 +72,7 @@ std::optional<player::SearchResults> player::SearchItems(IAIMPCore *core, const 
 				{
 					if (!secondLine)
 						secondLine.emplace(core, playlist, true);
-					results.Items.push_back({info.Id, ReadPlaylistItem(ctx, i, *secondLine)});
+					results.Items.push_back({info.Id, ReadPlaylistItem(ctx, i, *secondLine, features)});
 				}
 				AddToSummary(ctx, results.Matches);
 				AddToSummary(ctx, info.Matches);

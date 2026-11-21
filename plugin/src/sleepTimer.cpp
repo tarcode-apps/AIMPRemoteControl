@@ -1,6 +1,7 @@
 #include "sleepTimer.h"
 
 #include <algorithm>
+#include <stdexcept>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -144,10 +145,27 @@ void SleepTimer::Start(IAIMPCore *core, StateUpdateEvents &events)
 	FCore = core;
 	FEvents = &events;
 	FStopped = false;
+	FFailed = false;
 	events.OnStreamEnd([this](unsigned flags)
 					   { StreamEnded(flags); });
+	// An error, such as a task the player did not complete, stops the thread and
+	// the timer, not the player.
 	FThread = std::thread([this]
-						  { Run(); });
+						  {
+		try
+		{
+			Run();
+		}
+		catch (...)
+		{
+			{
+				std::lock_guard lock(FMutex);
+				FFailed = true;
+				FState.Active = false;
+				++FGeneration;
+			}
+			FEvents->Notify(StateUpdateEvents::Timer);
+		} });
 }
 
 void SleepTimer::Stop()
@@ -176,6 +194,8 @@ void SleepTimer::Set(const Request &request)
 {
 	{
 		std::lock_guard lock(FMutex);
+		if (FFailed && IsTimed(request.When))
+			throw std::runtime_error("The sleep timer's thread has stopped on an error");
 		static_cast<Request &>(FState) = request;
 		FState.Active = true;
 		FState.SetAt = Clock::now();

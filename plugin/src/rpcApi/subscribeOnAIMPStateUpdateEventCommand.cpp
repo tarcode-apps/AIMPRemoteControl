@@ -33,7 +33,7 @@ namespace
 void rpcapi::SubscribeOnAIMPStateUpdateEventCommand::Register(IEndpointRouteBuilder &endpoints)
 {
 	endpoints.MapRpc("SubscribeOnAIMPStateUpdateEvent",
-			[core = FCore, &idManager = FIdManager, &events = FEvents, &timer = FTimer](const nlohmann::json &params) -> nlohmann::json
+			[core = FCore, &features = FFeatures, &idManager = FIdManager, &events = FEvents, &timer = FTimer](const nlohmann::json &params) -> nlohmann::json
 			{
 				const StateUpdateEvents::Kind kind = KindFor(params.value("event", std::string()));
 
@@ -53,7 +53,7 @@ void rpcapi::SubscribeOnAIMPStateUpdateEventCommand::Register(IEndpointRouteBuil
 				case StateUpdateEvents::Playlists:
 					return {{"event", "playlists_changed"},
 							{"playlists", RunOnMainThread(core, [&]
-														  { return GetPlaylistsCommand::BuildPlaylists(core, idManager, {"id", "crc32"}); })}};
+														  { return GetPlaylistsCommand::BuildPlaylists(core, features, idManager, {"id", "crc32"}); })}};
 				case StateUpdateEvents::Timer:
 					return SchedulerCommand::BuildTimerState(timer);
 				case StateUpdateEvents::Queue:

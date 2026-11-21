@@ -25,4 +25,7 @@ std::string ToStringAndRelease(IAIMPString *s);
 IAIMPString *StringToIAIMPString(IAIMPCore *core, const std::string &utf8);
 
 std::string GetPropertyAsString(IAIMPPropertyList *props, INT32 propertyId);
+// The properties of a playlist, null when it gives none; released by the caller. Asked
+// for as IAIMPPropertyList: players before v5.40 do not give IAIMPPlaylistProperties.
+IAIMPPropertyList *PlaylistProperties(IAIMPPlaylist *playlist);
 std::string Localize(IAIMPCore *core, const std::string &keyPath, const std::string &fallback);

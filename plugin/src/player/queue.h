@@ -45,7 +45,7 @@ namespace player
 											std::int32_t position)>;
 
 	void VisitQueueItems(IAIMPCore *core, const QueueVisitor &visit);
-	QueueSnapshot GetQueue(IAIMPCore *core);
+	QueueSnapshot GetQueue(IAIMPCore *core, const PlayerFeatures &features);
 	QueueState GetQueueState(IAIMPCore *core);
 
 	// Adds the selected items, playlist by playlist and in playlist order, to the

@@ -7,6 +7,11 @@
 class IAIMPCore;
 class StateUpdateEvents;
 
+namespace player
+{
+	struct PlayerFeatures;
+}
+
 namespace webapi
 {
 	class CoverIndex;
@@ -14,8 +19,8 @@ namespace webapi
 	class PlayerController : public IApiController
 	{
 	public:
-		PlayerController(IAIMPCore *core, StateUpdateEvents &events, CoverIndex &covers)
-			: FCore(core), FEvents(events), FCovers(covers) {}
+		PlayerController(IAIMPCore *core, const player::PlayerFeatures &features, StateUpdateEvents &events, CoverIndex &covers)
+			: FCore(core), FFeatures(features), FEvents(events), FCovers(covers) {}
 
 		void Register(IEndpointRouteBuilder &endpoints) override;
 
@@ -24,6 +29,7 @@ namespace webapi
 
 	private:
 		IAIMPCore *FCore;
+		const player::PlayerFeatures &FFeatures;
 		StateUpdateEvents &FEvents;
 		CoverIndex &FCovers;
 	};

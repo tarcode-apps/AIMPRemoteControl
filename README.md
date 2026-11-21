@@ -45,8 +45,9 @@ Android app reaches the file browser through its upload menu, so there it needs 
    Plugins_ and click _install_. The package contains the builds for all platforms; AIMP picks the right one.
 3. Enable the plugin in _Options → Plugins_, then open `http://<address>:3333/` in a browser (see [Setup](#setup)).
 
-Tested with AIMP 5 and AIMP 6.0 on Windows and Linux. AIMP 6.0 build 3090 or later reports its playlist view settings
-and their changes itself; the plugin works around their absence in older versions.
+The plugin needs AIMP 5.00 or later and does not start in an older player. Tested with AIMP 5.00 to 5.40 on Windows and
+AIMP 6.0 on Windows and Linux. AIMP 6.0 build 3090 or later reports its playlist view settings and their changes itself;
+the plugin works around their absence in older versions.
 
 ## Setup
 

@@ -28,6 +28,22 @@ export class ListScreen {
         return this.rows.filter({ hasText: text });
     }
 
+    // How opaque the title of a row shows: the opacities from the title up to the
+    // row multiplied, past the elements laid out as contents, which have no box to fade.
+    titleOpacity(title: string): Promise<number> {
+        return this.row(title)
+            .getByText(title)
+            .first()
+            .evaluate(element => {
+                let opacity = 1;
+                for (let e: Element | null = element; e && e.getAttribute('role') !== 'option'; e = e.parentElement) {
+                    const style = getComputedStyle(e);
+                    if (style.display !== 'contents') opacity *= Number(style.opacity);
+                }
+                return opacity;
+            });
+    }
+
     groupRow(name: string): Locator {
         return this.list.getByTestId('group-row').filter({ hasText: name });
     }

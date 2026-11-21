@@ -22,6 +22,7 @@ namespace webapi
 			{"rating", item.Marks.Rating},
 			{"displayingMark", item.Marks.DisplayingMark},
 			{"enabled", item.Enabled},
+			{"dead", item.Dead},
 			{"isUrl", item.IsUrl},
 			{"inContainer", item.InContainer},
 			{"cover", player::CoverKey(item.Cover)},

@@ -37,6 +37,34 @@ namespace
 		return Succeeded(dispatcher->Send(property, AIMP_MSG_PROPVALUE_SET, &raw));
 	}
 
+	// AIMP_MSG_PROPERTY_REPEAT_MODE values.
+	INT32 RepeatModeValue(player::RepeatMode mode)
+	{
+		switch (mode)
+		{
+		case player::RepeatMode::Track:
+			return 1;
+		case player::RepeatMode::Playlist:
+			return 2;
+		default:
+			return 0;
+		}
+	}
+
+	// Players without the repeat mode: the track repeat and the action at the end of a playlist.
+	bool SetRepeatByParts(IAIMPServiceMessageDispatcher *dispatcher, player::RepeatMode mode)
+	{
+		bool ok = SetBoolProperty(dispatcher, AIMP_MSG_PROPERTY_REPEAT, mode == player::RepeatMode::Track);
+		INT32 onEnd = JumpToNextPlaylistOnEnd;
+		dispatcher->Send(AIMP_MSG_PROPERTY_ACTION_ON_END_OF_PLAYLIST, AIMP_MSG_PROPVALUE_GET, &onEnd);
+		// Leaving the playlist repeat restores the default; "do nothing" is kept.
+		if (mode == player::RepeatMode::Playlist)
+			onEnd = RepeatPlaylistOnEnd;
+		else if (onEnd == RepeatPlaylistOnEnd)
+			onEnd = JumpToNextPlaylistOnEnd;
+		return Succeeded(dispatcher->Send(AIMP_MSG_PROPERTY_ACTION_ON_END_OF_PLAYLIST, AIMP_MSG_PROPVALUE_SET, &onEnd)) && ok;
+	}
+
 	player::PlaybackState ToPlaybackState(INT32 state)
 	{
 		switch (state)
@@ -177,8 +205,8 @@ std::optional<player::Cursor> player::GetCursor(IAIMPCore *core)
 		if (Failed(mgr->GetActivePlaylist(&playlist)))
 			playlist = nullptr;
 		mgr->Release();
-		IAIMPPlaylistProperties *props = nullptr;
-		if (playlist && Succeeded(playlist->QueryInterface(IID_IAIMPPlaylistProperties, reinterpret_cast<void **>(&props))) && props)
+		IAIMPPropertyList *props = PlaylistProperties(playlist);
+		if (props)
 		{
 			// The focus may be on a group; the playback cursor then stands in.
 			if (Failed(props->GetValueAsObject(AIMP_PLAYLIST_PROPID_FOCUSED_OBJECT, IID_IAIMPPlaylistItem, reinterpret_cast<void **>(&item))))
@@ -249,7 +277,7 @@ player::MutationResult player::PlayPlaylistItem(IAIMPCore *core, const std::stri
 	return ok ? MutationResult::Ok : MutationResult::Failed;
 }
 
-bool player::ApplyPlayerPatch(IAIMPCore *core, const PlayerPatch &patch)
+bool player::ApplyPlayerPatch(IAIMPCore *core, const PlayerFeatures &features, const PlayerPatch &patch)
 {
 	bool ok = true;
 	if (IAIMPServicePlayer *player = PlayerService(core))
@@ -269,18 +297,13 @@ bool player::ApplyPlayerPatch(IAIMPCore *core, const PlayerPatch &patch)
 		IAIMPServiceMessageDispatcher *dispatcher = DispatcherService(core);
 		if (!dispatcher)
 			return false;
-		if (patch.Repeat)
+		if (patch.Repeat && features.RepeatModeProperty)
 		{
-			ok = SetBoolProperty(dispatcher, AIMP_MSG_PROPERTY_REPEAT, *patch.Repeat == RepeatMode::Track) && ok;
-			INT32 onEnd = JumpToNextPlaylistOnEnd;
-			dispatcher->Send(AIMP_MSG_PROPERTY_ACTION_ON_END_OF_PLAYLIST, AIMP_MSG_PROPVALUE_GET, &onEnd);
-			// Leaving the playlist repeat restores the default; "do nothing" is kept.
-			if (*patch.Repeat == RepeatMode::Playlist)
-				onEnd = RepeatPlaylistOnEnd;
-			else if (onEnd == RepeatPlaylistOnEnd)
-				onEnd = JumpToNextPlaylistOnEnd;
-			ok = Succeeded(dispatcher->Send(AIMP_MSG_PROPERTY_ACTION_ON_END_OF_PLAYLIST, AIMP_MSG_PROPVALUE_SET, &onEnd)) && ok;
+			INT32 mode = RepeatModeValue(*patch.Repeat);
+			ok = Succeeded(dispatcher->Send(AIMP_MSG_PROPERTY_REPEAT_MODE, AIMP_MSG_PROPVALUE_SET, &mode)) && ok;
 		}
+		else if (patch.Repeat)
+			ok = SetRepeatByParts(dispatcher, *patch.Repeat) && ok;
 		if (patch.Shuffle)
 			ok = SetBoolProperty(dispatcher, AIMP_MSG_PROPERTY_SHUFFLE, *patch.Shuffle) && ok;
 		if (patch.RadioCapture)

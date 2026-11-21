@@ -39,14 +39,14 @@ void webapi::ItemsController::Register(IEndpointRouteBuilder &endpoints)
 		ThrowUnlessOk(result, body, failedPlaylist);
 		return nlohmann::json::object(); });
 
-	endpoints.MapApi(HttpMethod::Post, "/api/v1/items/details", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
+	endpoints.MapApi(HttpMethod::Post, "/api/v1/items/details", [core = FCore, &features = FFeatures, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {
 		const RequestSelection body = SelectionBody(request.Body);
 		CheckSelectionRevisions(body, events);
 		std::size_t failedPlaylist = 0;
 		std::vector<player::ItemDetails> details;
 		const player::MutationResult result = RunOnMainThread(core, [&]
-															  { return player::DescribeItems(core, body.Items, details, failedPlaylist); });
+															  { return player::DescribeItems(core, features, body.Items, details, failedPlaylist); });
 		ThrowUnlessOk(result, body, failedPlaylist);
 		const StateUpdateEvents::PlaylistRevisions revisions = events.CurrentPlaylistRevisions();
 		nlohmann::json items = nlohmann::json::array();

@@ -2,8 +2,10 @@
 
 #include "apiPlugin.h"
 #include "IUnknownImpl.h"
+#include "listenerStatus.h"
 #include "networkWatcher.h"
 #include "optionsFrame.h"
+#include "player/playerFeatures.h"
 #include "rpcApi/helpers/remoteControlIdManager.h"
 #include "remoteControlServer.h"
 #include "serviceDiscoveryServer.h"
@@ -24,6 +26,8 @@ public:
 
 private:
 	IAIMPCore *FCore = nullptr;
+	player::PlayerFeatures FFeatures;
+	ListenerStatus FListenerStatus;
 	OptionsFrame *FOptionsFrame = nullptr;
 	AIMPServiceDiscoveryServer FDiscoveryServer;
 	std::unique_ptr<AIMPRemoteControlServer> FRemoteControlServer;

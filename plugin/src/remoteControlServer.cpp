@@ -20,6 +20,7 @@
 
 #include "digestAuthenticator.h"
 #include "joinPumpingMessages.h"
+#include "listenerStatus.h"
 #include "moduleDirectory.h"
 #include "networkWatcher.h"
 #include "requestScope.h"
@@ -58,6 +59,19 @@ namespace
 		std::function<bool()> ConnectionClosed;
 	};
 	thread_local CurrentRequest Current;
+
+	// One listener per address and port. httplib's default lets another process listen on
+	// the same one (SO_REUSEADDR on Windows, SO_REUSEPORT on Linux), and a second player
+	// would then share the connections instead of being told the port is taken.
+	void ExclusivePort(socket_t sock)
+	{
+#ifdef _WIN32
+		httplib::set_socket_opt(sock, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, 1);
+#else
+		// Lets a restart listen while the old connections are in TIME_WAIT.
+		httplib::set_socket_opt(sock, SOL_SOCKET, SO_REUSEADDR, 1);
+#endif
+	}
 }
 
 bool requestScope::Cancelled()
@@ -110,6 +124,7 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 	jsonrpc::JsonRpcServer Rpc;
 	DigestAuthenticator Auth;
 	NetworkWatcher &Network;
+	ListenerStatus &Status;
 	MessageLocalizer LocalizeMessage;
 
 	std::mutex ListenersMutex;
@@ -121,8 +136,8 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 
 	const std::filesystem::path WwwRoot = ModuleDirectory() / "wwwroot";
 
-	Impl(std::vector<std::unique_ptr<IApiController>> commands, NetworkWatcher &network, MessageLocalizer localize)
-		: Commands(std::move(commands)), Network(network), LocalizeMessage(std::move(localize))
+	Impl(std::vector<std::unique_ptr<IApiController>> commands, NetworkWatcher &network, ListenerStatus &listenerStatus, MessageLocalizer localize)
+		: Commands(std::move(commands)), Network(network), Status(listenerStatus), LocalizeMessage(std::move(localize))
 	{
 		Routes.push_back([this](httplib::Server &http)
 						 {
@@ -527,9 +542,10 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 				continue;
 			}
 			complete = false;
-			if (BindFailure && ReportedBindFailures.insert(a.Address).second)
+			if (ReportedBindFailures.insert(a.Address).second && BindFailure)
 				BindFailure(a.Address, Port);
 		}
+		Status.SetTakenAddresses(ReportedBindFailures);
 		return complete;
 	}
 
@@ -538,6 +554,7 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 		Listener listener;
 		listener.Address = address;
 		listener.Http = std::make_unique<httplib::Server>();
+		listener.Http->set_socket_options(ExclusivePort);
 		listener.Http->new_task_queue = []
 		{ return new httplib::ThreadPool(BaseWorkers, MaxWorkers, MaxQueuedConnections); };
 		listener.Http->set_pre_request_handler([state = listener.State](const httplib::Request &req, httplib::Response &)
@@ -573,8 +590,9 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 	}
 };
 
-AIMPRemoteControlServer::AIMPRemoteControlServer(std::vector<std::unique_ptr<IApiController>> commands, NetworkWatcher &network, MessageLocalizer localize)
-	: FImpl(std::make_unique<Impl>(std::move(commands), network, std::move(localize))) {}
+AIMPRemoteControlServer::AIMPRemoteControlServer(std::vector<std::unique_ptr<IApiController>> commands, NetworkWatcher &network,
+												 ListenerStatus &listenerStatus, MessageLocalizer localize)
+	: FImpl(std::make_unique<Impl>(std::move(commands), network, listenerStatus, std::move(localize))) {}
 
 AIMPRemoteControlServer::~AIMPRemoteControlServer() { Stop(); }
 

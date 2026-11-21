@@ -38,7 +38,7 @@ public:
 	StateUpdateEvents(const StateUpdateEvents &) = delete;
 	StateUpdateEvents &operator=(const StateUpdateEvents &) = delete;
 
-	void Start(IAIMPCore *core);
+	void Start(IAIMPCore *core, const player::PlayerFeatures &features);
 	void Stop();
 
 	// Waits end early, without a change, once `cancelled` says so; it is asked

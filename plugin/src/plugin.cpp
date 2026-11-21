@@ -87,16 +87,20 @@ DWORD WINAPI AIMPPlugin::InfoGetCategories()
 
 HRESULT WINAPI AIMPPlugin::Initialize(IAIMPCore *Core)
 {
-	if (!HasService(Core, IID_IAIMPServicePlayer) ||
+	if (!player::IsSupportedPlayer(Core) ||
+		!HasService(Core, IID_IAIMPServicePlayer) ||
 		!HasService(Core, IID_IAIMPServicePlaylistManager) ||
 		!HasService(Core, IID_IAIMPServiceMessageDispatcher) ||
-		!HasService(Core, IID_IAIMPServiceThreads))
+		!HasService(Core, IID_IAIMPServiceThreads) ||
+		!HasService(Core, IID_IAIMPServicePlayerEqualizer) ||
+		!HasService(Core, IID_IAIMPServicePlayerEqualizerPresets))
 		return E_FAIL;
 
 	FCore = Core;
+	FFeatures = player::DetectPlayerFeatures(Core);
 	FSettings.Set(Settings::Load(Core));
 	FNetworkWatcher.SetExcludedInterfaces(FSettings.Get().Network.ExcludedInterfaces);
-	FOptionsFrame = new OptionsFrame(Core, [this](const Settings &s)
+	FOptionsFrame = new OptionsFrame(Core, FFeatures, FListenerStatus, [this](const Settings &s)
 									 {
 		FSettings.Set(s);
 		FStateEvents.Notify(StateUpdateEvents::Settings);
@@ -111,15 +115,21 @@ HRESULT WINAPI AIMPPlugin::Initialize(IAIMPCore *Core)
 		FOptionsFrame = nullptr;
 		return E_FAIL;
 	}
+	// The task holds the page: it may run after Finalize has let it go.
+	FOptionsFrame->AddRef();
+	FListenerStatus.OnChange([core = Core, frame = std::shared_ptr<OptionsFrame>(FOptionsFrame, [](OptionsFrame *f)
+																				  { f->Release(); })]
+						   { PostToMainThread(core, [frame]
+											  { frame->ShowTakenAddresses(); }); });
 	
-	FStateEvents.Start(Core);
+	FStateEvents.Start(Core, FFeatures);
 	FCoverIndex = std::make_unique<webapi::CoverIndex>(Core);
 	FSleepTimer.Start(Core, FStateEvents);
 	FDiscoveryServer.Start(FNetworkWatcher, FSettings);
 
 	std::vector<std::unique_ptr<IApiController>> commands;
 	commands.push_back(std::make_unique<rpcapi::VersionCommand>(Core));
-	commands.push_back(std::make_unique<rpcapi::GetPlaylistsCommand>(Core, FIdManager));
+	commands.push_back(std::make_unique<rpcapi::GetPlaylistsCommand>(Core, FFeatures, FIdManager));
 	commands.push_back(std::make_unique<rpcapi::GetQueuedEntriesCommand>(Core, FIdManager));
 	commands.push_back(std::make_unique<rpcapi::GetPlaylistEntriesCommand>(Core, FIdManager));
 	commands.push_back(std::make_unique<rpcapi::GetPlaylistEntryInfoCommand>(Core, FIdManager));
@@ -150,19 +160,19 @@ HRESULT WINAPI AIMPPlugin::Initialize(IAIMPCore *Core)
 	commands.push_back(std::make_unique<rpcapi::AddUrlToPlaylistCommand>(Core, FIdManager));
 	commands.push_back(std::make_unique<rpcapi::UploadTrackCommand>(Core, FIdManager, FSettings));
 	commands.push_back(std::make_unique<rpcapi::StatusCommand>(Core));
-	commands.push_back(std::make_unique<rpcapi::SubscribeOnAIMPStateUpdateEventCommand>(Core, FIdManager, FStateEvents, FSleepTimer));
-	commands.push_back(std::make_unique<webapi::PlaylistsController>(Core, FStateEvents, FSettings));
+	commands.push_back(std::make_unique<rpcapi::SubscribeOnAIMPStateUpdateEventCommand>(Core, FFeatures, FIdManager, FStateEvents, FSleepTimer));
+	commands.push_back(std::make_unique<webapi::PlaylistsController>(Core, FFeatures, FStateEvents, FSettings));
 	commands.push_back(std::make_unique<webapi::FilesController>(Core, FSettings));
 	commands.push_back(std::make_unique<webapi::SettingsController>(FSettings));
-	commands.push_back(std::make_unique<webapi::QueueController>(Core, FStateEvents));
-	commands.push_back(std::make_unique<webapi::SearchController>(Core, FStateEvents));
-	commands.push_back(std::make_unique<webapi::PlayerController>(Core, FStateEvents, *FCoverIndex));
+	commands.push_back(std::make_unique<webapi::QueueController>(Core, FFeatures, FStateEvents));
+	commands.push_back(std::make_unique<webapi::SearchController>(Core, FFeatures, FStateEvents));
+	commands.push_back(std::make_unique<webapi::PlayerController>(Core, FFeatures, FStateEvents, *FCoverIndex));
 	commands.push_back(std::make_unique<webapi::CoversController>(Core, FStateEvents, *FCoverIndex));
 	commands.push_back(std::make_unique<webapi::TimerController>(FSleepTimer, FSettings));
 	commands.push_back(std::make_unique<webapi::EffectsController>(Core, FStateEvents));
-	commands.push_back(std::make_unique<webapi::ItemsController>(Core, FStateEvents, FSettings));
-	commands.push_back(std::make_unique<webapi::EventsController>(Core, FStateEvents, *FCoverIndex, FSettings, FSleepTimer));
-	FRemoteControlServer = std::make_unique<AIMPRemoteControlServer>(std::move(commands), FNetworkWatcher,
+	commands.push_back(std::make_unique<webapi::ItemsController>(Core, FFeatures, FStateEvents, FSettings));
+	commands.push_back(std::make_unique<webapi::EventsController>(Core, FFeatures, FStateEvents, *FCoverIndex, FSettings, FSleepTimer));
+	FRemoteControlServer = std::make_unique<AIMPRemoteControlServer>(std::move(commands), FNetworkWatcher, FListenerStatus,
 		[core = FCore](const std::string &keyPath)
 		{
 			return RunOnMainThread(core, [&]
@@ -194,6 +204,7 @@ HRESULT WINAPI AIMPPlugin::Initialize(IAIMPCore *Core)
 HRESULT WINAPI AIMPPlugin::Finalize()
 {
 	FNetworkWatcher.Stop();
+	FListenerStatus.OnChange(nullptr);
 	FSleepTimer.Stop();
 	FStateEvents.Stop();
 	// The handlers use the cover index until the server has joined its workers.

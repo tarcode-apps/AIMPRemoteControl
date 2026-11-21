@@ -266,10 +266,10 @@ namespace
 
 void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 {
-	endpoints.MapApi(HttpMethod::Get, "/api/v1/playlists", [core = FCore, &events = FEvents](const ApiRequest &) -> nlohmann::json
+	endpoints.MapApi(HttpMethod::Get, "/api/v1/playlists", [core = FCore, &features = FFeatures, &events = FEvents](const ApiRequest &) -> nlohmann::json
 			   {
 		const std::vector<player::PlaylistInfo> playlists = RunOnMainThread(core, [&]
-																			 { return player::GetPlaylists(core); });
+																			 { return player::GetPlaylists(core, features); });
 		const StateUpdateEvents::PlaylistRevisions revisions = events.CurrentPlaylistRevisions();
 		nlohmann::json result = nlohmann::json::array();
 		for (const player::PlaylistInfo &playlist : playlists)
@@ -377,7 +377,7 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 		upload.Added();
 		return {{"id", id}}; });
 
-	endpoints.MapApi(HttpMethod::Get, R"(/api/v1/playlists/([^/]+)/items)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
+	endpoints.MapApi(HttpMethod::Get, R"(/api/v1/playlists/([^/]+)/items)", [core = FCore, &features = FFeatures, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {
 		const std::string playlistId = request.PathMatches.at(0);
 		player::ItemsQuery query;
@@ -389,7 +389,7 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 		// makes the page look older, never newer, than it is.
 		const std::uint64_t revision = events.PlaylistRevision(playlistId);
 		const std::optional<player::ItemsPage> page = RunOnMainThread(core, [&]
-																	   { return player::GetPlaylistItems(core, playlistId, query); });
+																	   { return player::GetPlaylistItems(core, features, playlistId, query); });
 		if (!page)
 			throw ApiError(404, "playlistNotFound");
 
@@ -477,7 +477,7 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 		content.Headers["Content-Disposition"] = webapi::AttachmentContentDisposition(PathToUtf8(path.filename()));
 		return content; });
 
-	endpoints.MapApi(HttpMethod::Post, "/api/v1/playlists/locate", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
+	endpoints.MapApi(HttpMethod::Post, "/api/v1/playlists/locate", [core = FCore, &features = FFeatures, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {
 		const nlohmann::json &body = request.Body;
 		if (!body.is_object() || !body.contains("items") || !body["items"].is_array())
@@ -496,7 +496,7 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 
 		const StateUpdateEvents::PlaylistRevisions revisions = events.CurrentPlaylistRevisions();
 		const std::vector<player::LocatedItem> located = RunOnMainThread(core, [&]
-																		  { return player::LocatePlaylistItems(core, requests); });
+																		  { return player::LocatePlaylistItems(core, features, requests); });
 		nlohmann::json found = nlohmann::json::array();
 		for (const player::LocatedItem &entry : located)
 			found.push_back(ItemJson(entry.Item, entry.PlaylistId, RevisionOf(revisions, entry.PlaylistId)));
@@ -531,6 +531,14 @@ void webapi::PlaylistsController::Register(IEndpointRouteBuilder &endpoints)
 		ThrowUnlessOk(RunOnMainThread(core, [&]
 									  { return player::SortPlaylist(core, playlistId, options); }));
 		return nlohmann::json::object(); });
+
+	endpoints.MapApi(HttpMethod::Post, R"(/api/v1/playlists/([^/]+)/items/removeNonExistent)", [core = FCore](const ApiRequest &request) -> nlohmann::json
+			   {
+		const std::string playlistId = request.PathMatches.at(0);
+		std::int32_t removed = 0;
+		ThrowUnlessOk(RunOnMainThread(core, [&]
+									  { return player::RemoveNonExistent(core, playlistId, removed); }));
+		return {{"removed", removed}}; });
 
 	endpoints.MapApi(HttpMethod::Post, R"(/api/v1/playlists/([^/]+)/items/move)", [core = FCore, &events = FEvents](const ApiRequest &request) -> nlohmann::json
 			   {

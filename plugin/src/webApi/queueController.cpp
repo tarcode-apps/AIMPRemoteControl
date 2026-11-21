@@ -41,11 +41,11 @@ namespace
 
 void webapi::QueueController::Register(IEndpointRouteBuilder &endpoints)
 {
-	endpoints.MapApi(HttpMethod::Get, "/api/v1/queue", [core = FCore, &events = FEvents](const ApiRequest &) -> nlohmann::json
+	endpoints.MapApi(HttpMethod::Get, "/api/v1/queue", [core = FCore, &features = FFeatures, &events = FEvents](const ApiRequest &) -> nlohmann::json
 			   {
 		const std::uint64_t revision = events.QueueRevision();
 		const player::QueueSnapshot queue = RunOnMainThread(core, [&]
-															 { return player::GetQueue(core); });
+															 { return player::GetQueue(core, features); });
 		nlohmann::json items = nlohmann::json::array();
 		for (const player::QueueItem &queued : queue.Items)
 			items.push_back(ToJson(queued));

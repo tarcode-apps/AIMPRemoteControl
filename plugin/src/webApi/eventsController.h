@@ -9,6 +9,11 @@ class SharedSettings;
 class SleepTimer;
 class StateUpdateEvents;
 
+namespace player
+{
+	struct PlayerFeatures;
+}
+
 namespace webapi
 {
 	class CoverIndex;
@@ -16,13 +21,14 @@ namespace webapi
 	class EventsController : public IApiController
 	{
 	public:
-		EventsController(IAIMPCore *core, StateUpdateEvents &events, CoverIndex &covers, const SharedSettings &settings,
-						 const SleepTimer &timer);
+		EventsController(IAIMPCore *core, const player::PlayerFeatures &features, StateUpdateEvents &events, CoverIndex &covers,
+						 const SharedSettings &settings, const SleepTimer &timer);
 
 		void Register(IEndpointRouteBuilder &endpoints) override;
 
 	private:
 		IAIMPCore *FCore;
+		const player::PlayerFeatures &FFeatures;
 		StateUpdateEvents &FEvents;
 		CoverIndex &FCovers;
 		const SharedSettings &FSettings;

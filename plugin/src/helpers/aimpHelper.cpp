@@ -21,6 +21,14 @@ std::string GetPropertyAsString(IAIMPPropertyList *props, INT32 propertyId)
 	return result;
 }
 
+IAIMPPropertyList *PlaylistProperties(IAIMPPlaylist *playlist)
+{
+	IAIMPPropertyList *props = nullptr;
+	if (!playlist || Failed(playlist->QueryInterface(IID_IAIMPPropertyList, reinterpret_cast<void **>(&props))))
+		return nullptr;
+	return props;
+}
+
 std::string IAIMPStringToString(IAIMPString *s)
 {
 	if (!s)

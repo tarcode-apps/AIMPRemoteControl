@@ -25,9 +25,9 @@
 }
 
 // A row whose track the player no longer has, such as a favorite that left its
-// playlist: shown from its snapshot, but nothing can be done with it.
-.row.missing .text,
-.row.missing .duration,
+// playlist, shown from its snapshot; or one whose file the player did not find.
+// By its lines: the docked layout lays the text out as contents, which take no opacity.
+.row.missing .line,
 .row.missing .thumbnail {
     opacity: 0.45;
 }

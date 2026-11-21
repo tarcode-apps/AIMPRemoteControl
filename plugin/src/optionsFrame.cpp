@@ -1,9 +1,13 @@
 #include "optionsFrame.h"
 
 #include <algorithm>
+#include <format>
+#include <set>
 
 #include "aimpHelper.h"
+#include "listenerStatus.h"
 #include "networkInterfaces.h"
+#include "player/playerFeatures.h"
 #include "pluginInfo.h"
 #include "remoteControlServer.h"
 
@@ -93,13 +97,40 @@ namespace
 		}
 	}
 
+	// Each control starts where its alignment puts the ones made after it: players up to
+	// v5.10 stack controls by their position, not by when they were made. Side by side
+	// they heed neither; see RowRest.
 	void Align(IAIMPUIControl *control, TAIMPUIControlAlignment alignment, int size = 0, RECT margins = {})
 	{
+		static int made = 0;
+		const int start = alignment == ualRight || alignment == ualBottom ? 100000 - ++made : ++made;
 		TAIMPUIControlPlacement placement = {};
 		placement.Alignment = alignment;
 		placement.AlignmentMargins = margins;
-		placement.Bounds = {0, 0, size, size};
+		placement.Bounds = {start, start, start + size, start + size};
 		control->SetPlacement(placement);
+	}
+
+	// Where a row goes on after a control aligned to one of its sides. Players up to v5.10
+	// line such controls up in an order of their own, so there the rest of the row is a
+	// panel holding the next control; later ones keep the row, as v5.30 cuts off what
+	// nested panels hold.
+	IAIMPUIWinControl *RowRest(IAIMPCore *core, IAIMPServiceUI *svc, IAIMPUIForm *form, IAIMPUIWinControl *row,
+							   const player::PlayerFeatures &features)
+	{
+		if (features.SideAlignmentInOrder)
+			return row;
+		static int made = 0;
+		const std::string name = "pnRest" + std::to_string(made++);
+		auto *rest = CreateControl<IAIMPUIPanel>(core, svc, form, row, nullptr, name.c_str(), IID_IAIMPUIPanel);
+		if (!rest)
+			return row;
+		rest->SetValueAsInt32(AIMPUI_PANEL_PROPID_TRANSPARENT, 1);
+		rest->SetValueAsInt32(AIMPUI_PANEL_PROPID_BORDERS, 0);
+		Align(rest, ualClient);
+		// Held by the form.
+		rest->Release();
+		return rest;
 	}
 
 	IAIMPUIGroupBox *CreateGroup(IAIMPCore *core, IAIMPServiceUI *svc, IAIMPUIForm *form, IUnknown *events,
@@ -160,8 +191,9 @@ namespace
 	}
 }
 
-OptionsFrame::OptionsFrame(IAIMPCore *Core, SettingsChangedHandler onSettingsChanged)
-	: FCore(Core), FOnSettingsChanged(std::move(onSettingsChanged))
+OptionsFrame::OptionsFrame(IAIMPCore *Core, const player::PlayerFeatures &features, const ListenerStatus &listenerStatus,
+						   SettingsChangedHandler onSettingsChanged)
+	: FCore(Core), FFeatures(features), FListenerStatus(listenerStatus), FOnSettingsChanged(std::move(onSettingsChanged))
 {
 	FEvents = new ChangeEvents([this]
 							   { OnControlChanged(); });
@@ -198,6 +230,8 @@ HWND WINAPI OptionsFrame::CreateFrame(HWND ParentWnd)
 
 	if (Succeeded(r) && FForm)
 	{
+		// Players up to v5.30 frame a child form unless told not to.
+		FForm->SetValueAsInt32(AIMPUI_FORM_PROPID_BORDERSTYLE, AIMPUI_FLAGS_BORDERSTYLE_NONE);
 		BuildControls(svc);
 		LoadFromSettings();
 	}
@@ -223,9 +257,10 @@ void OptionsFrame::BuildAboutRow(IAIMPServiceUI *svc)
 	row->SetValueAsInt32(AIMPUI_PANEL_PROPID_BORDERS, 0);
 	Align(row, ualBottom, RowHeight, {RowIndent, GroupGap, 0, 0});
 
+	IAIMPUIWinControl *tail = row;
 	const auto addLabel = [&](const char *name, const std::string &text, const char *url)
 	{
-		auto *label = CreateControl<IAIMPUILabel>(FCore, svc, FForm, row, nullptr, name, IID_IAIMPUILabel);
+		auto *label = CreateControl<IAIMPUILabel>(FCore, svc, FForm, tail, nullptr, name, IID_IAIMPUILabel);
 		if (!label)
 			return;
 		label->SetValueAsInt32(AIMPUI_LABEL_PROPID_AUTOSIZE, 1);
@@ -236,6 +271,7 @@ void OptionsFrame::BuildAboutRow(IAIMPServiceUI *svc)
 			SetString(FCore, label, AIMPUI_LABEL_PROPID_URL, url);
 		Align(label, ualRight, 0, {LinkGap, 0, 0, 0});
 		label->Release();
+		tail = RowRest(FCore, svc, FForm, tail, FFeatures);
 	};
 
 	addLabel("lbLinkForum", "4PDA", PLUGIN_URL_FORUM);
@@ -266,35 +302,54 @@ void OptionsFrame::BuildConnectionGroup(IAIMPServiceUI *svc)
 	IAIMPUIControl *lastRow = nullptr;
 	int linkCount = 0;
 
-	const auto addLink = [&](IAIMPUIPanel *row, const std::string &address)
+	const std::string taken = Localize(FCore, std::string(FormName) + "\\PortInUse", "port is in use");
+	const std::string takenHint = Localize(FCore, "AIMPRemoteControlMessages\\PortInUse",
+										   "Remote Control: cannot listen on {0} - the port is in use by another program");
+	const auto addLink = [&](IAIMPUIWinControl *&tail, const std::string &address)
 	{
-		const std::string name = "lbAddress" + std::to_string(linkCount++);
-		auto *link = CreateControl<IAIMPUILabel>(FCore, svc, FForm, row, nullptr, name.c_str(), IID_IAIMPUILabel);
+		const std::string endpoint = address + ":" + port;
+		const std::string name = "lbAddress" + std::to_string(linkCount);
+		auto *link = CreateControl<IAIMPUILabel>(FCore, svc, FForm, tail, nullptr, name.c_str(), IID_IAIMPUILabel);
 		if (!link)
 			return;
 		link->SetValueAsInt32(AIMPUI_LABEL_PROPID_AUTOSIZE, 1);
 		link->SetValueAsInt32(AIMPUI_LABEL_PROPID_TEXTALIGNVERT, AIMPUI_ALIGN_CENTER);
-		SetString(FCore, link, AIMPUI_LABEL_PROPID_TEXT, address + ":" + port);
-		SetString(FCore, link, AIMPUI_LABEL_PROPID_URL, "http://" + address + ":" + port + "/");
+		SetString(FCore, link, AIMPUI_LABEL_PROPID_TEXT, endpoint);
+		SetString(FCore, link, AIMPUI_LABEL_PROPID_URL, "http://" + endpoint + "/");
 		Align(link, ualLeft, 0, {AddressGap, -1, 0, 1});
-		link->Release();
+
+		const std::string takenName = "lbAddressTaken" + std::to_string(linkCount++);
+		auto *note = CreateControl<IAIMPUIValidationLabel>(FCore, svc, FForm, tail, nullptr, takenName.c_str(), IID_IAIMPUIValidationLabel);
+		if (note)
+		{
+			note->SetValueAsInt32(AIMPUI_LABEL_PROPID_AUTOSIZE, 1);
+			note->SetValueAsInt32(AIMPUI_LABEL_PROPID_TEXTALIGNVERT, AIMPUI_ALIGN_CENTER);
+			note->SetValueAsInt32(AIMPUI_VALIDATIONLABEL_PROPID_GLYPH, AIMPUI_VALIDATIONLABEL_GLYPH_ERROR);
+			SetString(FCore, note, AIMPUI_LABEL_PROPID_TEXT, endpoint + " - " + taken);
+			SetString(FCore, note, AIMPUI_CONTROL_PROPID_HINT, std::vformat(takenHint, std::make_format_args(endpoint)));
+			Align(note, ualLeft, 0, {AddressGap, -1, 0, 1});
+		}
+		FAddressLabels.push_back({address, link, note});
+		tail = RowRest(FCore, svc, FForm, tail, FFeatures);
 	};
 
-	std::vector<std::pair<std::string, IAIMPUIPanel *>> rows;
-
+	// A row per interface, loopback first, with every address of the interface.
 	std::vector<NetworkAddress> addresses = ListIPv4Addresses();
 	std::stable_partition(addresses.begin(), addresses.end(), [](const NetworkAddress &a)
 						  { return a.IsLoopback; });
+	std::vector<std::pair<NetworkAddress, std::vector<std::string>>> interfaces;
 	for (const NetworkAddress &a : addresses)
 	{
-		auto known = std::find_if(rows.begin(), rows.end(),
-								  [&](const auto &r)
-								  { return r.first == a.InterfaceId; });
-		if (known != rows.end())
-		{
-			addLink(known->second, a.Address);
-			continue;
-		}
+		auto known = std::find_if(interfaces.begin(), interfaces.end(),
+								  [&](const auto &i)
+								  { return i.first.InterfaceId == a.InterfaceId; });
+		if (known != interfaces.end())
+			known->second.push_back(a.Address);
+		else
+			interfaces.push_back({a, {a.Address}});
+	}
+	for (const auto &[a, interfaceAddresses] : interfaces)
+	{
 		const std::string rowName = "pnInterface" + std::to_string(FInterfaceChecks.size());
 		auto *row = CreateControl<IAIMPUIPanel>(FCore, svc, FForm, group, nullptr, rowName.c_str(), IID_IAIMPUIPanel);
 		if (!row)
@@ -314,8 +369,9 @@ void OptionsFrame::BuildConnectionGroup(IAIMPServiceUI *svc)
 		const std::string label = a.IsLoopback ? "localhost" : (a.InterfaceName.empty() ? a.InterfaceId : a.InterfaceName);
 		SetString(FCore, check, AIMPUI_CHECKBOX_PROPID_CAPTION, label + ":");
 		FInterfaceChecks.push_back({a.InterfaceId, check});
-		addLink(row, a.Address);
-		rows.push_back({a.InterfaceId, row});
+		IAIMPUIWinControl *tail = RowRest(FCore, svc, FForm, row, FFeatures);
+		for (const std::string &address : interfaceAddresses)
+			addLink(tail, address);
 		lastRow = row;
 		row->Release();
 	}
@@ -323,6 +379,21 @@ void OptionsFrame::BuildConnectionGroup(IAIMPServiceUI *svc)
 	if (lastRow)
 		Align(lastRow, ualTop, CheckRowHeight, {RowIndent, RowGap, 0, GroupBottomPad});
 	group->Release();
+	ShowTakenAddresses();
+}
+
+void OptionsFrame::ShowTakenAddresses()
+{
+	if (!FForm)
+		return;
+	const std::set<std::string> takenAddresses = FListenerStatus.TakenAddresses();
+	for (const AddressLabels &labels : FAddressLabels)
+	{
+		const bool taken = labels.Taken && takenAddresses.contains(labels.Address);
+		labels.Link->SetValueAsInt32(AIMPUI_CONTROL_PROPID_VISIBLE, taken ? 0 : 1);
+		if (labels.Taken)
+			labels.Taken->SetValueAsInt32(AIMPUI_CONTROL_PROPID_VISIBLE, taken ? 1 : 0);
+	}
 }
 
 void OptionsFrame::BuildAuthGroup(IAIMPServiceUI *svc)
@@ -549,6 +620,13 @@ void WINAPI OptionsFrame::DestroyFrame()
 	for (InterfaceCheck &c : FInterfaceChecks)
 		c.Check->Release();
 	FInterfaceChecks.clear();
+	for (AddressLabels &labels : FAddressLabels)
+	{
+		labels.Link->Release();
+		if (labels.Taken)
+			labels.Taken->Release();
+	}
+	FAddressLabels.clear();
 	Drop(FPassEdit);
 	Drop(FUserEdit);
 	Drop(FAuthGroup);

@@ -11,12 +11,24 @@
 
 #include "settings.h"
 
+class ListenerStatus;
+
+namespace player
+{
+	struct PlayerFeatures;
+}
+
 class OptionsFrame : public IUnknownImpl<IAIMPOptionsDialogFrame>
 {
 public:
 	using SettingsChangedHandler = std::function<void(const Settings &)>;
 
-	OptionsFrame(IAIMPCore *Core, SettingsChangedHandler onSettingsChanged);
+	OptionsFrame(IAIMPCore *Core, const player::PlayerFeatures &features, const ListenerStatus &listenerStatus,
+				 SettingsChangedHandler onSettingsChanged);
+
+	// Marks the addresses whose port is taken; the server's look at the network after
+	// the settings are applied brings it too.
+	void ShowTakenAddresses();
 
 	BOOL isOurRIID(REFIID riid) override;
 
@@ -41,6 +53,8 @@ private:
 	bool HasPassword() const;
 
 	IAIMPCore *FCore;
+	const player::PlayerFeatures &FFeatures;
+	const ListenerStatus &FListenerStatus;
 	SettingsChangedHandler FOnSettingsChanged;
 	ChangeEvents *FEvents = nullptr;
 	ChangeEvents *FBrowseEvents = nullptr;
@@ -56,6 +70,14 @@ private:
 		IAIMPUICheckBox *Check;
 	};
 	std::vector<InterfaceCheck> FInterfaceChecks;
+	// One of the two shows: the link, or the note that the port is taken.
+	struct AddressLabels
+	{
+		std::string Address;
+		IAIMPUIControl *Link;
+		IAIMPUIControl *Taken;
+	};
+	std::vector<AddressLabels> FAddressLabels;
 
 	// Authentication group
 	IAIMPUIGroupBox *FAuthGroup = nullptr;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <exception>
 #include <functional>
 #include <stdexcept>
 #include <type_traits>
@@ -40,32 +41,49 @@ namespace detail
 			throw std::logic_error("IAIMPServiceThreads is not available");
 		return svc;
 	}
+
+	// Runs `fn` on the main thread and waits for it, throwing here what it threw. The
+	// player swallows whatever escapes a task, an access violation inside it included,
+	// so a task that did not get to its end is an error too, never a default result.
+	inline void RunAndWait(IAIMPCore *core, const std::function<void()> &fn)
+	{
+		std::exception_ptr error;
+		bool completed = false;
+		auto *svc = RequireThreadsService(core);
+		auto *task = new FunctionTask([&]
+									  {
+			try
+			{
+				fn();
+				completed = true;
+			}
+			catch (...)
+			{
+				error = std::current_exception();
+			} });
+		task->AddRef();
+		svc->ExecuteInMainThread(task, AIMP_SERVICE_THREADS_FLAGS_WAITFOR);
+		task->Release();
+		svc->Release();
+		if (error)
+			std::rethrow_exception(error);
+		if (!completed)
+			throw std::runtime_error("The player did not complete a task on its main thread");
+	}
 }
 
 template <typename Fn>
 auto RunOnMainThread(IAIMPCore *core, Fn &&fn) -> std::invoke_result_t<Fn>
 {
 	using R = std::invoke_result_t<Fn>;
-	auto *svc = detail::RequireThreadsService(core);
-
 	if constexpr (std::is_void_v<R>)
-	{
-		auto *task = new detail::FunctionTask([&]()
-											  { fn(); });
-		task->AddRef();
-		svc->ExecuteInMainThread(task, AIMP_SERVICE_THREADS_FLAGS_WAITFOR);
-		task->Release();
-		svc->Release();
-	}
+		detail::RunAndWait(core, [&]
+						   { fn(); });
 	else
 	{
 		R result{};
-		auto *task = new detail::FunctionTask([&]()
-											  { result = fn(); });
-		task->AddRef();
-		svc->ExecuteInMainThread(task, AIMP_SERVICE_THREADS_FLAGS_WAITFOR);
-		task->Release();
-		svc->Release();
+		detail::RunAndWait(core, [&]
+						   { result = fn(); });
 		return result;
 	}
 }

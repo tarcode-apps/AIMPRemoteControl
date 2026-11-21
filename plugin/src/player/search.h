@@ -43,5 +43,5 @@ namespace player
 
 	// The matches of `query` in playlist order, `Items` being the page `Offset` and
 	// `Limit` cut out of them. Nullopt when one of `PlaylistIds` is not loaded.
-	std::optional<SearchResults> SearchItems(IAIMPCore *core, const SearchQuery &query);
+	std::optional<SearchResults> SearchItems(IAIMPCore *core, const PlayerFeatures &features, const SearchQuery &query);
 }

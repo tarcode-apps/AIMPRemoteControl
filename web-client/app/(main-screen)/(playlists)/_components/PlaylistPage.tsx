@@ -763,10 +763,12 @@ export function PlaylistPage({ playlist }: PlaylistPageProps) {
                                     role="option"
                                     data-testid="item-row"
                                     aria-selected={isActive}
+                                    title={item?.dead ? t('playlist.dead') : undefined}
                                     className={clsx(
                                         styles.row,
                                         index % 2 && styles.odd,
                                         isActive && styles.active,
+                                        item?.dead && styles.missing,
                                         item && item.index === playingIndex && styles.playing,
                                         hidden && styles.hidden,
                                     )}

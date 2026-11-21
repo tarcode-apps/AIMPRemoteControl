@@ -26,14 +26,14 @@ namespace
 	}
 }
 
-nlohmann::json rpcapi::GetPlaylistsCommand::BuildPlaylists(IAIMPCore *core, RemoteControlIdManager &idManager,
+nlohmann::json rpcapi::GetPlaylistsCommand::BuildPlaylists(IAIMPCore *core, const player::PlayerFeatures &features, RemoteControlIdManager &idManager,
 												   const std::vector<std::string> &fields)
 {
 	const std::unordered_set<std::string> fieldSet(fields.begin(), fields.end());
 	const bool withCrc32 = fieldSet.count("crc32") > 0;
 
 	nlohmann::json result = nlohmann::json::array();
-	for (const player::PlaylistInfo &playlist : player::GetPlaylists(core))
+	for (const player::PlaylistInfo &playlist : player::GetPlaylists(core, features))
 	{
 		nlohmann::json out = nlohmann::json::object();
 		if (fieldSet.count("id"))
@@ -53,8 +53,8 @@ nlohmann::json rpcapi::GetPlaylistsCommand::BuildPlaylists(IAIMPCore *core, Remo
 
 void rpcapi::GetPlaylistsCommand::Register(IEndpointRouteBuilder &endpoints)
 {
-	endpoints.MapRpc("GetPlaylists", [core = FCore, &idManager = FIdManager](const nlohmann::json &params) -> nlohmann::json
+	endpoints.MapRpc("GetPlaylists", [core = FCore, &features = FFeatures, &idManager = FIdManager](const nlohmann::json &params) -> nlohmann::json
 			{
 		const std::vector<std::string> fields = params.value("fields", std::vector<std::string>{});
-		return RunOnMainThread(core, [&] { return BuildPlaylists(core, idManager, fields); }); });
+		return RunOnMainThread(core, [&] { return BuildPlaylists(core, features, idManager, fields); }); });
 }

@@ -169,11 +169,11 @@ void webapi::PlayerController::Register(IEndpointRouteBuilder &endpoints)
 		SendCommand(core, CommandNamed(request.PathMatches.at(0)));
 		return nlohmann::json::object(); });
 
-	endpoints.MapApi(HttpMethod::Patch, "/api/v1/player", [core = FCore](const ApiRequest &request) -> nlohmann::json
+	endpoints.MapApi(HttpMethod::Patch, "/api/v1/player", [core = FCore, &features = FFeatures](const ApiRequest &request) -> nlohmann::json
 			   {
 		const player::PlayerPatch patch = PatchBody(request.Body);
 		if (!RunOnMainThread(core, [&]
-							 { return player::ApplyPlayerPatch(core, patch); }))
+							 { return player::ApplyPlayerPatch(core, features, patch); }))
 			throw ApiError(500, "playerCommandFailed");
 		return nlohmann::json::object(); });
 }

@@ -105,8 +105,10 @@ public:
 	void WINAPI Activated() override {}
 	void WINAPI Changed(DWORD flags) override
 	{
+		// The player marks a track dead as it skips it, so the start of the next one
+		// must not hide the change.
 		if (flags & (AIMP_PLAYLIST_NOTIFY_NAME | AIMP_PLAYLIST_NOTIFY_READONLY | AIMP_PLAYLIST_NOTIFY_PLAYINGSWITCHS |
-					 AIMP_PLAYLIST_NOTIFY_GROUPNAME | AIMP_PLAYLIST_NOTIFY_SETTINGS))
+					 AIMP_PLAYLIST_NOTIFY_DEADSTATE | AIMP_PLAYLIST_NOTIFY_GROUPNAME | AIMP_PLAYLIST_NOTIFY_SETTINGS))
 			FOwner.PlaylistChanged(FId, false);
 		if (flags & (AIMP_PLAYLIST_NOTIFY_CONTENT | AIMP_PLAYLIST_NOTIFY_FILEINFO | AIMP_PLAYLIST_NOTIFY_STATISTICS))
 			FOwner.FilterChange(FId, flags, FPlaylist ? FPlaylist->GetItemCount() : 0);
@@ -179,7 +181,7 @@ StateUpdateEvents::~StateUpdateEvents()
 	Stop();
 }
 
-void StateUpdateEvents::Start(IAIMPCore *core)
+void StateUpdateEvents::Start(IAIMPCore *core, const player::PlayerFeatures &features)
 {
 	FCore = core;
 	FStopped = false;
@@ -228,9 +230,17 @@ void StateUpdateEvents::Start(IAIMPCore *core)
 		mgr->Release();
 	}
 
-	if (!player::GetPlayerFeatures(core).SettingsNotifications)
+	if (!features.SettingsNotifications)
+		// An error, such as a task the player did not complete, ends the polling, not the player.
 		FSettingsPoller = std::thread([this]
-									  { PollPlaylistSettings(); });
+									  {
+			try
+			{
+				PollPlaylistSettings();
+			}
+			catch (...)
+			{
+			} });
 }
 
 void StateUpdateEvents::Stop()

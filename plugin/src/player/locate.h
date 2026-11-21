@@ -24,5 +24,5 @@ namespace player
 
 	// The first item of each playlist whose URI equals the file, byte for byte; a
 	// file that is not in its playlist, or whose playlist is not loaded, is left out.
-	std::vector<LocatedItem> LocatePlaylistItems(IAIMPCore *core, const std::vector<LocateRequest> &requests);
+	std::vector<LocatedItem> LocatePlaylistItems(IAIMPCore *core, const PlayerFeatures &features, const std::vector<LocateRequest> &requests);
 }

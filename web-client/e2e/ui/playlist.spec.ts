@@ -107,6 +107,21 @@ test.describe('playlist', () => {
         await expect(screen.row('Charlie').getByTitle(t('playlist.inQueue'))).toHaveText('[2]');
     });
 
+    test('a track the player found no file for is dimmed, and the menu takes such tracks out', async ({ api, app }) => {
+        fs.rmSync(playlist.files[1]);
+        await api.play(playlist.id, 1);
+        await expect(screen.row('Bravo')).toHaveAttribute('title', t('playlist.dead'));
+        await expect(screen.row('Alpha')).not.toHaveAttribute('title');
+        expect(await screen.titleOpacity('Bravo')).toBeLessThan(0.6);
+        expect(await screen.titleOpacity('Alpha')).toBe(1);
+        await api.command('stop');
+
+        await screen.more(t('playlist.removeNonExistent'));
+        await expect(app.toast).toHaveText(t('playlist.nonExistentRemoved', { number: 1 }));
+        await expect(screen.row('Bravo')).toBeHidden();
+        expect(await api.playlistItemCount(playlist.id)).toBe(2);
+    });
+
     test('a refused action says why in the toast', async ({ app, page }) => {
         const message = 'The queue is busy.';
         await page.route('**/api/v1/queue/items', route =>

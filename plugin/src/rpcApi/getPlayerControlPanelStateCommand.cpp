@@ -47,8 +47,8 @@ namespace
 		if (!playlist)
 			return nullptr;
 
-		IAIMPPlaylistProperties *props = nullptr;
-		if (Succeeded(playlist->QueryInterface(IID_IAIMPPlaylistProperties, reinterpret_cast<void **>(&props))) && props)
+		IAIMPPropertyList *props = PlaylistProperties(playlist);
+		if (props)
 		{
 			if (Failed(props->GetValueAsObject(AIMP_PLAYLIST_PROPID_FOCUSED_OBJECT, IID_IAIMPPlaylistItem, reinterpret_cast<void **>(&item))))
 				item = nullptr;

@@ -40,6 +40,7 @@ test.describe('favorites', () => {
         await api.post('/items/remove', { playlists: [{ playlistId: playlist.id, indexes: [1] }] });
         const favorites = await openFavorites(app);
         await expect(favorites.row('Bravo')).toHaveAttribute('title', t('favorites.missing'));
+        expect(await favorites.titleOpacity('Bravo')).toBeLessThan(0.6);
         // Nothing is known about it beyond its name: its menu offers to find it, not to describe it.
         await favorites
             .row('Bravo')

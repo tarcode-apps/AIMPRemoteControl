@@ -6,6 +6,8 @@ export type About = {
     name: string;
     aimpVersion: string;
     pluginVersion: string;
+    // What the player can do that an older one cannot.
+    features: { groupShuffle: boolean };
 };
 
 let current: About | undefined;

@@ -13,8 +13,8 @@ namespace
 {
 	std::optional<player::PlaylistInfo> Describe(IAIMPPlaylist *playlist, const player::PlayerFeatures &features)
 	{
-		IAIMPPlaylistProperties *props = nullptr;
-		if (Failed(playlist->QueryInterface(IID_IAIMPPlaylistProperties, reinterpret_cast<void **>(&props))) || !props)
+		IAIMPPropertyList *props = PlaylistProperties(playlist);
+		if (!props)
 			return std::nullopt;
 
 		player::PlaylistInfo info;
@@ -74,7 +74,7 @@ void player::VisitPlaylistFiles(IAIMPCore *core, const std::string &playlistId, 
 	playlist->Release();
 }
 
-std::vector<player::PlaylistInfo> player::GetPlaylists(IAIMPCore *core)
+std::vector<player::PlaylistInfo> player::GetPlaylists(IAIMPCore *core, const PlayerFeatures &features)
 {
 	std::vector<PlaylistInfo> result;
 
@@ -82,7 +82,6 @@ std::vector<player::PlaylistInfo> player::GetPlaylists(IAIMPCore *core)
 	if (Failed(core->QueryInterface(IID_IAIMPServicePlaylistManager, reinterpret_cast<void **>(&mgr))) || !mgr)
 		return result;
 
-	const PlayerFeatures features = GetPlayerFeatures(core);
 	const INT32 count = mgr->GetLoadedPlaylistCount();
 	for (INT32 i = 0; i < count; ++i)
 	{
@@ -125,8 +124,8 @@ player::MutationResult player::RenamePlaylist(IAIMPCore *core, const std::string
 		return MutationResult::PlaylistNotFound;
 
 	HRESULT hr = E_FAIL;
-	IAIMPPlaylistProperties *props = nullptr;
-	if (Succeeded(playlist->QueryInterface(IID_IAIMPPlaylistProperties, reinterpret_cast<void **>(&props))) && props)
+	IAIMPPropertyList *props = PlaylistProperties(playlist);
+	if (props)
 	{
 		if (IAIMPString *aimpName = StringToIAIMPString(core, name))
 		{
@@ -156,8 +155,8 @@ player::MutationResult player::OpenWritablePlaylist(IAIMPCore *core, const std::
 	if (!playlist)
 		return MutationResult::PlaylistNotFound;
 	INT32 readOnly = 0;
-	IAIMPPlaylistProperties *props = nullptr;
-	if (Succeeded(playlist->QueryInterface(IID_IAIMPPlaylistProperties, reinterpret_cast<void **>(&props))) && props)
+	IAIMPPropertyList *props = PlaylistProperties(playlist);
+	if (props)
 	{
 		props->GetValueAsInt32(AIMP_PLAYLIST_PROPID_READONLY, &readOnly);
 		props->Release();
@@ -212,8 +211,8 @@ player::MutationResult player::AddFiles(IAIMPCore *core, const std::string &play
 
 std::string player::SettingsSnapshot(IAIMPPlaylist *playlist)
 {
-	IAIMPPlaylistProperties *props = nullptr;
-	if (Failed(playlist->QueryInterface(IID_IAIMPPlaylistProperties, reinterpret_cast<void **>(&props))) || !props)
+	IAIMPPropertyList *props = PlaylistProperties(playlist);
+	if (!props)
 		return {};
 
 	std::string settings;
@@ -237,8 +236,8 @@ std::string player::GetPlaylistAIMPId(IAIMPPlaylist *playlist)
 {
 	if (!playlist)
 		return {};
-	IAIMPPlaylistProperties *props = nullptr;
-	if (Failed(playlist->QueryInterface(IID_IAIMPPlaylistProperties, reinterpret_cast<void **>(&props))) || !props)
+	IAIMPPropertyList *props = PlaylistProperties(playlist);
+	if (!props)
 		return {};
 	std::string aimpId = GetPropertyAsString(props, AIMP_PLAYLIST_PROPID_ID);
 	props->Release();

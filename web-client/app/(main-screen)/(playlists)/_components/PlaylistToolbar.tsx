@@ -3,6 +3,7 @@
 import { useFormats } from '@/app/_api/files';
 import { useSetItemsEnabled } from '@/app/_api/items';
 import { usePlayer } from '@/app/_api/player';
+import { useRemoveNonExistent } from '@/app/_api/playlists';
 import { useEnqueue } from '@/app/_api/queue';
 import { useSettings } from '@/app/_api/settings';
 import type { FileType } from '@/app/_api/types';
@@ -88,8 +89,28 @@ export function PlaylistToolbar() {
         },
     };
 
+    const removeNonExistent = useRemoveNonExistent();
     const playlistEntries: MenuEntry[] = selected
-        ? [menuSeparator, playlistActions.renameItem(selected), playlistActions.removeItem(selected)]
+        ? [
+              {
+                  label: t('playlist.removeNonExistent'),
+                  icon: 'delete_sweep',
+                  disabled: selected.readOnly,
+                  onSelect: () =>
+                      removeNonExistent.mutate(selected.id, {
+                          onSuccess: ({ removed }) =>
+                              toast.show(
+                                  removed
+                                      ? t('playlist.nonExistentRemoved', { number: removed })
+                                      : t('playlist.noNonExistent'),
+                              ),
+                          onError: showError,
+                      }),
+              },
+              menuSeparator,
+              playlistActions.renameItem(selected),
+              playlistActions.removeItem(selected),
+          ]
         : [];
 
     // What the player's settings allow; a URL needs no permission.

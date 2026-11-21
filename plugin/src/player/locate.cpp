@@ -11,7 +11,8 @@
 #include "playlistItemContext.h"
 #include "playlists.h"
 
-std::vector<player::LocatedItem> player::LocatePlaylistItems(IAIMPCore *core, const std::vector<LocateRequest> &requests)
+std::vector<player::LocatedItem> player::LocatePlaylistItems(IAIMPCore *core, const PlayerFeatures &features,
+																	 const std::vector<LocateRequest> &requests)
 {
 	std::map<std::string, std::unordered_set<std::string>> wantedByPlaylist;
 	for (const LocateRequest &request : requests)
@@ -38,7 +39,7 @@ std::vector<player::LocatedItem> player::LocatePlaylistItems(IAIMPCore *core, co
 				if (!secondLine)
 					secondLine.emplace(core, playlist, true);
 				const PlaylistItemContext ctx(fileUriService, item);
-				located.push_back({playlistId, ReadPlaylistItem(ctx, i, *secondLine)});
+				located.push_back({playlistId, ReadPlaylistItem(ctx, i, *secondLine, features)});
 			}
 			item->Release();
 		}

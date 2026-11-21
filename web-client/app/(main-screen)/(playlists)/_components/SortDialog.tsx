@@ -1,7 +1,8 @@
 'use client';
 
+import { useAbout } from '@/app/_api/about';
 import { useSortPlaylist } from '@/app/_api/playlists';
-import { sortModes, type Playlist } from '@/app/_api/types';
+import { groupShuffles, sortModes, type Playlist } from '@/app/_api/types';
 import { SortDialog, type SortChoice } from '@/app/_components/dialogs';
 
 export type PlaylistSortDialogProps = {
@@ -12,6 +13,9 @@ export type PlaylistSortDialogProps = {
 
 export function PlaylistSortDialog({ playlist, open, onClose }: PlaylistSortDialogProps) {
     const sort = useSortPlaylist(playlist.id);
+    const about = useAbout();
+    const modes =
+        about?.features.groupShuffle === false ? sortModes.filter(mode => !groupShuffles.includes(mode)) : sortModes;
     const submit = (choice: SortChoice) =>
         sort.mutate({ ...choice, revision: playlist.revision }, { onSuccess: onClose });
     // The next opening starts without the last attempt's error.
@@ -24,7 +28,7 @@ export function PlaylistSortDialog({ playlist, open, onClose }: PlaylistSortDial
         <SortDialog
             open={open}
             onClose={close}
-            modes={sortModes}
+            modes={modes}
             onSubmit={submit}
             pending={sort.isPending}
             error={sort.error}

@@ -40,8 +40,8 @@ export function SearchToolbar() {
                 externalSearch={{ value: mode.typed, onChange: mode.setTyped }}
                 idle={
                     <>
-                        <ToolbarButton title={t('search.playlists')} onClick={() => setDialog('playlists')}>
-                            <Icon>queue_music</Icon>
+                        <ToolbarButton title={t('search.fields')} onClick={() => setDialog('fields')}>
+                            <Icon>tune</Icon>
                         </ToolbarButton>
                         <ToolbarButton
                             title={t('playlist.select')}
@@ -53,7 +53,9 @@ export function SearchToolbar() {
                         <span />
                     </>
                 }
-                moreActions={[{ label: t('search.fields'), icon: 'tune', onSelect: () => setDialog('fields') }]}
+                moreActions={[
+                    { label: t('search.playlists'), icon: 'queue_music', onSelect: () => setDialog('playlists') },
+                ]}
                 selectedActions={[
                     {
                         label: t('playlist.enqueue'),

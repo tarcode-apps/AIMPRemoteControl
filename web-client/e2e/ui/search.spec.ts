@@ -73,13 +73,13 @@ test.describe('extended search', () => {
         await search.search('zephyr');
         await expect(search.row('Zephyr Band')).toBeVisible();
 
-        await search.more(t('search.fields'));
+        await search.toolbarButton(t('search.fields')).click();
         await app.dialog.getByRole('checkbox', { name: t('search.field.artist') }).uncheck();
         await app.dialogButton(t('actions.ok')).click();
         await expect(search.row('Zephyr Band')).toBeHidden();
         await expect(search.row('Zephyr one')).toBeVisible();
 
-        await search.toolbarButton(t('search.playlists')).click();
+        await search.more(t('search.playlists'));
         await app.dialog.getByRole('checkbox', { name: first.name, exact: true }).uncheck();
         await app.dialogButton(t('actions.ok')).click();
         await expect(search.row('Zephyr one')).toBeHidden();

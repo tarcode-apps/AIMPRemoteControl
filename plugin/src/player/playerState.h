@@ -91,5 +91,5 @@ namespace player
 		std::optional<bool> RadioCapture;
 	};
 
-	bool ApplyPlayerPatch(IAIMPCore *core, const PlayerPatch &patch);
+	bool ApplyPlayerPatch(IAIMPCore *core, const PlayerFeatures &features, const PlayerPatch &patch);
 }

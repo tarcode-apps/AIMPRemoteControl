@@ -1,6 +1,8 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 import { expect, test } from '../fixtures';
+import { unreachableStreamUrl } from '../lib/streams';
 
 const route = '/items/remove';
 
@@ -171,6 +173,34 @@ test.describe('removing items', () => {
         const selection = { playlists: [{ playlistId: playlist.id, indexes: [part!.index] }] };
         expect((await api.post(route, selection)).status).toBe(200);
         await expect.poll(() => api.playlistItemCount(playlist.id)).toBe(2);
+    });
+
+    test('takes out the tracks whose files are gone, keeping streams and the parts of a container that is there', async ({
+        api,
+        media,
+        playlists,
+    }) => {
+        const kept = media.cue(['Kept one', 'Kept two'], { folder: 'kept' });
+        const gone = media.cue(['Gone one', 'Gone two'], { folder: 'gone' });
+        const playlist = await playlists.create({
+            tracks: 3,
+            files: [kept, gone],
+            urls: [unreachableStreamUrl],
+            expectItems: 8,
+        });
+        const before = (await api.allItems(playlist.id)).map(item => item.fileUri);
+        fs.rmSync(playlist.files[1]);
+        // A sheet without its audio plays nothing.
+        fs.rmSync(path.join(path.dirname(gone), 'album.wav'));
+
+        const removeNonExistent = `/playlists/${encodeURIComponent(playlist.id)}/items/removeNonExistent`;
+        const answer = await api.post<{ removed: number }>(removeNonExistent);
+        expect(answer.body).toEqual({ removed: 3 });
+        const left = (await api.allItems(playlist.id)).map(item => item.fileUri);
+        expect(left).toEqual(before.filter(uri => uri !== playlist.files[1] && !uri.startsWith(gone)));
+
+        expect((await api.post<{ removed: number }>(removeNonExistent)).body).toEqual({ removed: 0 });
+        expect((await api.post('/playlists/%7Bnone%7D/items/removeNonExistent')).error?.code).toBe('playlistNotFound');
     });
 
     test('refuses to delete a file held by another program, naming it', async ({ api, playlists }) => {

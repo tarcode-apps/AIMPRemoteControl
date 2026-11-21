@@ -72,7 +72,8 @@ public:
 	void Stop();
 
 	State Get() const;
-	// Replaces the current timer, if any.
+	// Replaces the current timer, if any. A timed one is refused once the timer's
+	// thread has stopped on an error.
 	void Set(const Request &request);
 	void Cancel();
 
@@ -88,6 +89,7 @@ private:
 	mutable std::mutex FMutex;
 	std::condition_variable FChanged;
 	bool FStopped = false;
+	bool FFailed = false; // the thread stopped on an error, so nothing times a timer
 	State FState;
 	std::uint64_t FGeneration = 0; // bumped by every change, so a wait knows its timer is gone
 };

@@ -7,6 +7,7 @@ type PlaylistsEvent = { playlists: { id: string; revision: number }[] };
 const versions = {
     pluginVersion: expect.stringMatching(/^\d+\.\d+\.\d+\.\d+$/),
     aimpVersion: expect.stringMatching(/\d/),
+    features: { groupShuffle: true },
 };
 
 test.describe('events', () => {

@@ -124,7 +124,7 @@ void player::VisitQueueItems(IAIMPCore *core, const QueueVisitor &visit)
 	queue->Release();
 }
 
-player::QueueSnapshot player::GetQueue(IAIMPCore *core)
+player::QueueSnapshot player::GetQueue(IAIMPCore *core, const PlayerFeatures &features)
 {
 	QueueSnapshot snapshot;
 	if (IAIMPPlaylistQueue *queue = Queue(core))
@@ -141,7 +141,7 @@ player::QueueSnapshot player::GetQueue(IAIMPCore *core)
 		queued.Position = position;
 		queued.PlaylistId = GetPlaylistAIMPId(playlist);
 		const SecondLineFormatter &secondLine = formatters.try_emplace(queued.PlaylistId, core, playlist, true).first->second;
-		queued.Item = ReadPlaylistItem(ctx, index, secondLine);
+		queued.Item = ReadPlaylistItem(ctx, index, secondLine, features);
 		snapshot.Items.push_back(std::move(queued)); });
 	return snapshot;
 }

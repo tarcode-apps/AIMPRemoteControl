@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
-    <style name="Theme.AIMPRemoteControl" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- The window's background is what shows while the app starts: the same as the app's own. -->
+    <style name="Theme.AimpRemoteControl" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <!-- Without it the system's splash screen leaves out the black disc of the icon. -->
+        <item name="android:windowSplashScreenIconBackgroundColor" tools:targetApi="31">#000000</item>
+    </style>
 </resources>

@@ -1,19 +1,25 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    What a backup of the app takes, from Android 12 on; backup_rules.xml is for the versions before it.
+    Naming a file here ends the default of taking everything, so the rest is named too: the data of the
+    web view (what the web client keeps in the browser) and the preferences.
 -->
 <data-extraction-rules>
-    <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
-    </cloud-backup>
     <!--
-    <device-transfer>
-        <include .../>
-        <exclude .../>
-    </device-transfer>
+        A copy in the cloud is made only where it is encrypted with the user's screen lock: it has the
+        passwords in it, and this format has no condition for a single file (requireFlags is not read).
     -->
+    <cloud-backup disableIfNoEncryptionCapabilities="true">
+        <include domain="file" path="datastore/players.json" />
+        <include domain="file" path="datastore/passwords.json" />
+        <include domain="root" path="app_webview" />
+        <include domain="sharedpref" path="." />
+    </cloud-backup>
+    <!-- From one device straight to another. -->
+    <device-transfer>
+        <include domain="file" path="datastore/players.json" />
+        <include domain="file" path="datastore/passwords.json" />
+        <include domain="root" path="app_webview" />
+        <include domain="sharedpref" path="." />
+    </device-transfer>
 </data-extraction-rules>

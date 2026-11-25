@@ -1,3 +1,87 @@
 <resources>
-    <string name="app_name">AIMP Remote Control</string>
+    <string name="app_name" translatable="false">AIMP Remote Control</string>
+
+    <string name="players_saved">My players</string>
+    <string name="players_found">Found in the network</string>
+    <string name="players_searching">Searching</string>
+    <string name="players_search_failed">The search did not start: %1$s</string>
+    <string name="players_nobody_found">No new players found</string>
+    <string name="players_empty_title">Searching for players in the network</string>
+    <string name="players_empty_text">Once these are done, the player will appear here by itself.</string>
+    <string name="players_setup_aimp">Install AIMP on a computer.</string>
+    <string name="players_setup_plugin">Install the Remote Control plugin in AIMP and turn it on in the player\'s settings, under Plugins.</string>
+    <string name="players_setup_network">Connect the computer and this device to the same Wi-Fi network.</string>
+    <string name="players_get_plugin">Where to get the plugin?</string>
+    <string name="players_add">Add</string>
+    <string name="players_add_manually">Add manually</string>
+    <string name="local_network_refused">No access to the local network: players can be neither found nor reached.</string>
+    <string name="local_network_allow">Allow</string>
+
+    <string name="player_online">Online</string>
+    <string name="player_offline">Offline</string>
+    <string name="player_checking">Checking…</string>
+    <string name="player_auto_connect">Auto-connect</string>
+    <string name="player_call_lower">Down to %1$d%%</string>
+    <string name="player_connect">Connect</string>
+    <string name="player_connecting">Connecting…</string>
+    <string name="player_unreachable">The player does not answer</string>
+    <string name="player_more">More: %1$s</string>
+    <string name="player_edit">Edit</string>
+    <string name="player_delete">Delete</string>
+
+    <!-- The words of the plugin's own settings: "Require authentication", "Username", "Password". -->
+    <string name="auth_required">Authentication required</string>
+    <string name="auth_refused">Wrong username or password</string>
+    <string name="auth_username">Username</string>
+    <string name="auth_password">Password</string>
+    <string name="auth_sign_in">Sign in</string>
+    <string name="auth_show_password">Show the password</string>
+    <string name="auth_hide_password">Hide the password</string>
+
+    <string name="edit_new_player">New player</string>
+    <string name="edit_name">Name</string>
+    <string name="edit_name_placeholder">The name from the plugin\'s settings</string>
+    <string name="edit_address_placeholder">For example, 192.168.0.100</string>
+    <string name="edit_icon">Icon</string>
+    <string name="edit_address">Address</string>
+    <string name="edit_address_required">Enter the address</string>
+    <string name="edit_address_invalid">A computer name or an IP address, without http:// or a port</string>
+    <string name="edit_port">Port</string>
+    <string name="edit_port_invalid" translatable="false">1–65535</string>
+    <string name="edit_section_auth">Authentication</string>
+    <string name="edit_section_launch">When the app starts</string>
+    <string name="edit_auto_connect">Connect automatically</string>
+    <string name="edit_auto_connect_hint">One player only: the others lose this setting</string>
+    <string name="edit_delete">Delete the player</string>
+
+    <string name="delete_title">Delete the player?</string>
+    <string name="delete_text">It will be removed from the list with its settings and password.</string>
+
+    <string name="call_title">During a call</string>
+    <string name="call_nothing">Nothing</string>
+    <string name="call_lower">Quieter</string>
+    <string name="call_pause">Pause</string>
+    <string name="call_volume">Volume during a call</string>
+    <string name="call_volume_value">%1$d%%</string>
+    <string name="call_volume_hint">The volume comes back after the call</string>
+    <string name="call_nothing_hint">Calls do not affect the player</string>
+    <string name="call_pause_hint">Playback is paused for the time of the call</string>
+
+    <string name="icon_desktop">Computer</string>
+    <string name="icon_laptop">Laptop</string>
+    <string name="icon_living_room">Living room</string>
+    <string name="icon_study">Study</string>
+    <string name="icon_bedroom">Bedroom</string>
+    <string name="icon_kitchen">Kitchen</string>
+    <string name="icon_garage">Garage</string>
+    <string name="icon_home">Home</string>
+    <string name="icon_speaker">Speaker</string>
+    <string name="icon_tv">TV</string>
+    <string name="icon_headphones">Headphones</string>
+    <string name="icon_music">Music</string>
+
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_back">Back</string>
 </resources>

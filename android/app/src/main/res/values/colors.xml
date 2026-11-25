@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        The background of the app, for the window that shows while it starts. It has to be a resource: the
+        system's splash screen does not take a colour written into the theme itself.
+    -->
+    <color name="window_background">#FFFFFF</color>
+</resources>

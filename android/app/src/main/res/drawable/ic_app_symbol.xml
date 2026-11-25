@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="160"
+    android:viewportHeight="160">
+    <!-- The sign of the app's own icon, see ic_launcher_monochrome.xml: the same paths, fitted to the frame. -->
+    <group
+        android:translateX="-59"
+        android:translateY="-48">
+        <path
+            android:fillColor="#FF000000"
+            android:pathData="M74,90L132,128L74,166Z"
+            android:strokeColor="#FF000000"
+            android:strokeLineJoin="round"
+            android:strokeWidth="14" />
+        <path
+            android:pathData="M163,96A45,45 0 0 1 163,160M182,77A72,72 0 0 1 182,179"
+            android:strokeColor="#FF000000"
+            android:strokeLineCap="round"
+            android:strokeWidth="15" />
+    </group>
+</vector>

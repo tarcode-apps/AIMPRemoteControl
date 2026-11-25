@@ -1,0 +1,84 @@
+<resources>
+    <string name="players_saved">Мои плееры</string>
+    <string name="players_found">Найдены в сети</string>
+    <string name="players_searching">Поиск идёт</string>
+    <string name="players_search_failed">Поиск не запустился: %1$s</string>
+    <string name="players_nobody_found">Новых плееров не найдено</string>
+    <string name="players_empty_title">Поиск плееров в сети</string>
+    <string name="players_empty_text">После этого плеер появится здесь сам.</string>
+    <string name="players_setup_aimp">Установите AIMP на компьютер.</string>
+    <string name="players_setup_plugin">Установите в AIMP плагин Remote Control и включите его в настройках плеера, в разделе «Плагины».</string>
+    <string name="players_setup_network">Подключите компьютер и это устройство к одной сети Wi-Fi.</string>
+    <string name="players_get_plugin">Где скачать плагин?</string>
+    <string name="players_add">Добавить</string>
+    <string name="players_add_manually">Добавить вручную</string>
+    <string name="local_network_refused">Нет доступа к локальной сети: плееры не найти и к ним не подключиться.</string>
+    <string name="local_network_allow">Разрешить</string>
+
+    <string name="player_online">В сети</string>
+    <string name="player_offline">Не в сети</string>
+    <string name="player_checking">Проверка…</string>
+    <string name="player_auto_connect">Автоподключение</string>
+    <string name="player_call_lower">Тише до %1$d %%</string>
+    <string name="player_connect">Подключить</string>
+    <string name="player_connecting">Подключение…</string>
+    <string name="player_unreachable">Плеер не отвечает</string>
+    <string name="player_more">Ещё: %1$s</string>
+    <string name="player_edit">Изменить</string>
+    <string name="player_delete">Удалить</string>
+
+    <!-- The words of the plugin's own settings: «Требовать авторизацию», «Имя пользователя», «Пароль». -->
+    <string name="auth_required">Требуется авторизация</string>
+    <string name="auth_refused">Неверное имя пользователя или пароль</string>
+    <string name="auth_username">Имя пользователя</string>
+    <string name="auth_password">Пароль</string>
+    <string name="auth_sign_in">Войти</string>
+    <string name="auth_show_password">Показать пароль</string>
+    <string name="auth_hide_password">Скрыть пароль</string>
+
+    <string name="edit_new_player">Новый плеер</string>
+    <string name="edit_name">Название</string>
+    <string name="edit_name_placeholder">Имя из настроек плагина</string>
+    <string name="edit_address_placeholder">Например, 192.168.0.100</string>
+    <string name="edit_icon">Значок</string>
+    <string name="edit_address">Адрес</string>
+    <string name="edit_address_required">Введите адрес</string>
+    <string name="edit_address_invalid">Имя компьютера или IP-адрес, без http:// и порта</string>
+    <string name="edit_port">Порт</string>
+    <string name="edit_section_auth">Авторизация</string>
+    <string name="edit_section_launch">При запуске приложения</string>
+    <string name="edit_auto_connect">Подключаться автоматически</string>
+    <string name="edit_auto_connect_hint">Такой плеер один: у остальных настройка выключится</string>
+    <string name="edit_delete">Удалить плеер</string>
+
+    <string name="delete_title">Удалить плеер?</string>
+    <string name="delete_text">Он исчезнет из списка вместе с настройками и паролем.</string>
+
+    <string name="call_title">Во время звонка</string>
+    <string name="call_nothing">Ничего</string>
+    <string name="call_lower">Тише</string>
+    <string name="call_pause">Пауза</string>
+    <string name="call_volume">Громкость во время звонка</string>
+    <string name="call_volume_value">%1$d %%</string>
+    <string name="call_volume_hint">После звонка громкость вернётся</string>
+    <string name="call_nothing_hint">Плеер не реагирует на звонки</string>
+    <string name="call_pause_hint">Воспроизведение приостанавливается на время звонка</string>
+
+    <string name="icon_desktop">Компьютер</string>
+    <string name="icon_laptop">Ноутбук</string>
+    <string name="icon_living_room">Гостиная</string>
+    <string name="icon_study">Кабинет</string>
+    <string name="icon_bedroom">Спальня</string>
+    <string name="icon_kitchen">Кухня</string>
+    <string name="icon_garage">Гараж</string>
+    <string name="icon_home">Дом</string>
+    <string name="icon_speaker">Колонка</string>
+    <string name="icon_tv">Телевизор</string>
+    <string name="icon_headphones">Наушники</string>
+    <string name="icon_music">Музыка</string>
+
+    <string name="action_save">Сохранить</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_retry">Повторить</string>
+    <string name="action_back">Назад</string>
+</resources>

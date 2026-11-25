@@ -8,9 +8,9 @@ old Android app (v2.0.31). Nothing here is built yet; this is the agreed plan, d
 
 - A list of players, added by hand or found on the local network.
 - Scanning the local network for players.
-- Login and password per player, kept encrypted.
+- Login and password per player, which move to a new device with the rest.
 - A notification with the playing track and controls, also on the lock screen, watches and in the car.
-- Lowering the volume of the chosen player while a call rings or goes on.
+- Lowering the volume of the players or pausing them while a call rings or goes on, set per player.
 - The phone's volume rocker sets the player's volume.
 - The web client, shown full screen.
 
@@ -94,17 +94,30 @@ native login. No change on the server or in the client.
 
 ### Calls
 
-`AudioManager.OnModeChangedListener` (Android 12+, no permission), a `TelephonyCallback` with `READ_PHONE_STATE` below.
-While a call rings or goes on, the player's volume drops to a set share; after it, the volume comes back unless the user
-changed it meanwhile.
+Each player has its own action for a call: nothing, a lower volume (a set share) or a pause. While a call rings or goes
+on, the action applies to every saved player that has one and answers, whether the app is connected to it or not. After
+the call the volume or the playback comes back unless the user changed it meanwhile. What was changed is kept on disk:
+the process may be gone before the call ends.
+
+- **Ordinary calls, with the app closed too:** a manifest receiver of `PHONE_STATE` with `READ_PHONE_STATE`, asked for
+  when the user first turns an action on. It sends the requests to the saved addresses; there is no time for discovery.
+  To be verified on a device with the target SDK, and on OEM builds that stop background receivers.
+- **Calls in messengers:** `AudioManager.OnModeChangedListener` (Android 12+, no permission) needs a live process, so
+  they are caught only while the media session service runs, that is while its notification is there.
+- Both feed one call state, so that a call seen by both changes a player once.
 
 ### Discovery and credentials
 
 - A UDP datagram to port 3332 on the broadcast address of each interface, with a `MulticastLock` where reception needs
   it; the answer is the host name, the player is `<ip>:3333`. `GET /api/v1/settings` then tells whether a login is
   needed (`401`).
-- Passwords are encrypted with an AES-GCM key from the Android Keystore and kept in DataStore; not `security-crypto`,
-  which is deprecated.
+- Passwords are kept in DataStore, in a file of their own in the app's private storage, and not sealed with a key of the
+  Android Keystore: such a key stays on its device, and the passwords would not survive a move to a new one. A backup
+  takes them only where nobody but the user can read the copy: a transfer from device to device, and a copy in the cloud
+  that is encrypted with the screen lock. From Android 12 on the rules have no condition for a single file
+  (`requireFlags` is not read there, verified on Android 17), so the whole cloud copy is made only when encrypted
+  (`disableIfNoEncryptionCapabilities`); on Android 9 to 11 the list goes to the cloud always and the passwords on that
+  condition; Android 8 backs up the list alone.
 - The plugin's version comes with the `hello` event; the app refuses players whose plugin is too old for it.
 
 ## Web client changes
@@ -169,7 +182,7 @@ uploaded by hand: the API cannot create the app.
 2. **Skeleton:** project, Compose, players added by hand, DataStore, the web view with Digest and back navigation.
    Useful from here on.
 3. **Discovery** over UDP 3332.
-4. **Credentials** in the Keystore, login on the first `401`.
+4. **Credentials** kept with the players, login on the first `401`.
 5. **Service and notification:** the stream on OkHttp, Media3 session, covers, foreground rules.
 6. **Volume and calls.**
 7. **Bridge:** shared events, downloads, file chooser, folder uploads, share target.

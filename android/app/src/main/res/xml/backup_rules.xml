@@ -1,13 +1,10 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    What a backup of the app takes on Android 8: see data_extraction_rules.xml. These versions cannot
+    tell where a copy goes, so the passwords stay out of it; xml-v28 has the rules for Android 9 to 11.
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <include domain="file" path="datastore/players.json" />
+    <include domain="root" path="app_webview" />
+    <include domain="sharedpref" path="." />
 </full-backup-content>

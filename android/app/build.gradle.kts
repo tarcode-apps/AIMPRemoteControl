@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -22,8 +23,9 @@ android {
     buildTypes {
         release {
             optimization {
+                // The whole app, not the libraries alone (`packageScope`): optimized apart from the code that
+                // calls them, kotlin's sequence functions lose a class they inherit, and the app fails at start.
                 enable = true
-                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
         }
     }
@@ -41,4 +43,10 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.datastore)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.kotlinx.serialization.json)
+
+    testImplementation(libs.junit)
 }

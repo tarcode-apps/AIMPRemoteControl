@@ -147,10 +147,13 @@ Things that bite:
   (`.catch(showError)` for an async helper), which shows it in the one toast; a call that may fail unnoticed says why in
   a comment. There is no global error handler on purpose. A failure for want of the player is the one exception: queries
   wait for the player instead of failing, and `useErrorToast` leaves such a failure to the connection banner at the top
-  (`app/_api/helpers/connection.ts`). A class passed to a shared component never sets a property the component's own
-  root class sets: which of two rules of equal specificity wins depends on the order the bundler gives the stylesheets,
-  which differs between dev and build. The components take custom properties instead (`--icon-size`, `--icon-fill`,
-  `--icon-button-size`, `--icon-button-color`, …; each module names its own at the top).
+  (`app/_api/helpers/connection.ts`). Whatever reaches the API goes through `app/_api/helpers/transport.ts`, never a
+  `fetch`, an `EventSource` or an `<img src>` of its own: in the Android app the page has no login, and the API is
+  reached through the app ([docs/android-bridge.md](docs/android-bridge.md)); what the app cannot do yet is hidden
+  there. A class passed to a shared component never sets a property the component's own root class sets: which of two
+  rules of equal specificity wins depends on the order the bundler gives the stylesheets, which differs between dev and
+  build. The components take custom properties instead (`--icon-size`, `--icon-fill`, `--icon-button-size`,
+  `--icon-button-color`, …; each module names its own at the top).
 - **Localization.** `plugin/Langs/*.lng` are UTF-16LE with BOM and CRLF line endings — preserve both, git treats them as
   binary. Keys used in code must exist in every language file; format placeholders (`{0}`) must survive translation.
   Error messages of both protocols share `[AIMPRemoteControlErrors]`, keyed by the `LocalizedRpcError` key or the

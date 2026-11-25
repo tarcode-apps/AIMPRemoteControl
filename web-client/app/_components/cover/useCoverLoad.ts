@@ -1,3 +1,4 @@
+import { transport } from '@/app/_api/helpers/transport';
 import { useDebouncedValue } from '@/app/_hooks/useDebouncedValue';
 import { useEffect, useReducer } from 'react';
 
@@ -52,8 +53,8 @@ function remember(key: string, imageUrl: string, blob: Blob | undefined) {
     }
 }
 
-// Loads the cover at `url` through fetch, which can be cancelled, and keeps the
-// result under `key`.
+// Loads the cover at `url` as the API is reached, which can be cancelled, and keeps
+// the result under `key`.
 export function useCoverLoad(url: string | undefined, key = url): CoverLoad | undefined {
     const [, loaded] = useReducer((n: number) => n + 1, 0);
     // Debounced as one string: an object would be new on every render.
@@ -65,10 +66,10 @@ export function useCoverLoad(url: string | undefined, key = url): CoverLoad | un
         const controller = new AbortController();
         (async () => {
             try {
-                const response = await fetch(settledUrl, { signal: controller.signal });
-                const blob = response.ok ? await response.blob() : undefined;
+                const { load } = await transport;
+                const { status, url: imageUrl, blob } = await load(settledUrl, controller.signal);
                 if (controller.signal.aborted) return;
-                remember(settledKey, response.url || settledUrl, blob);
+                remember(settledKey, imageUrl, status >= 200 && status < 300 ? blob : undefined);
                 loaded();
             } catch {
                 // Cancelled, or the network failed, which leaves the last image in place.

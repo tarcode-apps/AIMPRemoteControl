@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tarasovlabs.aimpremotecontrol.R
+import com.tarasovlabs.aimpremotecontrol.network.MinPluginVersion
 import com.tarasovlabs.aimpremotecontrol.players.CallAction
 import com.tarasovlabs.aimpremotecontrol.players.Player
 
@@ -70,14 +71,16 @@ internal fun Modifier.bleed(horizontal: Dp) = layout { measurable, constraints -
 }
 
 /**
- * A player the user keeps. [online] is null while nothing is known yet. Its settings are rows across the
- * card, as in the system's settings, so that they fit a narrow screen whatever their values say.
+ * A player the user keeps. [online] is null while nothing is known yet; [outdated] is a player whose plugin
+ * the app does not work with. Its settings are rows across the card, as in the system's settings, so that
+ * they fit a narrow screen whatever their values say.
  */
 @Composable
 fun SavedPlayerCard(
     player: Player,
     online: Boolean?,
     loginNeeded: Boolean,
+    outdated: Boolean,
     connecting: Boolean,
     unreachable: Boolean,
     onConnect: () -> Unit,
@@ -109,7 +112,7 @@ fun SavedPlayerCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    IconTile(player.icon.drawable, size = 48.dp, active = online == true && !unreachable)
+                    IconTile(player.icon.drawable, size = 48.dp, active = online == true && !unreachable && !outdated)
                     NameAndAddress(
                         player.title,
                         player.address,
@@ -134,6 +137,8 @@ fun SavedPlayerCard(
 
                             unreachable -> Unreachable()
 
+                            outdated -> Outdated()
+
                             else -> Status(online, authMissing = loginNeeded && player.login.isEmpty())
                         }
                     }
@@ -143,7 +148,8 @@ fun SavedPlayerCard(
                     when {
                         connecting -> CapsButton(stringResource(R.string.action_cancel), onClick = onCancel)
 
-                        unreachable -> CapsButton(stringResource(R.string.action_retry), onClick = onConnect)
+                        unreachable || outdated ->
+                            CapsButton(stringResource(R.string.action_retry), onClick = onConnect)
 
                         else -> CapsButton(
                             stringResource(R.string.player_connect),
@@ -212,6 +218,7 @@ fun FoundPlayerCard(
     name: String,
     address: String,
     loginNeeded: Boolean,
+    outdated: Boolean,
     connecting: Boolean,
     unreachable: Boolean,
     onConnect: () -> Unit,
@@ -257,7 +264,10 @@ fun FoundPlayerCard(
                     }
                 }
             )
-            if (unreachable) Unreachable(modifier = Modifier.padding(end = 12.dp))
+            when {
+                unreachable -> Unreachable(modifier = Modifier.padding(end = 12.dp))
+                outdated -> Outdated(modifier = Modifier.padding(end = 12.dp))
+            }
         }
     }
 }
@@ -424,13 +434,16 @@ private fun NameAndAddress(
 
 /** What a card says of a player that did not answer. */
 @Composable
-private fun Unreachable(modifier: Modifier = Modifier) {
-    Text(
-        stringResource(R.string.player_unreachable),
-        modifier = modifier,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.error
-    )
+private fun Unreachable(modifier: Modifier = Modifier) = Failure(stringResource(R.string.player_unreachable), modifier)
+
+/** What a card says of a player whose plugin is older than the app works with. */
+@Composable
+private fun Outdated(modifier: Modifier = Modifier) =
+    Failure(stringResource(R.string.player_outdated, MinPluginVersion), modifier)
+
+@Composable
+private fun Failure(text: String, modifier: Modifier) {
+    Text(text, modifier = modifier, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
 }
 
 /**

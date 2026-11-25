@@ -100,7 +100,7 @@ private const val LocalNetworkPermission = "android.permission.ACCESS_LOCAL_NETW
  * a low one has no title row.
  */
 @Composable
-fun PlayersScreen(viewModel: PlayersViewModel, onOpen: (id: String) -> Unit, onEdit: (id: String?) -> Unit) {
+fun PlayersScreen(viewModel: PlayersViewModel, onEdit: (id: String?) -> Unit) {
     val context = LocalContext.current
     val activity = LocalActivity.current
     val layout = rememberWindowLayout()
@@ -124,16 +124,10 @@ fun PlayersScreen(viewModel: PlayersViewModel, onOpen: (id: String) -> Unit, onE
     // The user may have changed it in the system settings meanwhile.
     LifecycleResumeEffect(Unit) {
         localNetwork = hasLocalNetwork(context)
+        viewModel.checkWebView()
         onPauseOrDispose { }
     }
     LaunchedEffect(localNetwork) { viewModel.setLocalNetwork(localNetwork) }
-
-    LaunchedEffect(state.opened) {
-        state.opened?.let { id ->
-            viewModel.openedHandled()
-            onOpen(id)
-        }
-    }
 
     var callActionOf by rememberSaveable { mutableStateOf<String?>(null) }
     var deleting by rememberSaveable { mutableStateOf<String?>(null) }
@@ -145,6 +139,7 @@ fun PlayersScreen(viewModel: PlayersViewModel, onOpen: (id: String) -> Unit, onE
             player = player,
             online = item.online,
             loginNeeded = item.loginNeeded,
+            outdated = item.outdated,
             connecting = state.connecting == player.id,
             unreachable = player.id in state.unreachable,
             onConnect = { viewModel.connect(player) },
@@ -162,6 +157,7 @@ fun PlayersScreen(viewModel: PlayersViewModel, onOpen: (id: String) -> Unit, onE
             name = item.name,
             address = item.host,
             loginNeeded = item.loginNeeded,
+            outdated = item.outdated,
             connecting = state.connecting == item.key,
             unreachable = item.key in state.unreachable,
             onConnect = { viewModel.connect(item) }
@@ -223,9 +219,18 @@ fun PlayersScreen(viewModel: PlayersViewModel, onOpen: (id: String) -> Unit, onE
                     end = innerPadding.calculateEndPadding(direction)
                 )
         ) {
+            if (!state.webView.usable) {
+                Notice(
+                    text = stringResource(R.string.webview_outdated, MinWebViewVersion),
+                    action = stringResource(R.string.webview_update),
+                    onAction = { openWebViewUpdate(context, state.webView.packageName) }
+                )
+            }
             if (!localNetwork && refused) {
-                LocalNetworkRefused(
-                    onAllow = {
+                Notice(
+                    text = stringResource(R.string.local_network_refused),
+                    action = stringResource(R.string.local_network_allow),
+                    onAction = {
                         // Refused for good, the system no longer asks: the way is through its settings.
                         if (activity?.shouldShowRequestPermissionRationale(LocalNetworkPermission) == false) {
                             context.startActivity(
@@ -434,8 +439,9 @@ private fun AddButton(text: String, onClick: () -> Unit) {
     }
 }
 
+/** What keeps the app from its players, above the list, with the action that helps. */
 @Composable
-private fun LocalNetworkRefused(onAllow: () -> Unit) {
+private fun Notice(text: String, action: String, onAction: () -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -449,15 +455,11 @@ private fun LocalNetworkRefused(onAllow: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                stringResource(R.string.local_network_refused),
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium
-            )
+            Text(text, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
             TextButton(
-                onClick = onAllow,
+                onClick = onAction,
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onErrorContainer)
-            ) { Text(stringResource(R.string.local_network_allow)) }
+            ) { Text(action) }
         }
     }
 }

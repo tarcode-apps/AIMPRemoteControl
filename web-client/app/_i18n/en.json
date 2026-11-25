@@ -44,7 +44,8 @@
     "main": "Main navigation",
     "playlists": "Playlists",
     "menu": "Menu",
-    "back": "Back"
+    "back": "Back",
+    "disconnect": "Disconnect"
   },
   "screens": {
     "player": "Player",

@@ -6,11 +6,13 @@ import { useLyrics, useTrackInfo } from '@/app/_api/playlists';
 import type { Lyrics, TrackInfo } from '@/app/_api/types';
 import { ToolbarButton, useHoldGesture } from '@/app/_components/buttons';
 import { ItemCover } from '@/app/_components/cover';
+import { useCoverLoad } from '@/app/_components/cover/useCoverLoad';
 import { Icon } from '@/app/_components/icons';
 import { Screen } from '@/app/_components/pages';
 import { useToast } from '@/app/_components/toast';
 import { useMediaQuery } from '@/app/_hooks/useMediaQuery';
 import { media } from '@/app/_styles/media';
+import { useAppFeature } from '@/app/_utils/androidApp';
 import { formatKilobytes, formatPreciseDuration } from '@/app/_utils/format';
 import clsx from 'clsx';
 import type { TFunction } from 'i18next';
@@ -193,6 +195,12 @@ export function TrackInfoScreen() {
     const toast = useToast();
     const [hasCover, setHasCover] = useState(false);
     const [viewing, setViewing] = useState(false);
+    // A browser shows the image from its address, and saves it under the name the
+    // address offers. In the Android app the page has no login of its own, and the
+    // image comes as the rest of the API does.
+    const loadsCover = useAppFeature('api');
+    const original = info && viewing ? originalCoverUrl(info) : undefined;
+    const loaded = useCoverLoad(loadsCover ? original : undefined);
     const coverButton = useRef<HTMLButtonElement>(null);
 
     const gone = error instanceof ApiError && error.code === 'itemNotFound';
@@ -226,7 +234,7 @@ export function TrackInfoScreen() {
             toolbar={toolbar}
         >
             <CoverViewer
-                src={info && viewing ? originalCoverUrl(info) : null}
+                src={(loadsCover ? loaded?.objectUrl : original) ?? null}
                 label={t('trackInfo.cover')}
                 origin={() => coverButton.current?.getBoundingClientRect()}
                 onClose={() => setViewing(false)}

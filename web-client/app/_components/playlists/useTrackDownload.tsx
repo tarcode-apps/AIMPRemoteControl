@@ -4,6 +4,7 @@ import { errorMessage, NetworkError } from '@/app/_api/helpers/errors';
 import { responseError } from '@/app/_api/helpers/request';
 import { itemFileUrl } from '@/app/_api/playlists';
 import { useSettings } from '@/app/_api/settings';
+import { useAppFeature } from '@/app/_utils/androidApp';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextButton } from '../buttons';
@@ -56,7 +57,10 @@ export type TrackDownload = {
 
 export function useTrackDownload(): TrackDownload {
     const { t } = useTranslation();
-    const allowed = useSettings().data?.permissions.downloadTracks === true;
+    // The browser saves the file by itself, with its own login. In the Android app
+    // the page has none: the API is reached through the app, which saves no files yet.
+    const saves = !useAppFeature('api');
+    const allowed = useSettings().data?.permissions.downloadTracks === true && saves;
     const [error, setError] = useState<unknown>(null);
     const close = () => setError(null);
 

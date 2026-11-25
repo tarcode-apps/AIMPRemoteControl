@@ -14,6 +14,8 @@
     <string name="players_add_manually">Добавить вручную</string>
     <string name="local_network_refused">Нет доступа к локальной сети: плееры не найти и к ним не подключиться.</string>
     <string name="local_network_allow">Разрешить</string>
+    <string name="webview_outdated">Плееры открываются в Android System WebView версии %1$d или новее. Обновите его или включите в настройках системы.</string>
+    <string name="webview_update">Обновить</string>
 
     <string name="player_online">В сети</string>
     <string name="player_offline">Не в сети</string>
@@ -23,6 +25,7 @@
     <string name="player_connect">Подключить</string>
     <string name="player_connecting">Подключение…</string>
     <string name="player_unreachable">Плеер не отвечает</string>
+    <string name="player_outdated">Обновите плагин в AIMP до версии %1$s или новее</string>
     <string name="player_more">Ещё: %1$s</string>
     <string name="player_edit">Изменить</string>
     <string name="player_delete">Удалить</string>

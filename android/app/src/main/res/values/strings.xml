@@ -16,6 +16,8 @@
     <string name="players_add_manually">Add manually</string>
     <string name="local_network_refused">No access to the local network: players can be neither found nor reached.</string>
     <string name="local_network_allow">Allow</string>
+    <string name="webview_outdated">Players open in Android System WebView %1$d or later. Update it, or turn it on in the system settings.</string>
+    <string name="webview_update">Update</string>
 
     <string name="player_online">Online</string>
     <string name="player_offline">Offline</string>
@@ -25,6 +27,7 @@
     <string name="player_connect">Connect</string>
     <string name="player_connecting">Connecting…</string>
     <string name="player_unreachable">The player does not answer</string>
+    <string name="player_outdated">Update the plugin in AIMP to version %1$s or later</string>
     <string name="player_more">More: %1$s</string>
     <string name="player_edit">Edit</string>
     <string name="player_delete">Delete</string>

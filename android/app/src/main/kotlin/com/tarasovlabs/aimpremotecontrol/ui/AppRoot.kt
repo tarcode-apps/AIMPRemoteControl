@@ -14,29 +14,32 @@ import com.tarasovlabs.aimpremotecontrol.players.Player
 
 private const val NewPlayer = "new"
 
-/** The app's screens and the way between them: the list, a player's settings, a player's web client. */
+/**
+ * The app's screens and the way between them. With a player connected the app is that player's: its web
+ * client is all there is, until the user disconnects in it. With none connected there is the list of
+ * players and their settings.
+ */
 @Composable
 fun AppRoot(viewModel: PlayersViewModel = viewModel(factory = PlayersViewModel.Factory)) {
     val players by viewModel.players.collectAsStateWithLifecycle()
+    val connectedId by viewModel.connected.collectAsStateWithLifecycle()
 
-    var opened by rememberSaveable { mutableStateOf<String?>(null) }
     var editing by rememberSaveable { mutableStateOf<String?>(null) }
 
     val saved: List<Player> = players ?: run {
         Surface(modifier = Modifier.fillMaxSize()) { }
         return
     }
-    val openedPlayer = saved.firstOrNull { it.id == opened }
+    val connected = saved.firstOrNull { it.id == connectedId }
     val editedId = editing
 
     when {
-        openedPlayer != null -> PlayerWebView(
-            player = openedPlayer,
-            onClose = { opened = null },
-            onLoginRefused = {
-                viewModel.loginRefused(openedPlayer.id)
-                opened = null
-            }
+        connected != null -> PlayerWebView(
+            player = connected,
+            connection = viewModel.connection,
+            onDisconnect = viewModel::disconnect,
+            onLoginRefused = { viewModel.loginRefused(connected.id) },
+            onLoadFailed = { reason -> viewModel.loadFailed(connected.id, reason) }
         )
 
         editedId != null -> PlayerEditScreen(
@@ -52,10 +55,6 @@ fun AppRoot(viewModel: PlayersViewModel = viewModel(factory = PlayersViewModel.F
             onClose = { editing = null }
         )
 
-        else -> PlayersScreen(
-            viewModel = viewModel,
-            onOpen = { opened = it },
-            onEdit = { editing = it ?: NewPlayer }
-        )
+        else -> PlayersScreen(viewModel = viewModel, onEdit = { editing = it ?: NewPlayer })
     }
 }

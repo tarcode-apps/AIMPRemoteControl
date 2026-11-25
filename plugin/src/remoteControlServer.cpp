@@ -23,6 +23,7 @@
 #include "listenerStatus.h"
 #include "moduleDirectory.h"
 #include "networkWatcher.h"
+#include "pluginInfo.h"
 #include "requestScope.h"
 #include "utf8Path.h"
 #include "apiController.h"
@@ -555,6 +556,7 @@ struct AIMPRemoteControlServer::Impl : IEndpointRouteBuilder
 		listener.Address = address;
 		listener.Http = std::make_unique<httplib::Server>();
 		listener.Http->set_socket_options(ExclusivePort);
+		listener.Http->set_default_headers({{PLUGIN_VERSION_HEADER, PLUGIN_VERSION_STRING}});
 		listener.Http->new_task_queue = []
 		{ return new httplib::ThreadPool(BaseWorkers, MaxWorkers, MaxQueuedConnections); };
 		listener.Http->set_pre_request_handler([state = listener.State](const httplib::Request &req, httplib::Response &)

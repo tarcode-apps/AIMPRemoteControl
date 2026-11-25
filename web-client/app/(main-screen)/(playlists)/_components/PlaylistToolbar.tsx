@@ -19,6 +19,7 @@ import { useNavigation } from '@/app/_state/Navigation';
 import { usePlaylistSelection } from '@/app/_state/PlaylistSelection';
 import { useFavoriteActions } from '@/app/_state/useFavoriteActions';
 import { media } from '@/app/_styles/media';
+import { useAppFeature } from '@/app/_utils/androidApp';
 import { pickedFiles } from '@/app/_utils/droppedFiles';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -116,7 +117,10 @@ export function PlaylistToolbar() {
     // What the player's settings allow; a URL needs no permission.
     const pickFiles = () => fileInput.current?.click();
     const canBrowse = selected !== undefined && permissions?.browseFiles === true;
-    const canUpload = permissions?.uploadTracks === true;
+    // The browser sends the files by itself, with its own login. In the Android app
+    // the page has none: the API is reached through the app, which sends no files yet.
+    const sends = !useAppFeature('api');
+    const canUpload = permissions?.uploadTracks === true && sends;
     const browseEntries: MenuEntry[] =
         canBrowse && selected
             ? [

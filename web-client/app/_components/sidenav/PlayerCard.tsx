@@ -1,10 +1,12 @@
 'use client';
 
 import { useAbout, type About } from '@/app/_api/about';
+import { disconnect, useAppFeature } from '@/app/_utils/androidApp';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TextButton } from '../buttons';
+import { IconButton, TextButton } from '../buttons';
 import { Dialog } from '../dialogs';
+import { Icon } from '../icons';
 import styles from './PlayerCard.module.scss';
 
 const sourceUrl = 'https://github.com/tarcode-apps/AIMPRemoteControl';
@@ -12,20 +14,30 @@ const sourceUrl = 'https://github.com/tarcode-apps/AIMPRemoteControl';
 const licensesUrl = '/_next/static/third-party-licenses.txt';
 
 // The player under control, at the top of the sidebar; it opens what is known of it.
+// In the Android app, which keeps several players and is connected to one of them,
+// the card has the button that leaves this one.
 export function PlayerCard() {
     const { t } = useTranslation();
     const about = useAbout();
     const [open, setOpen] = useState(false);
+    const canDisconnect = useAppFeature('disconnect');
 
     return (
         <div className={styles.header} data-row>
-            <button type="button" className={styles.card} disabled={!about} onClick={() => setOpen(true)}>
-                <LogoIcon />
-                <span className={styles.text}>
-                    <span className={styles.name}>{about?.name || t('app.name')}</span>
-                    {about && <span className={styles.details}>AIMP {about.aimpVersion}</span>}
-                </span>
-            </button>
+            <div className={styles.card}>
+                <button type="button" className={styles.about} disabled={!about} onClick={() => setOpen(true)}>
+                    <LogoIcon />
+                    <span className={styles.text}>
+                        <span className={styles.name}>{about?.name || t('app.name')}</span>
+                        {about && <span className={styles.details}>AIMP {about.aimpVersion}</span>}
+                    </span>
+                </button>
+                {canDisconnect && (
+                    <IconButton title={t('nav.disconnect')} className={styles.disconnect} onClick={disconnect}>
+                        <Icon>close</Icon>
+                    </IconButton>
+                )}
+            </div>
             {open && about && <AboutDialog about={about} onClose={() => setOpen(false)} />}
         </div>
     );

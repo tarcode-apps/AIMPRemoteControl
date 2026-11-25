@@ -9,9 +9,9 @@
 #define PLUGIN_URL_APP "https://aimpremote.blogspot.com"
 #define PLUGIN_URL_FORUM "https://4pda.to/forum/index.php?showtopic=499539"
 
-#define PLUGIN_VERSION_MAJOR 2
+#define PLUGIN_VERSION_MAJOR 3
 #define PLUGIN_VERSION_MINOR 0
-#define PLUGIN_VERSION_PATCH 1
+#define PLUGIN_VERSION_PATCH 0
 #define PLUGIN_VERSION_BUILD 0
 
 #define PLUGIN_STRINGIZE_(x) #x
@@ -23,5 +23,8 @@
 #define PLUGIN_COPYRIGHT "Copyright (c) " PLUGIN_STRINGIZE(PLUGIN_BUILD_YEAR) " " PLUGIN_AUTHOR ". " PLUGIN_LICENSE "."
 
 #define PLUGIN_AUTH_REALM "AIMP Remote Control"
+// The header of every answer that carries PLUGIN_VERSION_STRING: a client learns the version before it has a login.
+// Not `Server`, which a proxy in front of the player replaces with its own.
+#define PLUGIN_VERSION_HEADER "AIMP-Remote-Control-Version"
 #define PLUGIN_REMOTE_CONTROL_VERSION "1.2.0.5"
 #define PLUGIN_MDNS_SERVICE_TYPE "_aimp-remote._tcp"

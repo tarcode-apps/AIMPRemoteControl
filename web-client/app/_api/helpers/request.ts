@@ -1,7 +1,6 @@
 import { reportConnectionFailure } from './connection';
 import { ApiError, HttpError, isConnectionError, NetworkError } from './errors';
-
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+import { transport, type Answer, type HttpMethod } from './transport';
 
 export type RequestOptions = {
     body?: unknown;
@@ -29,31 +28,24 @@ export function responseError(status: number, contentType: string | null, text: 
 }
 
 export async function request<T>(method: HttpMethod, path: string, options: RequestOptions = {}): Promise<T> {
-    let response: Response;
+    let answer: Answer;
     try {
-        response = await fetch(basePath + path, {
-            method,
-            headers: {
-                Accept: 'application/json',
-                ...(options.body !== undefined && { 'Content-Type': 'application/json' }),
-            },
-            body: options.body === undefined ? undefined : JSON.stringify(options.body),
-            signal: options.signal,
-            cache: 'no-store',
-        });
+        const { send } = await transport;
+        const body = options.body === undefined ? undefined : JSON.stringify(options.body);
+        answer = await send(method, basePath + path, body, options.signal);
     } catch (cause) {
         if (cause instanceof DOMException && cause.name === 'AbortError') throw cause;
         reportConnectionFailure();
         throw new NetworkError(cause);
     }
 
-    const contentType = response.headers.get('Content-Type');
-    if (response.ok) {
-        if (response.status === 204) return undefined as T;
-        if (!contentType?.includes('application/json')) throw new HttpError(response.status);
-        return (await response.json()) as T;
+    const { status, contentType, text } = answer;
+    if (status >= 200 && status < 300) {
+        if (status === 204) return undefined as T;
+        if (!contentType?.includes('application/json')) throw new HttpError(status);
+        return JSON.parse(text) as T;
     }
-    const error = responseError(response.status, contentType, await response.text());
+    const error = responseError(status, contentType, text);
     if (isConnectionError(error)) reportConnectionFailure();
     throw error;
 }

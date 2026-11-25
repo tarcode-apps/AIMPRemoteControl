@@ -54,6 +54,17 @@ test.describe('with authentication', () => {
         expect((await api.context.get('/api/v1/events', { timeout: 5000 })).status()).toBe(401);
     });
 
+    // The Android app reads it to tell a plugin too old for it, before it has a login.
+    test("every answer names the plugin's version, a refusal too", async ({ api }) => {
+        const header = 'aimp-remote-control-version';
+        const version = /^\d+\.\d+\.\d+\.\d+$/;
+        const refused = await api.context.get('/api/v1/settings');
+        expect(refused.status()).toBe(401);
+        expect(refused.headers()[header]).toMatch(version);
+        expect((await api.context.get('/')).headers()[header]).toMatch(version);
+        expect((await api.context.get('/no-such-page/')).headers()[header]).toMatch(version);
+    });
+
     test('a replayed header is not run, and is answered stale so a client signs anew', async ({ api }) => {
         const command = { jsonrpc: '2.0', id: 1, method: 'Version' };
         const challenge = challengeOf(await api.context.post('/RPC_JSON', { data: command }))!;

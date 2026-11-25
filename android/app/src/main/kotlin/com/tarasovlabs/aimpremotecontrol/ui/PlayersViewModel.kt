@@ -1,5 +1,6 @@
 package com.tarasovlabs.aimpremotecontrol.ui
 
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -13,7 +14,10 @@ import com.tarasovlabs.aimpremotecontrol.discovery.DiscoveryState
 import com.tarasovlabs.aimpremotecontrol.discovery.PlayerDiscovery
 import com.tarasovlabs.aimpremotecontrol.network.PlayerAnswer
 import com.tarasovlabs.aimpremotecontrol.network.askPlayer
+import com.tarasovlabs.aimpremotecontrol.network.pluginSupported
 import com.tarasovlabs.aimpremotecontrol.network.resolveHost
+import com.tarasovlabs.aimpremotecontrol.player.ConnectedPlayer
+import com.tarasovlabs.aimpremotecontrol.player.PlayerConnection
 import com.tarasovlabs.aimpremotecontrol.players.Player
 import com.tarasovlabs.aimpremotecontrol.players.PlayersStore
 import java.net.Inet4Address
@@ -41,11 +45,21 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** A kept player as the list shows it. [online] is null while nothing is known yet. */
-data class SavedPlayerItem(val player: Player, val online: Boolean?, val loginNeeded: Boolean)
+/**
+ * A kept player as the list shows it. [online] is null while nothing is known yet; [outdated] says that its
+ * plugin is older than the app works with.
+ */
+data class SavedPlayerItem(val player: Player, val online: Boolean?, val loginNeeded: Boolean, val outdated: Boolean)
 
 /** A found player the user does not keep, with the address the app would reach it at. */
-data class FoundPlayerItem(val key: String, val name: String, val host: String, val port: Int, val loginNeeded: Boolean)
+data class FoundPlayerItem(
+    val key: String,
+    val name: String,
+    val host: String,
+    val port: Int,
+    val loginNeeded: Boolean,
+    val outdated: Boolean
+)
 
 /** A login the user is asked for, to go on with the connection that [key] names. */
 data class LoginRequest(val key: String, val player: Player, val refused: Boolean)
@@ -62,44 +76,59 @@ data class PlayersUiState(
     /** Whose last connection got no answer, named as [connecting] is. */
     val unreachable: Set<String> = emptySet(),
     val loginRequest: LoginRequest? = null,
-    /** The id of a player that has just let the app in: the screen opens it and says so. */
-    val opened: String? = null
+    /** The system's web view, which shows the players' web clients. */
+    val webView: SystemWebView = SystemWebView(usable = true, packageName = "")
 )
 
 /**
- * The players and what is known of them: the kept ones, the ones the search finds, who answers, and the
- * connection being tried. The search and the checks run while somebody watches [uiState].
+ * The players and what is known of them: the kept ones, the ones the search finds, who answers, the
+ * connection being tried and the player that is connected. The search and the checks run while somebody
+ * watches [uiState].
  */
-@OptIn(ExperimentalCoroutinesApi::class)
 class PlayersViewModel(
     private val store: PlayersStore,
     private val discovery: PlayerDiscovery,
-    private val savedState: SavedStateHandle
+    private val connectedPlayer: ConnectedPlayer,
+    private val savedState: SavedStateHandle,
+    private val readWebView: () -> SystemWebView
 ) : ViewModel() {
     /** The kept players; null until they are read. */
     val players: StateFlow<List<Player>?> = store.players.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    /**
+     * The id of the connected player: the app shows its web client and nothing else, and is left with it
+     * connected. The list is there while no player is connected.
+     */
+    val connected: StateFlow<String?> = connectedPlayer.id
+
+    /** The connection to that player. */
+    val connection: StateFlow<PlayerConnection?> = connectedPlayer.connection
+
     private data class Attempt(
         val connecting: String? = null,
         val unreachable: Set<String> = emptySet(),
-        val loginRequest: LoginRequest? = null,
-        val opened: String? = null
+        val loginRequest: LoginRequest? = null
     )
 
     /** A found player with the address the app would reach it at: the plugin listens on IPv4 only. */
     private class Found(val player: DiscoveredPlayer, val host: String) {
         val loginNeeded: Boolean get() = player.attributes["auth"] == "1"
+        val outdated: Boolean get() = !pluginSupported(player.attributes["version"])
     }
 
     private val localNetwork = MutableStateFlow(false)
+
+    // Read before anything is connected: with a web view too old for it, no player is.
+    private val webView = MutableStateFlow(readWebView())
 
     // What the hosts of the kept players stand for, and whether a player answers there: a player reached
     // by a name of the user's own, or through another network, is not among the found ones.
     private val addresses = MutableStateFlow(emptyMap<String, Set<InetAddress>>())
     private val answers = MutableStateFlow(emptyMap<String, PlayerAnswer>())
     private val attempt = MutableStateFlow(Attempt())
-    private var connection: Job? = null
+    private var asking: Job? = null
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     private val watching: Flow<Nothing> = localNetwork.flatMapLatest { allowed ->
         if (!allowed) {
             emptyFlow()
@@ -123,8 +152,8 @@ class PlayersViewModel(
         discovery.state,
         addresses,
         answers,
-        attempt
-    ) { players, discovery, addresses, answers, attempt ->
+        combine(attempt, webView, ::Pair)
+    ) { players, discovery, addresses, answers, (attempt, webView) ->
         val found = reachable(discovery)
         fun match(player: Player) = found.firstOrNull { it.player.isAt(player.host, player.port, addresses[player.host].orEmpty()) }
 
@@ -136,19 +165,29 @@ class PlayersViewModel(
                 SavedPlayerItem(
                     player = player,
                     online = if (match != null) true else answer?.reached,
-                    loginNeeded = match?.loginNeeded == true || answer == PlayerAnswer.LoginNeeded
+                    loginNeeded = match?.loginNeeded == true || answer == PlayerAnswer.LoginNeeded,
+                    outdated = match?.outdated == true || answer == PlayerAnswer.Outdated
                 )
             },
             found = found
                 .filter { candidate -> players.none { match(it) === candidate } }
                 .sortedBy { it.player.name.lowercase() }
-                .map { FoundPlayerItem(it.player.serviceName, it.player.name, it.host, it.player.port, it.loginNeeded) },
+                .map {
+                    FoundPlayerItem(
+                        key = it.player.serviceName,
+                        name = it.player.name,
+                        host = it.host,
+                        port = it.player.port,
+                        loginNeeded = it.loginNeeded,
+                        outdated = it.outdated || answers["${it.host}:${it.player.port}"] == PlayerAnswer.Outdated
+                    )
+                },
             searching = discovery.searching,
             searchFailure = discovery.failure,
             connecting = attempt.connecting,
             unreachable = attempt.unreachable,
             loginRequest = attempt.loginRequest,
-            opened = attempt.opened
+            webView = webView
         )
     }
 
@@ -156,13 +195,25 @@ class PlayersViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(StopAfter), PlayersUiState())
 
     init {
-        // The player marked for it is opened once, when the app starts.
+        // The system ended the process with a player connected: the activity it brings back goes on with it.
+        val restored: String? = savedState[Connected]
+        if (connectedPlayer.id.value == null && restored != null) {
+            connectedPlayer.resume(restored)
+            viewModelScope.launch {
+                val player = players.filterNotNull().first().firstOrNull { it.id == restored }
+                if (connectedPlayer.id.value != restored || connectedPlayer.connection.value != null) return@launch
+                if (player != null) connectedPlayer.connect(player) else disconnect()
+            }
+        }
+
+        // The player marked for it is connected once, when the app starts with none connected.
         if (savedState.get<Boolean>(AutoConnectTried) != true) {
             viewModelScope.launch {
                 // Nothing is reached before the local network is open to the app.
                 localNetwork.first { it }
                 val marked = players.filterNotNull().first().firstOrNull { it.autoConnect }
-                if (marked != null && savedState.get<Boolean>(AutoConnectTried) != true) connect(marked)
+                val wanted = connectedPlayer.id.value == null && savedState.get<Boolean>(AutoConnectTried) != true
+                if (marked != null && wanted) connect(marked)
                 savedState[AutoConnectTried] = true
             }
         }
@@ -173,6 +224,11 @@ class PlayersViewModel(
         localNetwork.value = allowed
     }
 
+    /** The user may have updated the system's web view meanwhile. */
+    fun checkWebView() {
+        webView.value = readWebView()
+    }
+
     fun connect(player: Player) = connect(player.id, player)
 
     fun connect(found: FoundPlayerItem) = connect(
@@ -181,7 +237,7 @@ class PlayersViewModel(
     )
 
     fun cancel() {
-        connection?.cancel()
+        asking?.cancel()
         attempt.update { it.copy(connecting = null) }
     }
 
@@ -195,14 +251,28 @@ class PlayersViewModel(
         attempt.update { it.copy(loginRequest = null) }
     }
 
-    /** The web view was refused with the login of a kept player: it is asked for again. */
+    /** The user leaves the connected player for the list. */
+    fun disconnect() {
+        connectedPlayer.disconnect()
+        savedState[Connected] = null
+    }
+
+    /** The connected player takes the kept login no more: it is asked for again. */
     fun loginRefused(id: String) {
         val player = players.value?.firstOrNull { it.id == id } ?: return
+        if (connectedPlayer.id.value == id) disconnect()
         attempt.update { it.copy(loginRequest = LoginRequest(player.id, player, refused = true)) }
     }
 
-    fun openedHandled() {
-        attempt.update { it.copy(opened = null) }
+    /**
+     * The web view could not load the page of the connected player: the player is no longer connected, and
+     * the list says of it what it says after a connection that got no answer.
+     */
+    fun loadFailed(id: String, reason: String) {
+        if (connectedPlayer.id.value != id) return
+        Log.i(Tag, "the page of the player did not load: $reason")
+        disconnect()
+        attempt.update { it.copy(unreachable = it.unreachable + id) }
     }
 
     fun save(player: Player) {
@@ -216,18 +286,28 @@ class PlayersViewModel(
     private fun connect(key: String, player: Player) {
         // Whatever the user starts first, the player marked for the start no longer cuts in.
         savedState[AutoConnectTried] = true
-        connection?.cancel()
+        asking?.cancel()
+        // The card at the top of the list says why nothing happens.
+        if (!webView.value.usable) return
         attempt.update { it.copy(connecting = key, unreachable = it.unreachable - key, loginRequest = null) }
-        connection = viewModelScope.launch {
+        asking = viewModelScope.launch {
             when (askPlayer(player.host, player.port, player.login, player.password, ConnectTimeout)) {
                 PlayerAnswer.Ok -> {
                     // A found player is kept from here on, and so is a login that has just worked.
                     if (players.value?.contains(player) != true) store.save(player)
-                    attempt.update { it.copy(connecting = null, opened = player.id) }
+                    connectedPlayer.connect(player)
+                    savedState[Connected] = player.id
+                    attempt.update { it.copy(connecting = null) }
                 }
 
                 PlayerAnswer.LoginNeeded -> askLogin(key, player, refused = false)
                 PlayerAnswer.LoginRefused -> askLogin(key, player, refused = true)
+                PlayerAnswer.Outdated -> {
+                    // The list says so of the player until the address answers otherwise.
+                    answers.update { it + (player.address to PlayerAnswer.Outdated) }
+                    attempt.update { it.copy(connecting = null) }
+                }
+
                 is PlayerAnswer.Unreachable -> attempt.update { it.copy(connecting = null, unreachable = it.unreachable + key) }
             }
         }
@@ -279,7 +359,9 @@ class PlayersViewModel(
     }
 
     companion object {
+        private const val Tag = "Players"
         private const val AutoConnectTried = "autoConnectTried"
+        private const val Connected = "connected"
         private const val ConnectTimeout = 5000L
         private const val CheckInterval = 15_000L
 
@@ -289,7 +371,9 @@ class PlayersViewModel(
         val Factory = viewModelFactory {
             initializer {
                 val app = this[APPLICATION_KEY] as App
-                PlayersViewModel(app.players, PlayerDiscovery(app), createSavedStateHandle())
+                PlayersViewModel(app.players, PlayerDiscovery(app), app.connected, createSavedStateHandle()) {
+                    systemWebView(app)
+                }
             }
         }
     }

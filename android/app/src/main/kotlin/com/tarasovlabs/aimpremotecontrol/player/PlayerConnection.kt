@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -36,7 +37,7 @@ import kotlinx.coroutines.launch
  * is. The player is lost only after [checking] for a while: a stream that drops and opens again is no news.
  */
 data class ConnectionStatus(
-    /** False from a loss of the player until its stream opens again. */
+    /** False from a loss of the player until its stream is open again and it has told its state. */
     val online: Boolean = true,
     /** A failure was met, and the stream is being tried before the loss is told. */
     val checking: Boolean = false,
@@ -66,9 +67,9 @@ data class ConnectionTimes(
 )
 
 /**
- * The connection to one player: its stream of events, kept open through every loss of the player, and
- * what is known of whether the player is there. The rules are those of the web client's stream in a
- * browser (`browserTransport.ts`), and a change to either is a change to both.
+ * The connection to one player: its stream of events, kept open through every loss of the player, what is
+ * known of whether the player is there, and what the player is doing. The rules are those of the web
+ * client's stream in a browser (`browserTransport.ts`), and a change to either is a change to both.
  *
  * It lives from when it is made until [close].
  *
@@ -91,6 +92,7 @@ class PlayerConnection(
 
     private val statusFlow = MutableStateFlow(ConnectionStatus())
     private val refusedFlow = MutableStateFlow(false)
+    private val stateFlow = MutableStateFlow<PlayerState?>(null)
     private val signalFlow = MutableSharedFlow<StreamSignal>(extraBufferCapacity = 64)
     private val restarts = MutableStateFlow(0)
 
@@ -106,6 +108,12 @@ class PlayerConnection(
 
     /** The player takes the login no more; the stream is not tried again. */
     val refused: StateFlow<Boolean> = refusedFlow.asStateFlow()
+
+    /**
+     * What the player is doing, as it last told; null until it has. It stands through a loss of the player,
+     * of which [status] tells.
+     */
+    val state: StateFlow<PlayerState?> = stateFlow.asStateFlow()
 
     /**
      * The stream as it goes, for one listener: [StreamSignal.Open] whenever it opens, and its events but the
@@ -199,27 +207,40 @@ class PlayerConnection(
 
     /** Reads the stream until it is over; what ended it, null where the player did. */
     private suspend fun read(): Exception? = try {
-        eventStream(stream, http.request("GET", EventsPath)).collect { signal ->
-            heardAt = elapsed()
-            when (signal) {
-                StreamSignal.Open -> {
-                    failures = 0
-                    open = true
-                    lossTimer?.cancel()
-                    lossTimer = null
-                    statusFlow.value = ConnectionStatus()
-                    signalFlow.emit(signal)
-                }
-
-                is StreamSignal.Event -> {
-                    when (signal.event.name) {
-                        "hello" -> hello = signal.event
-                        // The player is closing, which is told apart from a lost network.
-                        "shutdown" -> goOffline(closed = true)
+        coroutineScope {
+            // The stream tells of changes alone, so the state is asked for as it opens. A `player` event that
+            // comes before the answer is the newer of the two.
+            var asking: Job? = null
+            eventStream(stream, http.request("GET", EventsPath)).collect { signal ->
+                heardAt = elapsed()
+                when (signal) {
+                    StreamSignal.Open -> {
+                        open = true
+                        signalFlow.emit(signal)
+                        asking = launch { found(askState()) }
                     }
-                    if (signal.event.name != "ping") signalFlow.emit(signal)
+
+                    is StreamSignal.Event -> {
+                        when (signal.event.name) {
+                            "hello" -> hello = signal.event
+
+                            "player" -> {
+                                asking?.cancel()
+                                found(readPlayerState(signal.event.data, elapsed()))
+                            }
+
+                            // The player is closing, which is told apart from a lost network. The state
+                            // it was asked for means nothing any more: its answer would find it again.
+                            "shutdown" -> {
+                                asking?.cancel()
+                                goOffline(closed = true)
+                            }
+                        }
+                        if (signal.event.name != "ping") signalFlow.emit(signal)
+                    }
                 }
             }
+            asking?.cancel()
         }
         null
     } catch (e: IOException) {
@@ -227,6 +248,24 @@ class PlayerConnection(
     } catch (e: SecurityException) {
         // The local network is behind a permission the user has taken back.
         e
+    }
+
+    /**
+     * The player is there: its stream is open and it has told what it is doing. A stream alone is not taken
+     * for it, or what opens one and tells no state would pass for a player with every attempt.
+     */
+    private fun found(state: PlayerState) {
+        stateFlow.value = state
+        failures = 0
+        lossTimer?.cancel()
+        lossTimer = null
+        statusFlow.value = ConnectionStatus()
+    }
+
+    /** @throws IOException when the player does not answer with its state; the stream is then no good either. */
+    private suspend fun askState(): PlayerState = http.get(StatePath) { response ->
+        if (response.code != HttpURLConnection.HTTP_OK) throw HttpStatusException(response.code)
+        readPlayerState(response.body.string(), elapsed())
     }
 
     /** A failure: the loss is told once the grace and the time to wake up are both over. */
@@ -250,6 +289,7 @@ class PlayerConnection(
     internal companion object {
         /** The stream the connection keeps; the page may not open one of its own through the bridge. */
         const val EventsPath = "/api/v1/events"
+        private const val StatePath = "/api/v1/player"
         private const val MaxDoublings = 16
     }
 }

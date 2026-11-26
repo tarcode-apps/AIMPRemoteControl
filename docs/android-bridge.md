@@ -105,8 +105,9 @@ and again on every later `open`.
 `connection.ts`, which the client takes as they are. `retryAt` is when the next attempt to open the stream starts, in
 milliseconds of the device's clock, or `null`. The silence watchdog, the retries and the wait before a loss is told are
 the app's (`PlayerConnection.kt`), by the rules the client's own stream follows in a browser (`browserTransport.ts`): a
-change to either is a change to both. A request that found no player, the app has seen itself; `retry` is the button of
-the client's banner.
+change to either is a change to both. In one thing the app is stricter: it takes the player for found once the stream is
+open and the player has told its state, which the app asks for as the stream opens; `open` is told as before. A request
+that found no player, the app has seen itself; `retry` is the button of the client's banner.
 
 **What the app does not do yet.** The page saves no file and sends none: both need the login. The client hides the
 download of a track and the upload of files where the app names `api`, until the app names a feature for each.

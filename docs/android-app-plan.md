@@ -50,8 +50,8 @@ Once a player is connected, the app behaves as that player's own app:
 - The connection is what the media notification stands for. With no connected player the app starts with the list, and
   connects the player marked for it on a cold start.
 
-How long a paused player stays connected in the background is settled with the service, on a device: the system stops a
-service that is not in the foreground, and Media3 leaves the foreground on pause.
+Out of sight the app has its network only while its service is in the foreground, and Media3 keeps it there while the
+player plays and for ten minutes after, no longer: see [Notification and volume](#notification-and-volume).
 
 ### Where the code lives
 
@@ -145,11 +145,42 @@ it asks another address for.
 ### Notification and volume
 
 - Media3 builds the notification from the session; the foreground service runs while the player plays (type
-  `mediaPlayback`) and leaves the foreground on pause, keeping a dismissible notification. Media session notifications
-  are exempt from the notification permission of Android 13.
+  `mediaPlayback`) and for ten minutes after it has paused or stopped (`DEFAULT_FOREGROUND_SERVICE_TIMEOUT_MS`, which is
+  also the most Media3 allows), then leaves the foreground and keeps a dismissible notification. Media session
+  notifications are exempt from the notification permission of Android 13.
+- The session shows the track the player is on and whether it plays. A stopped player is shown by its name, as
+  `Stopped`, with the web client's cover for a track that has none (a note), as the player's own mobile app shows an
+  empty player: the session is never empty, for Media3 takes the notification away at once when it is, and the
+  foreground with it, and the app would then never hear the player begin again. A lost player keeps its track and plays
+  no more.
+- Before the player has played since the app connected, the service is not in the foreground, and out of sight the app
+  is cut off from it within seconds (Android 17): the notification shows the stopped player until the app is opened.
+- The service is started by a controller the screen of the connected player holds, and ends when no player is connected.
+  It is not open to other apps: the system reaches the session through its notification.
+- A task swiped away while the player plays leaves the service and the notification, which opens the player's web client
+  again; swiped away otherwise, it takes them along (Media3's own rule).
+- The notification has a button of its own, ✕ "Disconnect" (the web client's icon and word): the app leaves the player,
+  which goes on as it was, the notification goes, and the app's window closes as after Back: the app stays among the
+  recent ones. The next start is a cold one, which connects the player marked for it. The command is given to trusted
+  controllers alone: the system's and the notification's.
 - Covers come from `GET /api/v1/covers/{hash}?size=512` through a bitmap loader that uses the Digest client and its
   cache.
-- The position is extrapolated from the last `player` event, as the web client does.
+- The position is extrapolated from the last `player` event, as the web client does; a lost player stays where it was
+  when it was lost.
+- The controls are play, pause, next, previous and the seek bar. A command shows at once what it is to do, and is sent
+  apart: the request is answered before the player's event comes, and a state read in between would put the seek bar
+  back where it was. What the player tells next stands, and so does what it told last when the command fails.
+- Previous is the track before, as the player's own button and the web client's have it, never the start of the playing
+  one, which Media3 would choose after the first seconds of a track: the session takes the command for the track before
+  whatever the position. Both commands of each kind are offered, `COMMAND_SEEK_TO_PREVIOUS` and
+  `COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM`, and so for next: the system's media card (Android 13 and later) is content with
+  either, but the notification's own buttons before that send a media key, which Media3 drops without the first.
+- The player's play starts a playing track anew and its pause is a toggle, so neither is sent to a player that is
+  already there. Media3 pauses its player as it stops the service; a player the app has disconnected from is sent
+  nothing, and goes on playing.
+- The buttons of a headset do not reach the session: the system gives them to the app that last played sound, and this
+  one plays none. Playing silence would get them (the probe has it), and would also take them from the music app of the
+  phone itself, so the app does not.
 - The rocker: `handleSetDeviceVolume` / `handleChangeDeviceVolume` send `PATCH /api/v1/player` with `volume` 0..1; 20–25
   steps rather than 100. Android routes the rocker to a remote session only while it plays (AOSP); OEM builds differ —
   verify on a Pixel and a Samsung, screen on and off.
@@ -252,7 +283,7 @@ uploaded by hand: the API cannot create the app.
 Built: the project, the list of players with their settings, discovery over mDNS, logins kept with the players and
 checked before the web view opens, the web view with back navigation.
 
-The stages, in this order; the first three are built too. Each stage is one finished change: it is reviewed and tried on
+The stages, in this order; the first five are built too. Each stage is one finished change: it is reviewed and tried on
 a device before the next one begins, and builds only on the stages before it.
 
 1. **HTTP base** (built). OkHttp with a Digest session per player; the check made before connecting moves onto it, so
@@ -266,30 +297,34 @@ a device before the next one begins, and builds only on the stages before it.
    app's one connection, and it closed the web view's answering of any login challenge. On a device: the client works as
    before with and without a login, follows the player, shows a loss and comes back, and a changed password leads to the
    login.
-4. **The notification shows the player.** The state's types, `PlaybackService` with a session that only shows: the
-   track, the artist, playing or not. The service keeps the connection's network alive out of the screen. On a device:
-   the notification follows the player, and comes back after the player restarts or Wi-Fi drops.
-5. **Controls** in the notification and on the lock screen: play, pause, next, previous and seeking through `PlayerApi`,
-   the position told between events. Whether the app plays silence for the buttons of a headset is decided here.
+4. **The notification shows the player** (built). The state's types, `PlaybackService` with a session that only shows:
+   the track, the artist, the cover, playing or not. The service keeps the connection's network alive out of the screen.
+   On a device: the notification follows the player, and comes back after the player restarts or Wi-Fi drops.
+5. **Controls** (built) in the notification and on the lock screen: play, pause, next, previous and seeking through
+   `PlayerApi`, the position told between events. The app plays no silence for the buttons of a headset.
 6. **The volume rocker.**
-7. **Covers** in the notification.
-8. **Ordinary calls:** the receiver, the actions, the record of what was changed; they work with the app closed.
-9. **Calls in messengers,** while the service runs.
-10. **Downloads,** asked of the app over the bridge.
-11. **Uploads of files,** picked and sent by the app.
-12. **Uploads of folders** and the share target.
-13. **Polish,** each a change of its own: binding to Wi-Fi without internet, refusing a plugin that is too old,
-    predictive back, Russian and English throughout.
-14. **Release:** signing, CI, Play internal track, F-Droid submission.
+7. **Ordinary calls:** the receiver, the actions, the record of what was changed; they work with the app closed.
+8. **Calls in messengers,** while the service runs.
+9. **Downloads,** asked of the app over the bridge.
+10. **Uploads of files,** picked and sent by the app.
+11. **Uploads of folders** and the share target.
+12. **Polish,** each a change of its own: binding to Wi-Fi without internet, predictive back, Russian and English
+    throughout.
+13. **Release:** signing, CI, Play internal track, F-Droid submission.
 
-Stages 8 to 12 depend on nothing after stage 5 and may change places; stages 1 to 7 may not.
+Stages 7 to 11 depend on nothing after stage 5 and may change places; stages 1 to 6 may not. The covers, once a stage of
+their own, came with stage 4: a notification without one was not wanted.
 
 ## Open questions
 
-- How long does a paused player stay connected in the background, and what does the app show when it is opened after the
-  system stopped the service? Without a service the stream is lost within seconds of leaving the screen, and is retried
-  to no end until the system freezes the app.
-- Does the app play silence so that the buttons of a headset reach it?
+- A player silent for more than ten minutes is lost to the app in the background, and so is one that never played while
+  the app was open: the service is then out of the foreground, the system cuts the network within seconds (Android 17),
+  and the stream is retried to no end until the system freezes the app. The notification shows the last track until the
+  app is opened again. Is that enough, or does the app need a way to stay with a silent player? A foreground service of
+  another type would have to be justified to Google Play.
+- A player that begins to play while the app is out of sight and out of the foreground, on a system that still gives it
+  the network (before Android 17): Media3 is refused the foreground (Android 12 and later) and the notification may stay
+  as it was. Not seen yet; to be tried on a phone.
 - Can a Play developer account be paid for and kept from Russia?
 - Will F-Droid build from this repository with the AIMP SDK in it?
 - How do OEM builds route the rocker to a remote session, screen off included?

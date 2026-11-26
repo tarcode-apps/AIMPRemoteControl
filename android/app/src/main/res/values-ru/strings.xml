@@ -19,6 +19,8 @@
 
     <string name="player_online">В сети</string>
     <string name="player_offline">Не в сети</string>
+    <string name="player_stopped">Остановлен</string>
+    <string name="notification_disconnect">Отключиться</string>
     <string name="player_checking">Проверка…</string>
     <string name="player_auto_connect">Автоподключение</string>
     <string name="player_call_lower">Тише до %1$d %%</string>

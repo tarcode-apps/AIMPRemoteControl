@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tarasovlabs.aimpremotecontrol.playback.PlaybackSession
 import com.tarasovlabs.aimpremotecontrol.players.Player
 
 private const val NewPlayer = "new"
@@ -34,13 +35,16 @@ fun AppRoot(viewModel: PlayersViewModel = viewModel(factory = PlayersViewModel.F
     val editedId = editing
 
     when {
-        connected != null -> PlayerWebView(
-            player = connected,
-            connection = viewModel.connection,
-            onDisconnect = viewModel::disconnect,
-            onLoginRefused = { viewModel.loginRefused(connected.id) },
-            onLoadFailed = { reason -> viewModel.loadFailed(connected.id, reason) }
-        )
+        connected != null -> {
+            PlaybackSession()
+            PlayerWebView(
+                player = connected,
+                connection = viewModel.connection,
+                onDisconnect = viewModel::disconnect,
+                onLoginRefused = { viewModel.loginRefused(connected.id) },
+                onLoadFailed = { reason -> viewModel.loadFailed(connected.id, reason) }
+            )
+        }
 
         editedId != null -> PlayerEditScreen(
             player = saved.firstOrNull { it.id == editedId },

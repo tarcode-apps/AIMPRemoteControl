@@ -13,10 +13,14 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 class ConnectedPlayer {
     private val ids = MutableStateFlow<String?>(null)
+    private val names = MutableStateFlow("")
     private val connections = MutableStateFlow<PlayerConnection?>(null)
 
     /** The id of the player; null while the app is connected to none. */
     val id: StateFlow<String?> = ids.asStateFlow()
+
+    /** The name the user knows the player by, as the list of players shows it; empty while none is connected. */
+    val name: StateFlow<String> = names.asStateFlow()
 
     /** There while a player is connected, but for the moment after [resume]. */
     val connection: StateFlow<PlayerConnection?> = connections.asStateFlow()
@@ -29,6 +33,7 @@ class ConnectedPlayer {
     fun connect(player: Player) {
         connections.value?.close()
         connections.value = PlayerConnection(PlayerHttp(player.host, player.port, player.login, player.password))
+        names.value = player.title
         ids.value = player.id
     }
 
@@ -44,6 +49,7 @@ class ConnectedPlayer {
     @Synchronized
     fun disconnect() {
         ids.value = null
+        names.value = ""
         connections.value?.close()
         connections.value = null
     }

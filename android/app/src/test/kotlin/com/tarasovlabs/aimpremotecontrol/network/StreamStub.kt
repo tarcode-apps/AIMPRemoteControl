@@ -10,8 +10,9 @@ import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 /**
- * A player as far as its stream of events goes: every request is answered with a stream, which the test
- * takes from [streams] and writes to, or with [status] when that is not 200.
+ * A player as far as its stream of events goes: a request for it is answered with a stream, which the test
+ * takes with [stream] and writes to, or with [status] when that is not 200. Asked for its state, it
+ * answers with [state].
  */
 class StreamStub : Closeable {
     private val server = ServerSocket(0, 50, InetAddress.getLoopbackAddress())
@@ -23,10 +24,25 @@ class StreamStub : Closeable {
     @Volatile
     var status = 200
 
+    /** What `GET /api/v1/player` answers with: JSON, or what is none. */
+    @Volatile
+    var state = Stopped
+
+    /** How long the state takes to come. */
+    @Volatile
+    var stateDelay = 0L
+
     init {
         thread(isDaemon = true) {
             try {
-                while (true) answer(server.accept())
+                while (true) {
+                    val socket = server.accept()
+                    try {
+                        answer(socket)
+                    } catch (_: IOException) {
+                        // The client left before its answer: a request for the state that it cancelled.
+                    }
+                }
             } catch (_: IOException) {
                 // Closed.
             }
@@ -43,8 +59,21 @@ class StreamStub : Closeable {
 
     private fun answer(socket: Socket) {
         val reader = socket.getInputStream().bufferedReader()
+        val path = reader.readLine()?.split(' ')?.getOrNull(1)
         while (!reader.readLine().isNullOrEmpty()) Unit
         val out = socket.getOutputStream()
+        if (path == "/api/v1/player") {
+            Thread.sleep(stateDelay)
+            val body = state.toByteArray()
+            out.write("HTTP/1.1 200 OK\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n".toByteArray() + body)
+            socket.close()
+            return
+        }
+        // A client that left before it asked for anything: a request for the state that it cancelled.
+        if (path != "/api/v1/events") {
+            socket.close()
+            return
+        }
         if (status != 200) {
             out.write("HTTP/1.1 $status Refused\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".toByteArray())
             socket.close()
@@ -69,7 +98,8 @@ class StreamStub : Closeable {
         override fun close() = socket.close()
     }
 
-    private companion object {
-        const val Patience = 10L
+    companion object {
+        const val Stopped = """{"state":"stopped","position":0,"duration":0,"track":null}"""
+        private const val Patience = 10L
     }
 }

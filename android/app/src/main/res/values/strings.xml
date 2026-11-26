@@ -21,6 +21,10 @@
 
     <string name="player_online">Online</string>
     <string name="player_offline">Offline</string>
+    <!-- The line under the player's name in the media notification while nothing plays. -->
+    <string name="player_stopped">Stopped</string>
+    <!-- The button of the media notification that leaves the player and closes the app; the web client's word. -->
+    <string name="notification_disconnect">Disconnect</string>
     <string name="player_checking">Checking…</string>
     <string name="player_auto_connect">Auto-connect</string>
     <string name="player_call_lower">Down to %1$d%%</string>

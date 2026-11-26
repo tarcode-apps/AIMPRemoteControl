@@ -75,10 +75,10 @@ class PlayerConnectionTest {
 
         stream.send("hello", "1")
         stream.send("ping")
-        stream.send("player", "2")
+        stream.send("queue", "2")
 
         assertEquals(event("hello", "1"), heard.next())
-        assertEquals(event("player", "2"), heard.next())
+        assertEquals(event("queue", "2"), heard.next())
         assertEquals(ConnectionStatus(), connection.status.value)
     }
 
@@ -89,18 +89,18 @@ class PlayerConnectionTest {
         val stream = stub.stream()
         assertEquals(StreamSignal.Open, first.next())
         stream.send("hello", "1")
-        stream.send("player", "2")
+        stream.send("queue", "2")
         assertEquals(event("hello", "1"), first.next())
-        assertEquals(event("player", "2"), first.next())
+        assertEquals(event("queue", "2"), first.next())
 
         val late = connection.heard()
         assertEquals(StreamSignal.Open, late.next())
         assertEquals(event("hello", "1"), late.next())
-        stream.send("player", "3")
+        stream.send("queue", "3")
 
         // Told of the open stream once, and of nothing else that came before it.
-        assertEquals(event("player", "3"), late.next())
-        assertEquals(event("player", "3"), first.next())
+        assertEquals(event("queue", "3"), late.next())
+        assertEquals(event("queue", "3"), first.next())
     }
 
     @Test
@@ -111,9 +111,9 @@ class PlayerConnectionTest {
             val stream = stub.stream()
             assertEquals(StreamSignal.Open, heard.next())
 
-            stream.send("player", "1")
+            stream.send("queue", "1")
 
-            assertEquals(event("player", "1"), heard.next())
+            assertEquals(event("queue", "1"), heard.next())
             connection.close()
         }
     }
@@ -164,6 +164,20 @@ class PlayerConnectionTest {
     }
 
     @Test
+    fun takesAPlayerThatIsClosingForGoneWhateverItAnswersAfter() {
+        stub.stateDelay = 500
+        // No retry within the test: nothing but the late answer could bring the player back.
+        val connection = connect(times.copy(firstRetry = 60_000, maxRetry = 60_000))
+        stub.stream().send("shutdown")
+        connection.waitFor { !it.online }
+
+        Thread.sleep(stub.stateDelay * 2)
+
+        assertEquals(ConnectionStatus(online = false, closed = true), connection.status.value.copy(retryAt = null))
+        assertNull(connection.state.value)
+    }
+
+    @Test
     fun triesNoMoreOnceTheLoginIsRefused() {
         stub.status = 401
         val connection = connect()
@@ -179,7 +193,8 @@ class PlayerConnectionTest {
         val connection = connect(times.copy(silence = 300, firstRetry = 60_000, maxRetry = 60_000))
         stub.stream().send("hello")
 
-        assertTrue(stub.opensWithin(Patience))
+        // Left open: a stream the player ends is tried again after a wait, which is another matter.
+        stub.stream()
         assertNull(connection.status.value.retryAt)
     }
 
@@ -222,7 +237,91 @@ class PlayerConnectionTest {
         assertTrue(stub.opensWithin(Patience))
     }
 
+    /** What the player told, whenever that was. */
+    private val PlayerConnection.told: PlayerState? get() = state.value?.copy(receivedAt = 0)
+
+    private fun PlayerConnection.waitForState(state: PlayerState?) =
+        runBlocking { withTimeout(Patience) { this@waitForState.state.first { it?.copy(receivedAt = 0) == state } } }
+
+    @Test
+    fun asksForThePlayersStateAsTheStreamOpens() {
+        stub.state = PlayingJson
+        val connection = connect()
+        assertNull(connection.state.value)
+
+        stub.stream()
+
+        connection.waitForState(Playing)
+    }
+
+    @Test
+    fun followsThePlayerByItsEvents() {
+        val connection = connect()
+        val stream = stub.stream()
+        connection.waitForState(PlayerState(Playback.Stopped, track = null))
+
+        stream.send("player", PlayingJson)
+
+        connection.waitForState(Playing)
+    }
+
+    @Test
+    fun takesAnEventForNewerThanTheAnswerItStillWaitsFor() {
+        stub.stateDelay = 500
+        val connection = connect()
+
+        stub.stream().send("player", PlayingJson)
+
+        connection.waitForState(Playing)
+        Thread.sleep(stub.stateDelay * 2)
+        assertEquals(Playing, connection.told)
+    }
+
+    @Test
+    fun keepsTheStateThroughALossAndAsksAgainAfterIt() {
+        stub.state = PlayingJson
+        val connection = connect()
+        val first = stub.stream()
+        connection.waitForState(Playing)
+        stub.status = 503
+        stub.state = StreamStub.Stopped
+        first.close()
+
+        connection.waitFor { !it.online }
+        assertEquals(Playing, connection.told)
+
+        stub.status = 200
+        stub.stream()
+        connection.waitForState(PlayerState(Playback.Stopped, track = null))
+    }
+
+    @Test
+    fun takesWhatAnswersWithNoStateForNoPlayer() {
+        stub.state = """{"state":"dancing","position":0,"duration":0,"track":null}"""
+        val connection = connect()
+        stub.stream()
+
+        connection.waitFor { !it.online }
+        assertNull(connection.state.value)
+
+        stub.state = PlayingJson
+        stub.stream()
+        connection.waitForState(Playing)
+        connection.waitFor { it.online }
+    }
+
     private companion object {
         const val Patience = 10_000L
+
+        // More than the app reads, as the player sends it.
+        const val PlayingJson = """{"state":"playing","position":83.2,"duration":266.4,"volume":0.75,"track":{""" +
+            """"playlistId":"{A1}","index":12,"title":"Track One","artist":"Artist A","album":"Album X",""" +
+            """"coverHash":"","fileUri":"C:\\Music\\One.mp3"}}"""
+        val Playing = PlayerState(
+            Playback.Playing,
+            Track("C:\\Music\\One.mp3", "Track One", "Artist A", "Album X", coverHash = ""),
+            position = 83.2,
+            duration = 266.4
+        )
     }
 }

@@ -310,7 +310,7 @@ class BridgeSessionTest {
         tell("""{"type":"events","listen":true}""")
         val first = List(3) { answer()!! }
         stream.send("ping")
-        stream.send("player", """{"state":"playing"}""")
+        stream.send("queue", """{"count":1}""")
 
         val heard = first + answer()!!
         val status = heard.single { it.text("type") == "connection" }
@@ -322,7 +322,7 @@ class BridgeSessionTest {
         val stream3 = heard.filter { it.text("type") != "connection" }
         assertEquals("open", stream3[0].text("type"))
         assertEquals(listOf("hello", """{"name":"PC"}"""), listOf(stream3[1].text("name"), stream3[1].text("data")))
-        assertEquals(listOf("player", """{"state":"playing"}"""), listOf(stream3[2].text("name"), stream3[2].text("data")))
+        assertEquals(listOf("queue", """{"count":1}"""), listOf(stream3[2].text("name"), stream3[2].text("data")))
     }
 
     @Test
@@ -353,7 +353,7 @@ class BridgeSessionTest {
         repeat(2) { answer() }
 
         tell("""{"type":"events","listen":false}""")
-        stream.send("player")
+        stream.send("queue")
 
         assertNull(answer(1000))
     }
